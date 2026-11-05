@@ -304,8 +304,27 @@ def convert(elf_path, rpx_path, keep_local_branches=False, filename='Minecraft.C
     out[new_symtab].data = bytearray(pack_symbols(symbol_rows))
     out[new_symtab].size = len(out[new_symtab].data)
 
+    # The console's loader places each section at its segment's base plus its offset from the segment's
+    # lowest address and rejects any that land off their alignment; Cemu does not check.
+    misaligned = []
+    for section in out:
+        if not section.flags & SHF_ALLOC:
+            continue
+        limit = TEXT_ALIGN if section.addr < DATA_BASE else DATA_ALIGN if section.addr < LOAD_BASE else LOAD_ALIGN
+        alignment = max(section.addralign, 1)
+        if section.addr % alignment or alignment > limit:
+            misaligned.append('%s at 0x%08x (align 0x%x)' % (section.name, section.addr, alignment))
+    if misaligned:
+        raise SystemExit('sections the Cafe loader rejects as misaligned: %s' % ', '.join(misaligned))
+
     tls = any(section.flags & SHF_RPL_TLS for section in out)
+    # The console's loader writes a 16-byte trampoline after the code for each R_PPC_REL24 that cannot
+    # reach its target, such as a branch into a system library, and fails the load once the room up to
+    # textSize runs out; the retail image reserves one per such relocation. Cemu makes its own.
+    branches = sum(1 for rela in rela_sections for offset in range(0, len(rela.data), 12)
+                   if rela.data[offset + 7] == R_PPC_REL24)
     text_end = max(s.addr + s.size for s in out if CODE_BASE <= s.addr < DATA_BASE)
+    text_end = align(text_end, 16) + 16 * branches
     data_end = max((s.addr + s.size for s in out if DATA_BASE <= s.addr < LOAD_BASE), default=DATA_BASE)
     load_end = max(s.addr + s.size for s in out if s.addr >= LOAD_BASE)
     temp = sum(len(s.data) + 128 for s in out[1:] if s.addr == 0)

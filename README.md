@@ -2,7 +2,7 @@
 
 LCEReborn is a cross-platform reimagining of Legacy Console Edition, built on the Wii U Edition decompilation at 1.13, the Aquatic Update.
 
-It runs on Windows, Linux and the Wii U (via Cemu), and they can all play together. There are no game files in this repo, so you'll need your own copy of the game, dumped from your own console.
+It runs on Windows, Linux and the Wii U (a homebrew bundle for Cemu and Aroma), and they can all play together. There are no game files in this repo, so you'll need your own copy of the game, dumped from your own console.
 
 ## Playing
 

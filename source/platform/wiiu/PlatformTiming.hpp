@@ -12,6 +12,7 @@ union _LARGE_INTEGER
 };
 
 unsigned int QueryPerformanceCounter(_LARGE_INTEGER* value);
+unsigned long long TicksToUnits(long long ticks, unsigned long long unitsPerSecond);
 unsigned int QueryPerformanceFrequency(_LARGE_INTEGER* value);
 
 #endif

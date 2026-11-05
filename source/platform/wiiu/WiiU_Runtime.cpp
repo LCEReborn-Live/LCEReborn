@@ -9,6 +9,7 @@
 #include <coreinit/time.h>
 
 #include "platform/wiiu/WiiU_Runtime.hpp"
+#include "platform/wiiu/PlatformTiming.hpp"
 #include "game/core/CriticalSection.hpp"
 #include "platform/wiiu/WiiU_FileCache.hpp"
 
@@ -209,9 +210,7 @@ void GlobalMemoryStatus(_MEMORYSTATUS* status)
 
 unsigned int GetTickCount()
 {
-    const unsigned long long microseconds = OSGetTime() * 1000000ULL;
-    const unsigned long long ticksPerMicrosecond = OSGetSystemInfo()->busClockSpeed >> 2;
-    return static_cast<unsigned int>(microseconds / ticksPerMicrosecond / 1000ULL);
+    return static_cast<unsigned int>(TicksToUnits(OSGetSystemTime(), 1000ULL));
 }
 
 void GetSystemTime(SYSTEMTIME* systemTime)

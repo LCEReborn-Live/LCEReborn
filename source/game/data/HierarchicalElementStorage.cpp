@@ -97,12 +97,12 @@ void HierarchicalElementStorage::SubChunkInfo::decSize(unsigned int subChunk, un
 
 void HierarchicalElementStorage::SubChunkInfo::incOffset(unsigned int subChunk, unsigned short amount)
 {
-    mOffsets[subChunk] = (unsigned short)(mOffsets[subChunk] + swapBytes(amount));
+    mOffsets[subChunk] = swapBytes((unsigned short)(swapBytes(mOffsets[subChunk]) + amount));
 }
 
 void HierarchicalElementStorage::SubChunkInfo::decOffset(unsigned int subChunk, unsigned short amount)
 {
-    mOffsets[subChunk] = (unsigned short)(mOffsets[subChunk] - swapBytes(amount));
+    mOffsets[subChunk] = swapBytes((unsigned short)(swapBytes(mOffsets[subChunk]) - amount));
 }
 
 int HierarchicalElementStorage::SubChunkInfo::getUsedSize()

@@ -18,7 +18,7 @@ SECTIONS
 		KEEP(*(.syscall))
 	}
 
-	.text ALIGN(32) : {
+	.text : ALIGN(32) {
 		*(.text .text.* .gnu.linkonce.t.*)
 	}
 
@@ -43,18 +43,18 @@ SECTIONS
 		PROVIDE_HIDDEN(__fini_array_end = .);
 	}
 
-	.data ALIGN(32) : {
+	.data : ALIGN(32) {
 		*(.data .data.* .gnu.linkonce.d.*)
 		*(.data1)
 		*(.sdata .sdata.* .gnu.linkonce.s.*)
 		*(.got1 .got2 .got .fixup)
 	}
 
-	.module_id ALIGN(32) : {
+	.module_id : ALIGN(32) {
 		KEEP(*(.module_id))
 	}
 
-	.bss ALIGN(64) (NOLOAD) : {
+	.bss (NOLOAD) : ALIGN(64) {
 		*(.sbss .sbss.* .gnu.linkonce.sb.*)
 		*(.scommon)
 		*(.bss .bss.* .gnu.linkonce.b.*)

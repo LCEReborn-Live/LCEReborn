@@ -17,6 +17,7 @@
 #include "game/core/CAchievements.hpp"
 #include "platform/wiiu/CInput.hpp"
 #include "platform/wiiu/CStorage.hpp"
+#include "platform/wiiu/PlatformTiming.hpp"
 #include "platform/wiiu/WiiU_Runtime.hpp"
 
 
@@ -139,7 +140,7 @@ int SCIGetParentalAccountNetCommunicationOnGame(unsigned char* blocked, unsigned
 
 static inline unsigned long long getSystemMilliseconds()
 {
-    return OSTicksToMilliseconds(OSGetTime());
+    return TicksToUnits(OSGetTime(), 1000ULL);
 }
 
 CProfile::PROFILE_DETAILS::PROFILE_DETAILS() : signedIn(false)

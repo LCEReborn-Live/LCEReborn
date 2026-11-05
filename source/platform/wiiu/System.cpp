@@ -4,6 +4,7 @@
 #if LCE_PLATFORM_WIIU
 #include <coreinit/systeminfo.h>
 #include <coreinit/time.h>
+#include "platform/wiiu/PlatformTiming.hpp"
 #elif LCE_PLATFORM_PC
 #include <chrono>
 #include <ctime>
@@ -72,12 +73,11 @@ uint64_t System::processTime(ETimeGranularity granularity)
     switch (granularity)
     {
     case eTimeGranularity_MilliSecs:
-        return (unsigned long long)OSGetTime() * 1000 / (OSGetSystemInfo()->busClockSpeed >> 2);
+        return TicksToUnits(OSGetTime(), 1000ULL);
     case eTimeGranularity_MicroSecs:
-        return (unsigned long long)OSGetTime() * 1000000 / (OSGetSystemInfo()->busClockSpeed >> 2);
+        return TicksToUnits(OSGetTime(), 1000000ULL);
     case eTimeGranularity_NanoSecs:
-        return (unsigned long long)OSGetTime() * 32000
-               / ((unsigned long long)(OSGetSystemInfo()->busClockSpeed >> 2) / 31250);
+        return TicksToUnits(OSGetTime(), 1000000000ULL);
     }
     return 0;
 #elif LCE_PLATFORM_PC
@@ -112,7 +112,7 @@ uint64_t System::processTimeInNanoSecs()
 uint64_t System::currentRealTimeMillis()
 {
 #if LCE_PLATFORM_WIIU
-    return (unsigned long long)OSGetTime() * 1000 / (OSGetSystemInfo()->busClockSpeed >> 2);
+    return TicksToUnits(OSGetTime(), 1000ULL);
 #elif LCE_PLATFORM_PC
     return LocalNanosecondsSince2000() / 1000000ULL;
 #endif

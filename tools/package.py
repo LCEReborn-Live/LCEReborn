@@ -1,32 +1,23 @@
 #!/usr/bin/env python3
-"""Package the built RPX as a title folder that Cemu runs.
+"""Package the built RPX as a Wii U homebrew bundle that Cemu and Aroma run.
 
     python tools/package.py --update <update dump>
 
-Run tools/prepare.py and tools/build.py first. This writes build/title/:
+Run tools/prepare.py and tools/build.py first. This writes build/LCEReborn.wuhb:
 
-  code/      Minecraft.Client.rpx from tools/build.py, with app.xml and
-             cos.xml from the update dump (cos.xml also allows SD card access)
-  meta/      the update dump's meta/
-  content/   a link to assets/, or a copy of it with --copy
+  code/root.rpx   Minecraft.Client.rpx from tools/build.py
+  meta/           the name the menu shows, with the menu icon and boot screens
+                  from the update dump's meta/
+  content/        assets/, the game content tools/prepare.py made from your dumps
 
-Start it with
-
-    Cemu -g build/title/code/Minecraft.Client.rpx
-
-Cemu mounts the folder as the update of the base game, so the base game must
-be in Cemu's game list or installed in Cemu.
-
-Options:
-  --copy     copy assets/ into content/ instead of linking it, for a folder
-             that can be moved elsewhere
+The bundle is its own title with its own saves; it needs no Wii U game installed.
+Open it in Cemu (File > Load, or Cemu -g build/LCEReborn.wuhb), or copy it to
+wiiu/apps/ on the SD card for Aroma.
 """
 import argparse
+import gzip
 import json
 import os
-import re
-import shutil
-import subprocess
 import sys
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
@@ -35,17 +26,20 @@ sys.path.insert(0, TOOLS)
 sys.path.insert(0, os.path.join(TOOLS, "gamedata"))
 import prepare  # noqa: E402
 import shaders  # noqa: E402
+import wuhb  # noqa: E402
 
 BUILD_DIR = os.path.join(ROOT, "build")
 RPX = os.path.join(BUILD_DIR, "Minecraft.Client.rpx")
-TITLE_DIR = os.path.join(BUILD_DIR, "title")
-CODE_FILES = ("app.xml", "cos.xml")
-FS_PERMISSION_GROUP = 11
-SD_CARD_PERMISSIONS = 0x000B0000
+BUNDLE = os.path.join(BUILD_DIR, "LCEReborn.wuhb")
+# The title ID comes from these names, so the title and its saves change with them.
+LONG_NAME = "Legacy Console Edition Reborn"
+SHORT_NAME = "LCEReborn"
+AUTHOR = "LCEReborn"
+META_IMAGES = ("iconTex", "bootTvTex", "bootDrcTex")
 
 
 class PackageError(Exception):
-    """An input is missing or the title folder cannot be written."""
+    """An input is missing or the bundle cannot be written."""
 
 
 def check_inputs(update):
@@ -59,97 +53,74 @@ def check_inputs(update):
         prepare.check_dump(update, "update", shaders.load_recipe())
     except prepare.PrepareError as error:
         raise PackageError(str(error))
-    for name in CODE_FILES:
-        if not os.path.isfile(os.path.join(update, "code", name)):
-            raise PackageError("update dump %s has no code/%s" % (update, name))
+    for name in META_IMAGES:
+        if not os.path.isfile(os.path.join(update, "meta", name + ".tga")):
+            raise PackageError("update dump %s has no meta/%s.tga" % (update, name))
     with open(manifest, encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def remove_content(path):
-    """Remove content/ without ever deleting through a link into assets/."""
-    if os.path.islink(path):
-        os.unlink(path)
-    elif os.path.isdir(path):
-        try:
-            # A Windows junction is removed by rmdir and its target is left alone;
-            # an empty folder goes the same way.
-            os.rmdir(path)
-        except OSError:
-            if getattr(os.path, "isjunction", lambda _: False)(path):
-                raise PackageError("cannot remove the content link %s" % path)
-            shutil.rmtree(path)
-    elif os.path.exists(path):
-        os.unlink(path)
+def read_file(path):
+    with open(path, "rb") as handle:
+        return handle.read()
 
 
-def link_content(target, link):
-    target, link = os.path.abspath(target), os.path.abspath(link)
-    if os.name == "nt":
-        # A junction needs no administrator rights or developer mode, unlike a symlink.
-        result = subprocess.run(["cmd", "/c", "mklink", "/J", link, target],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode != 0:
-            raise PackageError("could not link %s to %s: %s"
-                               % (link, target, result.stderr.decode("mbcs", "replace").strip()))
-    else:
-        os.symlink(target, link, target_is_directory=True)
+def add_content(content):
+    """Add every file in assets/ apart from the manifest, in a fixed order."""
+    for directory, folders, names in os.walk(prepare.ASSETS_DIR):
+        folders.sort()
+        for name in sorted(names):
+            path = os.path.join(directory, name)
+            relative = os.path.relpath(path, prepare.ASSETS_DIR).replace(os.sep, "/")
+            if relative != prepare.MANIFEST:
+                content.add_path(relative, os.path.getsize(path), lambda path=path: read_file(path))
 
 
-def copy_tree(source, target):
-    shutil.copytree(source, target, ignore=shutil.ignore_patterns(prepare.MANIFEST))
+def build_bundle(update):
+    root = wuhb.Dir("")
+    code = root.add(wuhb.Dir("code"))
+    code.add(wuhb.file_bytes("root.rpx", read_file(RPX)))
+
+    meta = root.add(wuhb.Dir("meta"))
+    meta.add(wuhb.file_bytes("meta.ini", wuhb.meta_ini(LONG_NAME, SHORT_NAME, AUTHOR)))
+    for name in META_IMAGES:
+        image = read_file(os.path.join(update, "meta", name + ".tga"))
+        meta.add(wuhb.file_bytes(name + ".tga.gz", gzip.compress(image, 9, mtime=0)))
+
+    add_content(root.add(wuhb.Dir("content")))
+    return root
 
 
-def grant_sd_card(path):
-    """Let the title read, write and mount the SD card, where the packs folder lives."""
-    with open(path, encoding="utf-8", newline="") as handle:
-        text = handle.read()
-    pattern = re.compile(r'(<group type="unsignedInt" length="4">\s*%d</group>\s*<mask type="hexBinary" length="8">)'
-                         r'([0-9A-Fa-f]{16})(</mask>)' % FS_PERMISSION_GROUP)
-    match = pattern.search(text)
-    if match is None:
-        raise PackageError("%s has no FS permission group" % path)
-    mask = "%016X" % (int(match.group(2), 16) | SD_CARD_PERMISSIONS)
-    text = text[:match.start(2)] + mask + text[match.end(2):]
-    with open(path, "w", encoding="utf-8", newline="") as handle:
-        handle.write(text)
+def package(update):
+    root = build_bundle(update)
+    partial = BUNDLE + ".part"
 
+    def progress(done, total):
+        if done % 200 == 0 or done == total:
+            print("  %d of %d files" % (done, total), flush=True)
 
-def package(update, copy):
-    content = os.path.join(TITLE_DIR, "content")
-    remove_content(content)
-    for folder in ("code", "meta"):
-        path = os.path.join(TITLE_DIR, folder)
-        if os.path.exists(path):
-            shutil.rmtree(path)
-    code = os.path.join(TITLE_DIR, "code")
-    os.makedirs(code)
-    shutil.copyfile(RPX, os.path.join(code, os.path.basename(RPX)))
-    for name in CODE_FILES:
-        shutil.copyfile(os.path.join(update, "code", name), os.path.join(code, name))
-    grant_sd_card(os.path.join(code, "cos.xml"))
-    copy_tree(os.path.join(update, "meta"), os.path.join(TITLE_DIR, "meta"))
-    if copy:
-        print("copying assets/ into %s" % os.path.relpath(content, ROOT), flush=True)
-        copy_tree(prepare.ASSETS_DIR, content)
-    else:
-        link_content(prepare.ASSETS_DIR, content)
+    print("writing %s" % os.path.relpath(BUNDLE, ROOT), flush=True)
+    try:
+        wuhb.write(partial, root, progress)
+    except BaseException:
+        if os.path.exists(partial):
+            os.unlink(partial)
+        raise
+    os.replace(partial, BUNDLE)
 
 
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--update", required=True, help="extracted update v688 dump (folder with code/, content/, meta/)")
-    parser.add_argument("--copy", action="store_true", help="copy assets/ into content/ instead of linking it")
     args = parser.parse_args(argv)
     try:
         check_inputs(args.update)
-        package(args.update, args.copy)
-    except (PackageError, OSError) as error:
+        package(args.update)
+    except (PackageError, wuhb.WuhbError, OSError) as error:
         print("error: %s" % error, file=sys.stderr)
         return 1
-    rpx = os.path.join(TITLE_DIR, "code", os.path.basename(RPX))
-    print("packaged %s" % os.path.relpath(TITLE_DIR, ROOT))
-    print("run it with: Cemu -g \"%s\"" % rpx)
+    print("packaged %s (title %016X)" % (os.path.relpath(BUNDLE, ROOT), wuhb.title_id(LONG_NAME, SHORT_NAME, AUTHOR)))
+    print("run it with: Cemu -g \"%s\"" % BUNDLE)
     return 0
 
 

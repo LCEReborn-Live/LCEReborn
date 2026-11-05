@@ -1,60 +1,42 @@
-# Source conventions
+# Code conventions
 
-These are the rules every file under `source/` follows. They exist so the
-tree reads as one codebase rather than as thousands of independent efforts.
+Everything under `source/` follows these rules so the tree reads like one codebase.
 
-## Language level
+## Language
 
-- C++03, the language level the original was written in. No `auto`,
-  lambdas, range-for, `nullptr`, `override`, `constexpr`, rvalue references
-  or `std::` types newer than C++03.
-- boost 1.x for smart pointers, unordered containers and hashing
-  (`boost::shared_ptr`, `boost::unordered_map`, `boost::hash`). The standard
-  library covers everything else.
-- No compiler extensions and no `#pragma pack`, except where the original
-  used a processor instruction directly (the time base, byte-reversed loads,
-  paired-single maths): that code sits behind a compiler check, with a
-  version for each compiler that does the same thing.
+The rules depend on where the code lives:
 
-## One family, two files
+| Where | Language |
+| --- | --- |
+| `source/game/` and other shared code | C++03 style. It has to build for the Wii U as well as PC. No `auto`, lambdas, range-for, `nullptr`, `override`, `constexpr` or rvalue references. |
+| `source/platform/pc/` and `launcher/` | C++17. Use it where it makes the code clearer. |
+| `source/platform/wiiu/` | Same as shared code. |
 
-- A class family is one header and one implementation file, both named
-  after the outermost class: `Block.hpp` and `Block.cpp`.
-- Nested classes, local helper classes and anonymous structs live inside
-  their outer class's files.
-- A template and all of its instantiations are one family.
-- Header-only families (interfaces and enum owners with no symbols of their
-  own) have a header and no implementation file.
+- Shared code uses boost 1.x for smart pointers, unordered containers and hashing, and the standard library for everything else.
+- No compiler extensions or `#pragma pack`, except where the original used a processor instruction directly. That code goes behind a compiler check.
+
+## Files
+
+- One class family per header and `.cpp`, named after the outermost class: `Block.hpp` and `Block.cpp`.
+- Nested and helper classes live in their outer class's files.
+- Header-only families get no `.cpp`.
 
 ## Naming
 
-- Classes keep the names the build exposes: Mojang-style names for the game
-  core (`LivingEntity`, `BlockPos`), 4J's `C`-prefixed names for the console
-  layer (`CConsoleMinecraftApp`, `CStorage`) and `FJ_` / `fui` for the UI.
-- Game-core members use the Mojang `mName` style; the 4J console and UI
-  layers use `m_name`, with `m_p` for pointers; statics use `s` or `s_`
-  to match their layer.
-- Parameter, local and field names that the build does not record are
-  chosen to read naturally in context. They are provisional and may be
-  renamed as understanding improves.
+- **Original classes keep their original names:** Mojang-style in the game core (`LivingEntity`), 4J's `C` prefix in the console layer (`CStorage`), and `FJ_` / `fui` in the UI.
+- **New classes follow the style of the layer they're in.** In `source/platform/pc/`, that's the `Pc` prefix (`PcSoundEngine`, `PcWindow`).
+- Members use `mName` in the game core and `m_name` (`m_p` for pointers) in the 4J layers.
+- Anything else just needs to read naturally.
 
 ## Content
 
-- Files contain code only: no comments, no headers describing where the
-  code came from, no annotations, no TODO or placeholder markers.
-- No stubs. A method exists with a real body or it does not exist yet.
-  A declaration with no definition is used only where the original build
-  itself has none.
-- No machine-generated idioms: no raw memory loads and stores standing in
-  for member access, no hand-built vtables, no decompiler identifiers.
+- **Comments explain why, not what.** Add one where the reason for something isn't obvious. Don't add notes about where code came from.
+- **No stubs or placeholders.** A method has a real body or doesn't exist yet.
+- **No machine-generated code.** No raw memory access in place of members, no hand-built vtables, no decompiler-style names.
+- **Platform differences go behind `#if LCE_PLATFORM_WIIU` / `#elif LCE_PLATFORM_PC`.** Keep them small and leave the other platform's code alone.
 
-## Layout and includes
+## Layout
 
-- Includes are `source/`-relative and sorted with the family's own header
-  first, then project headers, then library and system headers.
-- Forward declarations are preferred in headers; implementation files
-  include what they use.
-- The layout is the one `source/.clang-format` describes: four-space
-  indentation, braces on their own line, 120 columns, LF line endings,
-  UTF-8 without BOM. It was applied with clang-format 22; the few files
-  listed in `source/.clang-format-ignore` keep their layout.
+- Includes are relative to `source/`: the family's own header first, then project headers, then system headers.
+- Prefer forward declarations in headers.
+- Format with `source/.clang-format` (clang-format 22).

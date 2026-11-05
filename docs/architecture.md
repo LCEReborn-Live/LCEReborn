@@ -1,109 +1,31 @@
 # Architecture
 
-The title is one C++ codebase with a platform abstraction in the middle.
-The game core above the seam is platform-pure. The platform backends below
-it are the only code that talks to the operating system: on Wii U the Cafe
-OS, the GX2 graphics API and the VPAD/WPAD controllers; on PC SDL 3 and
-OpenGL. The reconstruction keeps that shape, and the directory layout is
-the seam made visible.
+The game is one codebase with a platform layer underneath. Only the platform layer talks to the OS: Cafe OS and GX2 on Wii U, SDL 3 and OpenGL on PC. Game code reaches it through shared interfaces, and only checks which platform it's on where the behaviour actually differs, like mouse look on PC.
 
-## Include root
+## Layout
 
-Every include is written relative to `source/`, for example
-`#include "game/world/block/Block.hpp"`. There are no relative includes and
-no umbrella headers. A translation unit includes exactly the headers it
-uses.
-
-## `source/game/` - the game core
-
-| Directory | Contents |
+| Folder | What's in it |
 | --- | --- |
-| `game/core` | The engine spine: `Minecraft`, services shared by client and server, `GlStateManager`, achievements and statistics, streams, the console application shell (`CConsoleMinecraftApp`), options, resources, and the many small value classes the rest of the game leans on. |
-| `game/util` | Maths and geometry (`AABB`, `Vec3`, `Mth`, `Random`), resource locations, UUIDs and other freestanding helpers. |
-| `game/data` | The NBT tag family (`CompoundTag`, `ListTag`, typed tags) and data fixers. |
-| `game/world` | `Level`, `LevelSource`, dimensions, explosions, lighting and the save format. |
-| `game/world/block` | `Block`, `Blocks`, block states and properties, block entities, materials and `BlockPos`. |
-| `game/world/chunk` | Chunk storage, chunk sources, compressed block storage and the region file format. |
-| `game/world/biome` | Biomes, biome sources and biome-driven decoration. |
-| `game/world/generation` | Chunk generators, structures, features, world templates and the level-type catalogue. |
-| `game/entity` | `Entity`, `LivingEntity`, players and the per-kind subdirectories `mob`, `ai` and `projectile`. |
-| `game/item` | `Item`, `Items`, `ItemInstance`, inventories, containers, recipes and enchantments. |
-| `game/network` | `Packet` and every packet type, packet listeners, connections and the session protocol. |
-| `game/server` | The integrated server: chunk cache, command dispatcher, scoreboard, boss events. |
-| `game/command` | Chat and console commands, target selectors and argument parsing. |
-| `game/minigame` | Battle, Tumble and Glide: rule definitions, medals, arenas and minigame state. |
-| `game/ui` | The 4J user interface layer (`FJ_*`, `fui*`): screens, controls, HUD, menus and the UI node graph. |
-| `game/client/render` | Renderers, particles, models, texture packs and the block/entity render dispatchers. |
-| `game/client/audio` | The sound engine front end, music and sound events. |
+| `source/game/` | The game: world, blocks, entities, items, networking, UI, rendering and audio |
+| `source/platform/wiiu/` | The Wii U platform layer |
+| `source/platform/pc/` | The PC platform layer: SDL 3, OpenGL 3.3, input, sound, logging |
+| `source/net/` | Multiplayer shared by every platform (TCP and UDP on port 25570) |
+| `source/vendor/` | Library internals the game links against, like Miles, Bink audio and dlmalloc |
+| `source/nn/` | Small Nintendo SDK libraries, plus the `ffl` Mii submodule |
+| `source/cafe/` | Cafe SDK pieces: GX2 declarations, maths and runtime support |
 
-## `source/platform/wiiu/` - the Nintendo backend
+Inside `source/game/`, things are grouped how you'd expect: `world/`, `entity/`, `item/`, `network/`, `server/`, `command/`, `minigame/`, `ui/`, `client/render/` and so on.
 
-4J's platform layer is a set of `C4J*` and `C*` interfaces implemented once
-per console. This directory holds the Wii U implementations: `C4JThread`,
-`C4JEvent`, `C4JStorage`, `CStorage`, `CProfile`, `CInput` and the
-allocator glue for the Mii face library. These files call Cafe OS and
-Nintendo SDK functions directly; no file under `game/` does.
+## Includes
 
-## `source/platform/pc/` - the PC backend
+Every include is relative to `source/`, like `#include "game/world/block/Block.hpp"`. Game code includes the shared headers in `source/platform/`, never `platform/wiiu/` or `platform/pc/` directly.
 
-The same interfaces implemented for PC: threads, storage, profiles and
-input over SDL 3, an OpenGL 3.3 renderer, the window, a sound engine for the
-game's own sound bank, logging and crash reports. Shared headers under
-`source/platform/` pick the backend, so game code never includes either
-directory directly. See `pc-platform.md` and `pc-input.md`.
+## Platform code
 
-## `source/net/` - multiplayer
+Code that differs per platform uses `#if LCE_PLATFORM_WIIU` / `#elif LCE_PLATFORM_PC`. Each build defines exactly one.
 
-The network manager both platforms use, so a Wii U and a PC can play
-together: TCP sessions and UDP discovery on port 25570, in one wire format.
-It replaces the title's Nintendo Network sessions. `ServerList` keeps the
-servers added on the Join tab.
+The rule: if a function ends up calling the OS, it belongs in the platform layer. Game code that calls the platform directly is a bug.
 
-## `source/vendor/` - third-party internals
+## The Mii submodule
 
-Internals of libraries the title links against and that the build exposes
-with full names: the Miles sound system (`Miles*`) and the Bink audio decoder
-(`BinkA*`), which only the Wii U build uses, the game's dlmalloc heap,
-stb_truetype, the file-local helpers of the SDK libraries (the `__N_*` files, named after the unit they belonged
-to) and small SDK-facing structures. They are kept apart so that game code is never
-mistaken for library code.
-
-## `source/nn/` - Nintendo library internals
-
-`source/nn/` holds the smaller SDK libraries the title links: `crypto`,
-`dbg`, `erreula` (the error viewer), `save`, `swkbd` (the software keyboard)
-and `util`. They are the same category as `source/vendor/`: reconstructed from the symbols and structure
-the build exposes, kept apart from the game so the boundary stays explicit,
-and to be replaced by a maintained upstream if one ever becomes available.
-Includes are spelled from the `source/` root, for example
-`#include "nn/dbg/Break.hpp"`.
-
-## `source/nn/ffl/` - the Mii face library (submodule)
-
-The title draws Mii icons with FFL, Nintendo's Face Library, at version
-1.5.6. Its source comes from aboood40091's public FFL decompilation
-(https://github.com/aboood40091/ffl, version 1.3.10), raised to 1.5.6 by
-this reconstruction. That code is not copied into this repository.
-`source/nn/ffl` is a git submodule pointing at the `wiiu-recon` branch of
-the fork https://github.com/Jacobwasbeast/ffl, where upstream's
-`include/nn/ffl/` and `src/` trees are flattened into one directory and the
-reconstruction's changes are committed on top. Includes keep the
-`<nn/ffl/...>` spelling, and `source/nn/ffl.h` is the umbrella header.
-
-## `source/cafe/` - Cafe SDK pieces
-
-Declarations of the GX2 graphics and GFD shader-file APIs the renderer
-uses, and the SDK code the title links statically, rebuilt from the
-functions linked into it: the GFD reader, the matrix library (`mtx`,
-`mtx44`, `vec`), the C runtime's system layer (`libsys`: time, files,
-signals and thread hooks on top of the Cafe OS) and the C++ runtime support
-(`libsedg`: `operator new` and `delete`, array construction, run-time type
-information and pure-virtual handling). Includes use the SDK spelling, for
-example `#include <cafe/gx2.h>`.
-
-## The seam rule
-
-A function belongs below the seam if, and only if, its call graph reaches
-an operating-system import. Anything above the seam that calls a platform
-function directly is a defect in the reconstruction and is fixed at the seam
-rather than kept.
+`source/nn/ffl` points at the `wiiu-recon` branch of https://github.com/Jacobwasbeast/ffl, a fork of aboood40091's FFL decompilation brought up to version 1.5.6.

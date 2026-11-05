@@ -1,86 +1,26 @@
 # Overview
 
-This repository holds a reconstructed C++ source tree for Minecraft: Wii U
-Edition, the 4J Studios Legacy Console Edition codebase as it shipped on
-Wii U. It is a matching decompilation: the source is written by reading the
-original Wii U executable's compiled code, together with the symbols, type
-information and string tables the unstripped build carries, and each
-function is compiled and compared with the original until it matches. The
-Xbox 360 TU75 build serves as a behavioural cross-check. Every file is
-hand-authored text; no decompiler output, disassembly or game data is
-committed. See `provenance.md`.
+LCEReborn is a cross-platform reimagining of Legacy Console Edition, built on the Wii U Edition decompilation at 1.13, the Aquatic Update. It runs on Windows, Linux and the Wii U (in Cemu), and all three can play together.
 
-The same source also builds a native PC version, LCEReborn, which runs the
-game on Windows and Linux from your own copy of it (`pc-platform.md`).
+The decompilation it started from was written by AI agents. Work on LCEReborn itself follows the same rules for everyone: you can use AI tools, but you commit as yourself and you're responsible for the code. See [provenance.md](provenance.md) for where the source comes from and how to contribute.
 
-## Who is writing it
+## What's in the repo
 
-All of the code in this repository is AI-constructed. No human writes
-source here; people direct the work, set the rules in `conventions.md`, and
-review.
+- `source/game/`: the game itself
+- `source/platform/`: the Wii U and PC platform layers
+- `source/net/`: multiplayer shared by every platform
+- `source/vendor/`, `source/nn/`, `source/cafe/`: library and SDK code the game needs
+- `launcher/`: the PC launcher
+- `tools/`: building and packaging
 
-The work is coordinated by Claude, which hands Claude Opus 5.5 worker agents
-one task at a time with the evidence for it: a class family to rebuild, or a
-set of functions whose compiled code differs from the original. Each change
-is compiled and compared function by function with the original executable,
-and independently audited, before it is accepted. Earlier phases worked the
-same way with other agents: the dispatchers Sol and Fable handed class
-families to Luna and Opus 5 workers.
+[architecture.md](architecture.md) goes into more detail.
 
-## What is here
+## What's not in the repo
 
-- `source/game/` - the platform-independent game: world, blocks, entities,
-  items, networking, UI, rendering and audio.
-- `source/platform/wiiu/` - the Nintendo backend of 4J's platform layer
-  (threads, storage, profiles, input, the Mii icon module).
-- `source/platform/pc/` - the PC backend: the same interfaces over SDL 3,
-  an OpenGL 3.3 renderer, keyboard, mouse and controllers, and a sound
-  engine for the game's own sound bank.
-- `source/net/` - multiplayer shared by the Wii U and PC builds, so the two
-  can play together.
-- `source/vendor/` - reconstructed internals of third-party libraries the
-  title links against (Miles audio and Bink audio, used by the Wii U build
-  only, dlmalloc, stb_truetype).
-- `source/nn/` - the small SDK libraries the title links (crypto, software
-  keyboard, error viewer), plus the Mii face library in the `source/nn/ffl`
-  submodule.
-- `source/cafe/` - reconstructed Cafe SDK pieces: GX2 and GFD declarations,
-  the matrix library, the C runtime system layer and the C++ runtime support
-  the title links.
-- `docs/` - these notes.
-- `tools/` - `prepare.py` sets up the game files from your own dumps,
-  `build.py` builds the RPX with RedHills, and `package.py` lays it out as a
-  title folder for Cemu. `tools/rpx/` and `tools/redhills/` link the image
-  the way the original was linked; `tools/build/` holds the pinned library
-  list, the toolchain image and the few altered library files;
-  `tools/measure/` compares a build with the original executable.
-  `package_pc.py` packages the PC build as a zip for players and
-  `release_pc.py` publishes it as a GitHub release.
-- `launcher/` - the PC port's Qt launcher, which imports the game files
-  without Python, keeps profiles, shows the game's log and the releases
-  (`pc-launcher.md`).
+No game assets, saves, executables, compiled shaders, symbol tables, disassembly or decompiler output. None of that should ever be committed.
 
-## What is not here
+## Where things stand
 
-No game assets, textures, models, sounds, fonts, save data, executables,
-compiled shaders, symbol tables, disassembly, or decompiler output are
-committed to this repository, and none should ever be.
+The Wii U build runs in stock Cemu 2.6. It boots, creates and loads worlds, and holds a full 20 ticks per second. It hasn't been tried on real hardware.
 
-## Status
-
-`tools/build.py` compiles the whole tree and links `Minecraft.Client.rpx`
-without any code from the original executable. It runs in a stock Cemu 2.6:
-it boots to the menus, creates and loads worlds, and its server has run at
-the full 20 ticks per second in testing. It has not been tried on a Wii U
-console. Nintendo ended the Wii U's online services in April 2024; this
-build's multiplayer uses LCEReborn's own network manager instead.
-
-The PC version builds with CMake and plays on Windows and Linux: worlds,
-mini games, split screen and multiplayer with other PCs and the Wii U build.
-Its releases are on GitHub, and `pc-platform.md` describes it.
-
-The reconstruction is still being refined toward the original function by
-function, and a behaviour difference you find is a bug worth reporting.
-`tools/measure/parity.py` compares your build with your copy of the
-original executable function by function; see `docs/measuring.md` for what
-it checks and the current result.
+The PC version plays on Windows and Linux, with worlds, mini games, split screen and multiplayer.

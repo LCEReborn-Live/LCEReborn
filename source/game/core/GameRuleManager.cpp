@@ -337,7 +337,8 @@ void GameRuleManager::readAttributes(DataInputStream* input, std::vector<std::ws
             definition->addAttribute(names->at(nameIndex), value);
         }
     }
-    definition->onAttributesAdded();
+    if (definition != NULL)
+        definition->onAttributesAdded();
 }
 
 void GameRuleManager::readChildren(DataInputStream* input, std::vector<std::wstring>* names,

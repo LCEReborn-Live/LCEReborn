@@ -367,7 +367,8 @@ void IUIScene_LoadCreateJoin::AddDefaultButtons()
             TexturePack* pack = Minecraft::GetInstance()->mTexturePackRepository->getTexturePackById(
                 options->getTexturePackId());
             unsigned int iconSize = 0;
-            unsigned char* icon = static_cast<unsigned char*>(const_cast<void*>(pack->getPackIcon(iconSize)));
+            unsigned char* icon =
+                pack != NULL ? static_cast<unsigned char*>(const_cast<void*>(pack->getPackIcon(iconSize))) : NULL;
             if (iconSize != 0 && icon != NULL)
             {
                 wchar_t name[64];

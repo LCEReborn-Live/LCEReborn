@@ -114,6 +114,8 @@ DLCPack* DLCTexturePack::getDLCPack()
 
 std::wstring DLCTexturePack::getDesc1()
 {
+    if (m_stringTable == NULL)
+        return m_desc1;
     std::wstring description = m_stringTable->getString(L"IDS_TP_DESCRIPTION");
     if (description == L"")
         return m_stringTable->getString(L"description");
@@ -122,6 +124,8 @@ std::wstring DLCTexturePack::getDesc1()
 
 std::wstring DLCTexturePack::getName()
 {
+    if (m_stringTable == NULL)
+        return m_name.empty() ? m_dlcPack->getName() : m_name;
     std::wstring name = m_stringTable->getString(L"IDS_DISPLAY_NAME");
     if (name == L"")
         return m_stringTable->getString(L"title");
@@ -130,6 +134,8 @@ std::wstring DLCTexturePack::getName()
 
 std::wstring DLCTexturePack::getWorldName()
 {
+    if (m_stringTable == NULL)
+        return m_worldName;
     return m_stringTable->getString(L"IDS_WORLD_NAME");
 }
 
@@ -516,6 +522,8 @@ void DLCTexturePack::unloadUI()
     AbstractTexturePack::unloadUI();
     gApp.mDLCManager.removePack(m_loadedPack);
     m_loadedPack = NULL;
+    loadColourTable();
+    loadMaterialTable();
     delete m_archiveFile;
     m_archiveFile = NULL;
     m_hasData = false;

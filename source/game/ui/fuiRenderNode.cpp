@@ -12,6 +12,14 @@
 
 static unsigned int g_fuiOldScissor[4] = {0, 0, 0, 0};
 
+// GX2 scissor registers hold 14 bits, and casting a negative or huge float to unsigned is undefined.
+static unsigned int ScrollRectEdge(float value)
+{
+    if (!(value > 0.0f))
+        return 0;
+    return value < 16383.0f ? (unsigned int)value : 16383;
+}
+
 fuiRenderNode::fuiRenderNode(fuiRenderNode* stage, fuiRenderNode* parent, fuiObject* object, unsigned int symbolIndex,
                              eFuiObjectType type, unsigned char renderFlags, fuiRGBA* color, unsigned char visible,
                              bool ctorEnabled, fuiFile* file)
@@ -128,12 +136,12 @@ void fuiRenderNode::setScrollRectViewport()
 
     gRenderer->StateGetScissorRect(g_fuiOldScissor[0], g_fuiOldScissor[1], g_fuiOldScissor[2], g_fuiOldScissor[3]);
 
-    unsigned int left = (unsigned int)(0.0f * m_globalMatrix.scaleX + gFui->m_originX + m_globalMatrix.translateX);
-    unsigned int top = (unsigned int)(0.0f * m_globalMatrix.scaleY + gFui->m_originY + m_globalMatrix.translateY);
-    unsigned int right = (unsigned int)((m_scrollRect.xMax - m_scrollRect.xMin) * m_globalMatrix.scaleX
-                                        + gFui->m_originX + m_globalMatrix.translateX);
-    unsigned int bottom = (unsigned int)((m_scrollRect.yMax - m_scrollRect.yMin) * m_globalMatrix.scaleY
-                                         + gFui->m_originY + m_globalMatrix.translateY);
+    unsigned int left = ScrollRectEdge(0.0f * m_globalMatrix.scaleX + gFui->m_originX + m_globalMatrix.translateX);
+    unsigned int top = ScrollRectEdge(0.0f * m_globalMatrix.scaleY + gFui->m_originY + m_globalMatrix.translateY);
+    unsigned int right = ScrollRectEdge((m_scrollRect.xMax - m_scrollRect.xMin) * m_globalMatrix.scaleX
+                                         + gFui->m_originX + m_globalMatrix.translateX);
+    unsigned int bottom = ScrollRectEdge((m_scrollRect.yMax - m_scrollRect.yMin) * m_globalMatrix.scaleY
+                                          + gFui->m_originY + m_globalMatrix.translateY);
     gRenderer->StateSetScissorRect(left, top, right, bottom);
 
     fuiMatrix translation = {1.0f, 0.0f, 0.0f, 1.0f, -m_scrollRect.xMin, -m_scrollRect.yMin};

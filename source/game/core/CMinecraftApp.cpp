@@ -2703,7 +2703,7 @@ uint32_t CMinecraftApp::GetNextTip(bool firstTipRequest, EMiniGameId miniGame)
 }
 unsigned int CMinecraftApp::GetHTMLColour(eMinecraftColour colour)
 {
-    return Minecraft::GetInstance()->mTexturePackRepository->getSelected()->getColourTable()->getColour(colour);
+    return Minecraft::GetInstance()->getColourTable()->getColour(colour);
 }
 unsigned int CMinecraftApp::GetHTMLColor(eMinecraftColour colour)
 {

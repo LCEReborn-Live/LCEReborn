@@ -1,7 +1,6 @@
 #include "game/client/render/Renderer.hpp"
 
 #include "platform/wiiu/MiiIcon/MakeIcon.hpp"
-#include "platform/wiiu/CafeThreadLocal.hpp"
 #include "platform/wiiu/InputManager.hpp"
 #include "platform/wiiu/NintendoFileSystem_WiiU.hpp"
 #include "platform/wiiu/WiiU_FileCache.hpp"
@@ -11,7 +10,6 @@
 #include <nn/ffl.h>
 
 #include <coreinit/thread.h>
-#include <map>
 #include <coreinit/memdefaultheap.h>
 #include <coreinit/memexpheap.h>
 #include <coreinit/memfrmheap.h>
@@ -132,12 +130,10 @@ Renderer* gRenderer = new Renderer;
 
 namespace
 {
-std::map<OSThread*, Renderer::Context*> s_rendererTlsContexts;
-
-Renderer::Context*& currentRendererContext()
-{
-    return CafeThreadLocal::slot(s_rendererTlsContexts);
-}
+// Each thread's renderer context sits in one of its coreinit thread-specific values. getContext runs for
+// nearly every renderer call, and a map lookup under a process-wide mutex there cost a few percent of the
+// frame.
+const OSThreadSpecificID RENDERER_CONTEXT_SLOT = OS_THREAD_SPECIFIC_11;
 }
 
 Renderer::Renderer()
@@ -157,7 +153,7 @@ void Renderer::UpdateGamma(unsigned short gamma)
 
 void Renderer::InitialiseContext(bool bReset)
 {
-    currentRendererContext() = new Context(this);
+    OSSetThreadSpecific(RENDERER_CONTEXT_SLOT, new Context(this));
 }
 
 void Renderer::InitialiseContext()
@@ -167,7 +163,7 @@ void Renderer::InitialiseContext()
 
 Renderer::Context& Renderer::getContext()
 {
-    return *currentRendererContext();
+    return *static_cast<Context*>(OSGetThreadSpecific(RENDERER_CONTEXT_SLOT));
 }
 
 void Renderer::SetupShaders()

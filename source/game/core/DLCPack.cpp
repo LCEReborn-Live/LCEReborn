@@ -61,7 +61,7 @@ DLCPack::~DLCPack()
 
     m_creditIds.clear();
 
-    if (m_data != NULL && m_parentPack == NULL)
+    if (m_data != NULL && m_ownsData)
         delete[] m_data;
 }
 

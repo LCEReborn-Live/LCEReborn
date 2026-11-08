@@ -50,20 +50,30 @@ const wchar_t* s_parameterNames[] = {L"DISPLAYNAME",
 
 char s_dlcDataFileName[256];
 
-#if LCE_PLATFORM_PC
-static unsigned int SwapDLCWord(unsigned char* pData, unsigned int offset)
+static bool DLCHostIsBigEndian()
+{
+    const unsigned int one = 1;
+    return *(const unsigned char*)&one == 0;
+}
+
+static unsigned int ReadDLCWord(unsigned char* pData, unsigned int offset, bool bigEndian, bool convert)
 {
     unsigned char* pWord = pData + offset;
-    unsigned int value = ((unsigned int)pWord[0] << 24) | ((unsigned int)pWord[1] << 16) | ((unsigned int)pWord[2] << 8) |
-                         (unsigned int)pWord[3];
-    std::memcpy(pWord, &value, sizeof(value));
+    unsigned int value = bigEndian ? ((unsigned int)pWord[0] << 24) | ((unsigned int)pWord[1] << 16)
+                                         | ((unsigned int)pWord[2] << 8) | (unsigned int)pWord[3]
+                                   : ((unsigned int)pWord[3] << 24) | ((unsigned int)pWord[2] << 16)
+                                         | ((unsigned int)pWord[1] << 8) | (unsigned int)pWord[0];
+    if (convert)
+    {
+        std::memcpy(pWord, &value, sizeof(value));
+    }
     return value;
 }
 
-static bool SwapDLCText(unsigned char* pData, unsigned int size, unsigned int offset, unsigned int length,
-                        std::wstring* pText)
+static bool ReadDLCText(unsigned char* pData, unsigned int size, unsigned int offset, unsigned int length,
+                        bool bigEndian, bool convert, std::wstring* pText)
 {
-    if (offset > size || (size - offset) / 2 < length + 2)
+    if (offset > size || (size - offset) / 2 < 2 || (size - offset) / 2 - 2 < length)
     {
         return false;
     }
@@ -71,8 +81,12 @@ static bool SwapDLCText(unsigned char* pData, unsigned int size, unsigned int of
     for (unsigned int i = 0; i < length + 2; i++)
     {
         unsigned char* pCharacter = pData + offset + i * 2;
-        unsigned short character = (unsigned short)((pCharacter[0] << 8) | pCharacter[1]);
-        std::memcpy(pCharacter, &character, sizeof(character));
+        unsigned short character = bigEndian ? (unsigned short)((pCharacter[0] << 8) | pCharacter[1])
+                                             : (unsigned short)((pCharacter[1] << 8) | pCharacter[0]);
+        if (convert)
+        {
+            std::memcpy(pCharacter, &character, sizeof(character));
+        }
         if (pText != NULL && i < length)
         {
             pText->push_back((wchar_t)character);
@@ -82,29 +96,30 @@ static bool SwapDLCText(unsigned char* pData, unsigned int size, unsigned int of
     return true;
 }
 
-static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nestedPacks)
+static bool WalkDLCData(unsigned char* pData, unsigned int size, bool nestedPacks, bool bigEndian, bool toHost)
 {
     if (size < 8)
     {
         return false;
     }
 
-    SwapDLCWord(pData, 0);
-    unsigned int parameterCount = SwapDLCWord(pData, 4);
+    const bool convert = toHost && bigEndian != DLCHostIsBigEndian();
+    ReadDLCWord(pData, 0, bigEndian, convert);
+    unsigned int parameterCount = ReadDLCWord(pData, 4, bigEndian, convert);
     unsigned int offset = 8;
     bool bHasXMLVersion = false;
 
     for (unsigned int i = 0; i < parameterCount; i++)
     {
-        if (size - offset < 8)
+        if (offset > size || size - offset < 8)
         {
             return false;
         }
 
-        SwapDLCWord(pData, offset);
-        unsigned int nameLength = SwapDLCWord(pData, offset + 4);
+        ReadDLCWord(pData, offset, bigEndian, convert);
+        unsigned int nameLength = ReadDLCWord(pData, offset + 4, bigEndian, convert);
         std::wstring parameterName;
-        if (!SwapDLCText(pData, size, offset + 8, nameLength, &parameterName))
+        if (!ReadDLCText(pData, size, offset + 8, nameLength, bigEndian, convert, &parameterName))
         {
             return false;
         }
@@ -119,12 +134,12 @@ static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nest
 
     if (bHasXMLVersion)
     {
-        if (size - offset < 4)
+        if (offset > size || size - offset < 4)
         {
             return false;
         }
 
-        SwapDLCWord(pData, offset);
+        ReadDLCWord(pData, offset, bigEndian, convert);
         offset += 4;
     }
 
@@ -133,7 +148,7 @@ static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nest
         return false;
     }
 
-    unsigned int itemCount = SwapDLCWord(pData, offset);
+    unsigned int itemCount = ReadDLCWord(pData, offset, bigEndian, convert);
     offset += 4;
 
     std::vector<unsigned int> itemSizes;
@@ -145,10 +160,10 @@ static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nest
             return false;
         }
 
-        itemSizes.push_back(SwapDLCWord(pData, offset));
-        itemTypes.push_back(SwapDLCWord(pData, offset + 4));
-        unsigned int nameLength = SwapDLCWord(pData, offset + 8);
-        if (!SwapDLCText(pData, size, offset + 12, nameLength, NULL))
+        itemSizes.push_back(ReadDLCWord(pData, offset, bigEndian, convert));
+        itemTypes.push_back(ReadDLCWord(pData, offset + 4, bigEndian, convert));
+        unsigned int nameLength = ReadDLCWord(pData, offset + 8, bigEndian, convert);
+        if (!ReadDLCText(pData, size, offset + 12, nameLength, bigEndian, convert, NULL))
         {
             return false;
         }
@@ -163,7 +178,7 @@ static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nest
             return false;
         }
 
-        unsigned int itemParameterCount = SwapDLCWord(pData, offset);
+        unsigned int itemParameterCount = ReadDLCWord(pData, offset, bigEndian, convert);
         offset += 4;
 
         for (unsigned int j = 0; j < itemParameterCount; j++)
@@ -173,9 +188,9 @@ static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nest
                 return false;
             }
 
-            SwapDLCWord(pData, offset);
-            unsigned int valueLength = SwapDLCWord(pData, offset + 4);
-            if (!SwapDLCText(pData, size, offset + 8, valueLength, NULL))
+            ReadDLCWord(pData, offset, bigEndian, convert);
+            unsigned int valueLength = ReadDLCWord(pData, offset + 4, bigEndian, convert);
+            if (!ReadDLCText(pData, size, offset + 8, valueLength, bigEndian, convert, NULL))
             {
                 return false;
             }
@@ -192,7 +207,18 @@ static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nest
             && (itemTypes[i] == DLCManager::eDLCType_TexturePack || itemTypes[i] == DLCManager::eDLCType_SkinPack
                 || itemTypes[i] == DLCManager::eDLCType_Audio))
         {
-            if (!SwapDLCDataToHost(pData + offset, itemSizes[i], itemTypes[i] != DLCManager::eDLCType_Audio))
+            const bool nested = itemTypes[i] != DLCManager::eDLCType_Audio;
+            bool nestedBigEndian = bigEndian;
+            if (!WalkDLCData(pData + offset, itemSizes[i], nested, nestedBigEndian, false))
+            {
+                nestedBigEndian = !bigEndian;
+                if (!WalkDLCData(pData + offset, itemSizes[i], nested, nestedBigEndian, false))
+                {
+                    return false;
+                }
+            }
+
+            if (toHost && !WalkDLCData(pData + offset, itemSizes[i], nested, nestedBigEndian, true))
             {
                 return false;
             }
@@ -203,7 +229,26 @@ static bool SwapDLCDataToHost(unsigned char* pData, unsigned int size, bool nest
 
     return true;
 }
-#endif
+
+static bool ConvertDLCDataToHost(unsigned char* pData, unsigned int size)
+{
+    if (size < 8)
+    {
+        return false;
+    }
+
+    for (int pass = 0; pass < 2; pass++)
+    {
+        const bool bigEndian = pass == 0 ? DLCHostIsBigEndian() : !DLCHostIsBigEndian();
+        const unsigned int version = ReadDLCWord(pData, 0, bigEndian, false);
+        if (version >= 3 && version <= 0xFF && WalkDLCData(pData, size, true, bigEndian, false))
+        {
+            return WalkDLCData(pData, size, true, bigEndian, true);
+        }
+    }
+
+    return false;
+}
 
 DLCManager::DLCManager()
 {
@@ -472,7 +517,8 @@ bool DLCManager::processDLCDataFile(unsigned int& numItemsAdded, unsigned char* 
 
     if (*(unsigned int*)pData < 3)
     {
-        delete[] pData;
+        if (bTakeDataOwnership)
+            delete[] pData;
         return false;
     }
 
@@ -679,8 +725,7 @@ bool DLCManager::readDLCDataFile(unsigned int& numItemsAdded, const std::string&
         return false;
     }
 
-#if LCE_PLATFORM_PC
-    if (!SwapDLCDataToHost(pData, bytesRead, true))
+    if (!ConvertDLCDataToHost(pData, bytesRead))
     {
         delete[] pData;
         pPack->SetIsCorrupt(true);
@@ -688,9 +733,8 @@ bool DLCManager::readDLCDataFile(unsigned int& numItemsAdded, const std::string&
 
         return false;
     }
-#endif
 
-    return processDLCDataFile(numItemsAdded, pData, bytesRead, pPack, bTakeDataOwnership);
+    return processDLCDataFile(numItemsAdded, pData, bytesRead, pPack, true);
 }
 
 bool DLCManager::readDLCDataFile(unsigned int& numItemsAdded, const std::wstring& fileName, DLCPack* pPack,
@@ -826,14 +870,12 @@ unsigned int DLCManager::retrievePackIDFromDLCDataFile(const std::string& fileNa
         return 0;
     }
 
-#if LCE_PLATFORM_PC
-    if (!SwapDLCDataToHost(pData, bytesRead, true))
+    if (!ConvertDLCDataToHost(pData, bytesRead))
     {
         delete[] pData;
 
         return 0;
     }
-#endif
 
     unsigned int packID = retrievePackID(pData, bytesRead);
 

@@ -25,8 +25,8 @@ std::vector<LevelGenerationOptions*>* LevelGenerators::getLevelGenerators()
 
 bool LevelGenerators::SortLevelGenerators(const LevelGenerationOptions* first, const LevelGenerationOptions* second)
 {
-    unsigned int firstPackId = first->getPack()->GetPackId();
-    unsigned int secondPackId = second->getPack()->GetPackId();
+    unsigned int firstPackId = first->getPack() != NULL ? first->getPack()->GetPackId() : 0;
+    unsigned int secondPackId = second->getPack() != NULL ? second->getPack()->GetPackId() : 0;
 
     if (firstPackId == 4)
     {

@@ -92,10 +92,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $archive = Get-ChildItem build -Filter 'LCEReborn-pc-*.zip' | Select-Object -First 1
           if (-not $archive) { throw 'The portable package ZIP was not created' }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0' }
+          Move-Item -LiteralPath $archive.FullName -Destination (Join-Path $archive.DirectoryName "LCEReborn-Live-Portable-$version.zip")
+          $archive = Get-ChildItem build -Filter 'LCEReborn-Live-Portable-*.zip' | Select-Object -First 1
           $stage = Join-Path $env:GITHUB_WORKSPACE 'build/installer-files'
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
           Expand-Archive -LiteralPath $archive.FullName -DestinationPath $stage -Force
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0' }
           $compilerPath = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
           if (-not $compilerPath) {
             $candidate = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
@@ -112,8 +114,8 @@ jobs:
         with:
           name: LCEReborn-Live-Windows
           path: |
-            build/LCEReborn-pc-*.zip
-            build/release/LCEReborn-Live-Setup-*.exe
+            build/LCEReborn-Live-Portable-*.zip
+            build/release/LCEReborn-Live-Installer-*.exe
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -125,7 +127,7 @@ jobs:
           RELEASE_REPOSITORY: ${{ github.repository }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $assets = @(Get-ChildItem build -Filter 'LCEReborn-pc-*.zip' | ForEach-Object FullName)
-          $assets += @(Get-ChildItem build/release -Filter 'LCEReborn-Live-Setup-*.exe' | ForEach-Object FullName)
+          $assets = @(Get-ChildItem build -Filter 'LCEReborn-Live-Portable-*.zip' | ForEach-Object FullName)
+          $assets += @(Get-ChildItem build/release -Filter 'LCEReborn-Live-Installer-*.exe' | ForEach-Object FullName)
           gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --generate-notes
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

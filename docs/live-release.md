@@ -8,7 +8,8 @@ publish downloadable build artifacts without creating a GitHub Release.
 
 To publish a release, merge the client changes, create and push a version tag
 such as `v0.1.0`, then wait for the workflow to finish. The GitHub Release gets
-`LCEReborn-Live-Setup-0.1.0.exe` and the portable ZIP.
+`LCEReborn-Live-Installer-0.1.0.exe` and
+`LCEReborn-Live-Portable-0.1.0.zip`.
 
 The packages contain the executables, launcher resources, open-source runtime
 dependencies, and Live networking scripts. They do not contain game content,

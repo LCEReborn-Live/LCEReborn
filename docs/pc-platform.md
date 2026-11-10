@@ -82,3 +82,5 @@ cmake --build build/pc
 - **Linux:** leave out the compiler options to use your system's clang or GCC. You'll need CMake 3.24+, Ninja and SDL's development packages (`tools/build/Dockerfile.linux` lists them).
 
 `python tools/build_linux.py` builds the Linux version in Docker from any system. `python tools/package_pc.py` packages a build for players, and `python tools/release_pc.py` publishes it as a GitHub release.
+
+For the LCEReborn Live Windows installer workflow and its release tags, see [live-release.md](live-release.md).

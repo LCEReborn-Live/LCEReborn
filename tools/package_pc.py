@@ -66,7 +66,7 @@ else:
     SYSTEM = "pc"
     PROGRAMS = ("LCEReborn.exe", "LCERebornLauncher.exe", "LCERebornServer.exe")
     QT_PLUGIN_DIRS = ("generic", "imageformats", "networkinformation", "platforms", "styles", "tls")
-    ALLOWED_NAME = re.compile(r"\.(exe|dll|png|ico|txt)$", re.I)
+    ALLOWED_NAME = re.compile(r"\.(exe|dll|png|ico|txt|js|json)$", re.I)
 REDIST_URL = "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"
 
 
@@ -202,6 +202,8 @@ def program_files(build):
         if not os.path.isfile(path):
             raise PackageError("%s is missing. Build the game and the launcher first." % os.path.relpath(path, ROOT))
         files.append((path, name))
+    if not LINUX:
+        files.append((os.path.join(build, PROGRAMS[0]), "LCEReborn-Live.exe"))
     qt_files = linux_qt_files(build) if LINUX else windows_qt_files(build)
     for path, arcname, _ in qt_files:
         files.append((path, arcname))
@@ -210,6 +212,17 @@ def program_files(build):
         for name in sorted(names):
             path = os.path.join(folder, name)
             files.append((path, "resources/" + os.path.relpath(path, resources).replace(os.sep, "/")))
+    if not LINUX:
+        live = os.path.join(ROOT, "live")
+        for folder, _, names in os.walk(live):
+            for name in sorted(names):
+                if os.path.splitext(name)[1].lower() not in (".js", ".json"):
+                    continue
+                path = os.path.join(folder, name)
+                files.append((path, "live/" + os.path.relpath(path, live).replace(os.sep, "/")))
+        runtime = os.path.join(build, "live-runtime", "node.exe")
+        if os.path.isfile(runtime):
+            files.append((runtime, "live/node.exe"))
     return files, [(arcname, sbom_name) for _, arcname, sbom_name in qt_files]
 
 
@@ -637,6 +650,10 @@ def package(build, allow_dirty, appimage=True):
             entries.append((arcname, handle.read()))
     entries.append(("README.txt", readme_text(source, glibc)))
     entries.append(("LICENSE.txt", read(os.path.join(ROOT, "LICENSE"))))
+    if not LINUX:
+        node_license = os.path.join(build, "live-runtime", "Node-LICENSE.txt")
+        if os.path.isfile(node_license):
+            entries.append(("third_party/Node-LICENSE.txt", read(node_license)))
     common = list(entries)
     entries.append(("third_party/NOTICES.txt", notices_text(source, game, qt, launcher)))
     entries.extend(license_files(game, qt, launcher))

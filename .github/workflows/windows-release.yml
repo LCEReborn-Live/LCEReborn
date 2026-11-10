@@ -1,0 +1,131 @@
+name: Windows build and release
+
+on:
+  push:
+    branches:
+      - main
+      - live-integration
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Cache build dependencies
+        uses: actions/cache@v5
+        with:
+          path: |
+            build/deps
+            build/qt
+          key: windows-build-deps-${{ hashFiles('tools/build/deps.json', 'tools/build/qt.json') }}
+
+      - name: Prepare bundled Node.js runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (& node --version).Trim()
+          $base = "https://nodejs.org/dist/$version"
+          $folder = Join-Path $env:RUNNER_TEMP 'node-runtime'
+          New-Item -ItemType Directory -Path $folder -Force | Out-Null
+          $archiveName = "node-$version-win-x64.zip"
+          Invoke-WebRequest "$base/$archiveName" -OutFile (Join-Path $folder $archiveName)
+          Invoke-WebRequest "$base/SHASUMS256.txt" -OutFile (Join-Path $folder 'SHASUMS256.txt')
+          $line = Select-String -Path (Join-Path $folder 'SHASUMS256.txt') -Pattern " $archiveName$" | Select-Object -First 1
+          if (-not $line) { throw "No checksum found for $archiveName" }
+          $expected = ($line.Line -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash (Join-Path $folder $archiveName) -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw 'Node.js archive checksum did not match' }
+          $unpack = Join-Path $folder 'unpacked'
+          Expand-Archive (Join-Path $folder $archiveName) -DestinationPath $unpack
+          $nodeFolder = Get-ChildItem -LiteralPath $unpack -Directory | Select-Object -First 1
+          $destination = Join-Path $env:GITHUB_WORKSPACE 'build/pc/live-runtime'
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          Copy-Item (Join-Path $nodeFolder.FullName 'node.exe') (Join-Path $destination 'node.exe')
+          Copy-Item (Join-Path $nodeFolder.FullName 'LICENSE') (Join-Path $destination 'Node-LICENSE.txt')
+
+      - name: Set up MSVC build environment
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Compile Windows client
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/build/deps.py build/deps
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/build/layout.py build/deps build/third_party
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/build/qt.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake -S . -B build/pc -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build/pc --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/package_pc.py --build build/pc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Get-ChildItem build -Filter 'LCEReborn-pc-*.zip' | Select-Object -First 1
+          if (-not $archive) { throw 'The portable package ZIP was not created' }
+          $stage = Join-Path $env:GITHUB_WORKSPACE 'build/installer-files'
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Expand-Archive -LiteralPath $archive.FullName -DestinationPath $stage -Force
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0' }
+          $compilerPath = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $compilerPath) {
+            $candidate = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
+            if (Test-Path $candidate) { $compilerPath = $candidate }
+          }
+          if (-not $compilerPath) { throw 'Inno Setup ISCC.exe is missing from the runner' }
+          Push-Location tools
+          & $compilerPath "/DAppVersion=$version" installer.iss
+          Pop-Location
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: LCEReborn-Live-Windows
+          path: |
+            build/LCEReborn-pc-*.zip
+            build/release/LCEReborn-Live-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = @(Get-ChildItem build -Filter 'LCEReborn-pc-*.zip' | ForEach-Object FullName)
+          $assets += @(Get-ChildItem build/release -Filter 'LCEReborn-Live-Setup-*.exe' | ForEach-Object FullName)
+          gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --generate-notes
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

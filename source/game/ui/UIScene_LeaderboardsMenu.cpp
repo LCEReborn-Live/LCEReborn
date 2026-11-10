@@ -2,6 +2,7 @@
 #include "game/core/StringIds.hpp"
 
 #include <cwchar>
+#include <cstdlib>
 #include <cstring>
 
 #include "game/core/CMinecraftApp.hpp"
@@ -27,6 +28,15 @@
 
 static std::vector<UIScene_LeaderboardsMenu::LeaderboardDescriptor> gLeaderboardDescriptors[4];
 static int gLeaderboardIconIds[UIScene_LeaderboardsMenu::LEADERBOARD_ICON_COUNT];
+
+namespace
+{
+bool LiveLeaderboardAvailable()
+{
+    const char* directory = std::getenv("LCE_LIVE_DIR");
+    return directory != NULL && *directory != '\0';
+}
+}
 
 UIScene_LeaderboardsMenu::UIScene_LeaderboardsMenu(int type, void* data, UILayer* layer)
     : UIScene(type, layer),
@@ -502,7 +512,7 @@ unsigned int UIScene_LeaderboardsMenu::mapElementsAndNames()
 void UIScene_LeaderboardsMenu::updateTooltips()
 {
     gConsoleUIController.SetTooltips(static_cast<unsigned int>(m_playerId), -1, IDS_TOOLTIPS_BACK,
-                                     m_worldLeaderboard ? IDS_TOOLTIPS_CHANGE_FILTER : -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0,
+                                     (m_worldLeaderboard || LiveLeaderboardAvailable()) ? IDS_TOOLTIPS_CHANGE_FILTER : -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0,
                                      0);
 }
 
@@ -640,7 +650,8 @@ void UIScene_LeaderboardsMenu::handleInput(int playerId, int action, bool repeat
     case EControllerActions_MenuB:
         break;
     case EControllerActions_MenuX:
-        if (m_worldLeaderboard && m_leaderboardPopulated && g_pLeaderboardManager->isIdle())
+        if ((m_worldLeaderboard || LiveLeaderboardAvailable()) && m_leaderboardPopulated
+            && g_pLeaderboardManager->isIdle())
         {
             gConsoleUIController.PlayUISFX(SoundEvents::UI_SCROLL);
             if (m_readType == LeaderboardManager::eReadType_TopRank)

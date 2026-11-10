@@ -34,12 +34,15 @@ private:
     {
         ePending_None,
         ePending_Server,
+        ePending_Live,
         ePending_Ready
     };
 
     void Begin(LeaderboardReadListener* listener, int userIndex, EStatsType board);
     void Finish(eStatsReturn result);
     void RequestFromServer(bool aroundMe, unsigned int startRank, unsigned int count);
+    void RequestFromLive(const char* filter, unsigned int startRank, unsigned int count);
+    bool ReadLiveResponse();
 
     EPending m_pending;
     eStatsReturn m_result;
@@ -48,6 +51,7 @@ private:
     int m_pad;
     unsigned int m_totalRows;
     long long m_sentAt;
+    unsigned int m_requestId;
     std::vector<ReadScore> m_rows;
 };
 

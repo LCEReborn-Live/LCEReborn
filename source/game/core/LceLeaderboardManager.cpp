@@ -1,6 +1,11 @@
 #include "game/core/LceLeaderboardManager.hpp"
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include <boost/shared_ptr.hpp>
 
@@ -21,6 +26,72 @@ LeaderboardManager* g_pLeaderboardManager = new LceLeaderboardManager();
 namespace
 {
 const long long kServerTimeoutMs = 5000;
+const long long kLiveTimeoutMs = 15000;
+
+int LiveBoardIndex(LeaderboardManager::EStatsType type)
+{
+    const int board = static_cast<int>(type);
+    return board >= 0 && board < 4 ? board : -1;
+}
+
+#ifdef _WIN32
+std::wstring LiveDirectory()
+{
+    const wchar_t* directory = _wgetenv(L"LCE_LIVE_DIR");
+    return directory == NULL ? std::wstring() : std::wstring(directory);
+}
+
+std::wstring LivePath(const wchar_t* name)
+{
+    const std::wstring directory = LiveDirectory();
+    return directory.empty() ? std::wstring() : directory + L"\\" + name;
+}
+
+bool WriteLiveFile(const std::wstring& path, const std::string& contents)
+{
+    if (path.empty())
+        return false;
+    const std::wstring temporary = path + L".tmp";
+    FILE* file = NULL;
+    if (_wfopen_s(&file, temporary.c_str(), L"wb") != 0 || file == NULL)
+        return false;
+    const bool written = std::fwrite(contents.data(), 1, contents.size(), file) == contents.size();
+    const bool closed = std::fclose(file) == 0;
+    if (!written || !closed)
+    {
+        _wremove(temporary.c_str());
+        return false;
+    }
+    _wremove(path.c_str());
+    if (_wrename(temporary.c_str(), path.c_str()) != 0)
+    {
+        _wremove(temporary.c_str());
+        return false;
+    }
+    return true;
+}
+
+#endif
+
+std::vector<std::string> SplitTabs(const std::string& line)
+{
+    std::vector<std::string> parts;
+    std::string::size_type start = 0;
+    for (;;)
+    {
+        const std::string::size_type tab = line.find('\t', start);
+        parts.push_back(line.substr(start, tab == std::string::npos ? tab : tab - start));
+        if (tab == std::string::npos)
+            break;
+        start = tab + 1;
+    }
+    return parts;
+}
+
+std::wstring AsciiWide(const std::string& value)
+{
+    return std::wstring(value.begin(), value.end());
+}
 }
 
 LceLeaderboardManager::LceLeaderboardManager()
@@ -30,7 +101,8 @@ LceLeaderboardManager::LceLeaderboardManager()
       m_board(0),
       m_pad(0),
       m_totalRows(0),
-      m_sentAt(0)
+      m_sentAt(0),
+      m_requestId(0)
 {
 }
 
@@ -40,6 +112,16 @@ LceLeaderboardManager::~LceLeaderboardManager()
 
 void LceLeaderboardManager::Tick()
 {
+    if (m_pending == ePending_Live)
+    {
+#ifdef _WIN32
+        if (ReadLiveResponse())
+            return;
+#endif
+        if (System::processTimeInMilliSecs() - m_sentAt > kLiveTimeoutMs)
+            Finish(eStatsReturn_Failed);
+        return;
+    }
     if (m_pending == ePending_Server && System::processTimeInMilliSecs() - m_sentAt > kServerTimeoutMs)
         Finish(eStatsReturn_Failed);
     if (m_pending != ePending_Ready)
@@ -68,8 +150,36 @@ void LceLeaderboardManager::DeleteSession()
 {
 }
 
-bool LceLeaderboardManager::WriteStats(unsigned int, RegisterScore*)
+bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores)
 {
+#ifdef _WIN32
+    if (LiveDirectory().empty() || scores == NULL || count == 0)
+        return true;
+    std::ostringstream contents;
+    bool any = false;
+    for (unsigned int i = 0; i < count; ++i)
+    {
+        const int board = LiveBoardIndex(scores[i].m_eStatsType);
+        if (board < 0 || scores[i].m_usNumStats == 0 || scores[i].m_usNumStats > MAX_STATS_PER_SCORE)
+            continue;
+        contents << board;
+        for (unsigned int column = 0; column < scores[i].m_usNumStats; ++column)
+            contents << '\t' << scores[i].m_auiStats[column];
+        contents << '\n';
+        any = true;
+    }
+    if (any)
+    {
+        static unsigned int submitId = 0;
+        const std::wstring name = L"leaderboard-submit-" +
+            std::to_wstring(static_cast<unsigned long long>(System::processTimeInMilliSecs())) + L"-" +
+            std::to_wstring(++submitId) + L".tsv";
+        WriteLiveFile(LivePath(name.c_str()), contents.str());
+    }
+#else
+    (void)count;
+    (void)scores;
+#endif
     return true;
 }
 
@@ -104,9 +214,17 @@ void LceLeaderboardManager::Finish(eStatsReturn result)
 }
 
 bool LceLeaderboardManager::ReadStats_Friends(LeaderboardReadListener* pReadListener, int iUserIndex,
-                                              EStatsType eStatsType, PlayerUID, unsigned int, unsigned int)
+                                              EStatsType eStatsType, PlayerUID, unsigned int uiStartRank,
+                                              unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
+#ifdef _WIN32
+    if (!LiveDirectory().empty())
+    {
+        RequestFromLive("friends", uiStartRank, uiNumRows);
+        return true;
+    }
+#endif
     const int pad = m_pad;
     Minecraft* minecraft = Minecraft::GetInstance();
     StatsCounter* counter = minecraft != NULL && pad >= 0 && pad < 4 ? minecraft->mStats[pad] : NULL;
@@ -136,6 +254,13 @@ bool LceLeaderboardManager::ReadStats_MyScore(LeaderboardReadListener* pReadList
                                               EStatsType eStatsType, PlayerUID, unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
+#ifdef _WIN32
+    if (!LiveDirectory().empty())
+    {
+        RequestFromLive("mine", 1, uiNumRows);
+        return true;
+    }
+#endif
     RequestFromServer(true, 1, uiNumRows);
     return true;
 }
@@ -144,8 +269,106 @@ bool LceLeaderboardManager::ReadStats_TopRank(LeaderboardReadListener* pReadList
                                               EStatsType eStatsType, unsigned int uiStartRank, unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
+#ifdef _WIN32
+    if (!LiveDirectory().empty())
+    {
+        RequestFromLive("overall", uiStartRank, uiNumRows);
+        return true;
+    }
+#endif
     RequestFromServer(false, uiStartRank, uiNumRows);
     return true;
+}
+
+void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int startRank, unsigned int count)
+{
+#ifdef _WIN32
+    const int board = LiveBoardIndex(static_cast<EStatsType>(m_board));
+    if (board < 0 || filter == NULL || count == 0 || count > 50)
+    {
+        Finish(eStatsReturn_Failed);
+        return;
+    }
+    ++m_requestId;
+    if (m_requestId == 0)
+        ++m_requestId;
+    std::ostringstream request;
+    request << m_requestId << '\t' << board << '\t' << filter << '\t' << startRank << '\t' << count << '\n';
+    _wremove(LivePath(L"leaderboard.response").c_str());
+    if (!WriteLiveFile(LivePath(L"leaderboard.request"), request.str()))
+    {
+        Finish(eStatsReturn_Failed);
+        return;
+    }
+    m_sentAt = System::processTimeInMilliSecs();
+    m_pending = ePending_Live;
+#else
+    (void)filter;
+    (void)startRank;
+    (void)count;
+    Finish(eStatsReturn_Failed);
+#endif
+}
+
+bool LceLeaderboardManager::ReadLiveResponse()
+{
+#ifdef _WIN32
+    const std::wstring responsePath = LivePath(L"leaderboard.response");
+    FILE* file = NULL;
+    if (responsePath.empty() || _wfopen_s(&file, responsePath.c_str(), L"rb") != 0 || file == NULL)
+        return false;
+    std::string contents;
+    char buffer[1024];
+    while (std::fgets(buffer, sizeof(buffer), file) != NULL)
+        contents += buffer;
+    std::fclose(file);
+    _wremove(responsePath.c_str());
+    std::istringstream lines(contents);
+    std::string line;
+    if (!std::getline(lines, line))
+        return false;
+    const std::vector<std::string> header = SplitTabs(line);
+    if (header.size() != 3)
+        return false;
+    const unsigned int id = static_cast<unsigned int>(std::strtoul(header[0].c_str(), NULL, 10));
+    if (id != m_requestId)
+        return false;
+    if (header[1] == "-1")
+    {
+        Finish(eStatsReturn_Failed);
+        return true;
+    }
+    const unsigned int total = static_cast<unsigned int>(std::strtoul(header[1].c_str(), NULL, 10));
+    const unsigned int count = static_cast<unsigned int>(std::strtoul(header[2].c_str(), NULL, 10));
+    if (count > 50)
+    {
+        Finish(eStatsReturn_Failed);
+        return true;
+    }
+    m_rows.clear();
+    for (unsigned int i = 0; i < count && std::getline(lines, line); ++i)
+    {
+        const std::vector<std::string> fields = SplitTabs(line);
+        if (fields.size() < 4 || fields.size() > MAX_STATS_PER_SCORE + 3)
+            continue;
+        ReadScore score;
+        std::memset(score.m_auiStats, 0, sizeof(score.m_auiStats));
+        score.m_uiRank = static_cast<unsigned int>(std::strtoul(fields[0].c_str(), NULL, 10));
+        score.m_wsGamertag = AsciiWide(fields[1]);
+        score.m_uid = PlayerUID(0);
+        score.m_usNumStats = static_cast<unsigned short>(fields.size() - 3);
+        for (unsigned int column = 0; column < score.m_usNumStats; ++column)
+            score.m_auiStats[column] = static_cast<unsigned int>(std::strtoul(fields[column + 3].c_str(), NULL, 10));
+        score.m_uiRating = 0;
+        score.m_iMessageStringId = 0;
+        m_rows.push_back(score);
+    }
+    m_totalRows = total;
+    Finish(eStatsReturn_Success);
+    return true;
+#else
+    return false;
+#endif
 }
 
 void LceLeaderboardManager::RequestFromServer(bool aroundMe, unsigned int startRank, unsigned int count)

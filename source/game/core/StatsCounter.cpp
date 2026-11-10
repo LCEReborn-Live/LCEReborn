@@ -1,6 +1,7 @@
 #include "game/core/StatsCounter.hpp"
 
 #include "game/core/GenericStats.hpp"
+#include "game/core/LeaderboardBoards.hpp"
 #include "game/core/LeaderboardManager.hpp"
 #include "game/core/Stat.hpp"
 #include "game/core/Stats.hpp"
@@ -382,6 +383,18 @@ void StatsCounter::save(int profile, bool force, unsigned char* data)
 
 void StatsCounter::writeStats()
 {
+    static const int boards[] = {LeaderboardBoards::eBoard_Travelling, LeaderboardBoards::eBoard_Mining,
+                                 LeaderboardBoards::eBoard_Farming, LeaderboardBoards::eBoard_Kills};
+    LeaderboardManager::RegisterScore scores[4];
+    for (int index = 0; index < 4; ++index)
+    {
+        scores[index].m_eStatsType = static_cast<LeaderboardManager::EStatsType>(boards[index]);
+        scores[index].m_usNumStats = static_cast<unsigned short>(LeaderboardBoards::ColumnCount(boards[index]));
+        std::memset(scores[index].m_auiStats, 0, sizeof(scores[index].m_auiStats));
+        for (int column = 0; column < scores[index].m_usNumStats; ++column)
+            scores[index].m_auiStats[column] = LeaderboardBoards::CounterValue(this, boards[index], column);
+    }
+    g_pLeaderboardManager->WriteStats(4, scores);
 }
 
 void StatsCounter::flushLeaderboards()

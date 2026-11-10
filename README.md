@@ -1,5 +1,7 @@
 # LCEReborn
-
+---
+Currently archived until further notice, use other forks that are more up to date and supported.
+---
 LCEReborn is a cross-platform reimagining of Legacy Console Edition, built on the Wii U Edition decompilation at 1.13, the Aquatic Update.
 
 It runs on Windows, Linux and the Wii U (a homebrew bundle for Cemu and Aroma), and they can all play together. There are no game files in this repo, so you'll need your own copy of the game, dumped from your own console.
@@ -18,7 +20,7 @@ The full game is unlocked from the start, along with the packs that came free wi
 
 - Keyboard and mouse or controllers, split screen, any window size or borderless fullscreen
 - Render distance up to 32 chunks and larger world sizes
-- OptiFine and Iris shader packs
+- OptiFine & Iris shader packs support
 - Open to LAN, a server list, and a dedicated server (`LCERebornServer`) for Windows and Linux
 - Servers can send players the texture and map packs they're missing
 

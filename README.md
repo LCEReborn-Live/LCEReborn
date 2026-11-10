@@ -37,7 +37,7 @@ Sign in to Live in the launcher, add friends by username, and open a world with 
 
 ### Build from source
 
-Client build instructions are in [`docs/pc-platform.md`](docs/pc-platform.md). Release build details are in [`docs/live-release.md`](docs/live-release.md). The Live API source is in [`live-api/`](live-api/).
+Client build instructions are in [`docs/pc-platform.md`](docs/pc-platform.md). Release build details are in [`docs/live-release.md`](docs/live-release.md).
 
 ### Credits and license
 
@@ -74,7 +74,7 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 
 ### Сборка из исходников
 
-Инструкции по сборке клиента находятся в [`docs/pc-platform.md`](docs/pc-platform.md), а сведения о сборке релизов — в [`docs/live-release.md`](docs/live-release.md). Исходный код API Live находится в [`live-api/`](live-api/).
+Инструкции по сборке клиента находятся в [`docs/pc-platform.md`](docs/pc-platform.md), а сведения о сборке релизов — в [`docs/live-release.md`](docs/live-release.md).
 
 ### Благодарности и лицензия
 

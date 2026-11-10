@@ -85,7 +85,3 @@ LCEReborn основан на восстановленном коде Minecraft:
 ## Contributors
 
 - [@kkerneldev](https://github.com/kkerneldev)
-
-## Контрибьюторы
-
-- [@kkerneldev](https://github.com/kkerneldev)

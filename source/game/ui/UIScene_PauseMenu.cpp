@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <stdlib.h>
 
 #include "game/client/audio/SoundEvents.hpp"
 #include "game/core/ChatScreen.hpp"
@@ -139,6 +140,9 @@ void UIScene_PauseMenu::Init()
                                       9);
     }
 
+    if (getenv("LCE_LIVE_DIR") && primaryPlayer && CGameNetworkManager::sInstance.IsHost()
+        && !CGameNetworkManager::sInstance.IsLocalGame())
+        m_buttonList.AddNewMenuButton(L10N::GetString(IDS_TOOLTIPS_INVITE_FRIENDS), 10);
     m_buttonList.AddNewMenuButton(L10N::GetString(IDS_EXIT_GAME), 6);
     if (gApp.GetGameHostOption(eGameHostOption_MiniGame) == 0
         || !CGameNetworkManager::sInstance.IsInPublicJoinableGame() || gProfile->GetPrimaryPad() != m_playerId
@@ -329,6 +333,9 @@ void UIScene_PauseMenu::handlePress(int, int childId)
         UIScene_OnlineSettingsMenu::Open(m_playerId, CGameNetworkManager::sInstance.IsLocalGame()
                                                          ? UIScene_OnlineSettingsMenu::eMode_OpenToLan
                                                          : UIScene_OnlineSettingsMenu::eMode_LanWorld);
+        return;
+    case 10:
+        CGameNetworkManager::sInstance.SendInviteGUI(m_playerId);
         return;
     case 3:
         break;

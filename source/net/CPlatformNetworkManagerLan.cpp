@@ -3,6 +3,8 @@
 #include <limits.h>
 #include <string.h>
 #include <wctype.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "game/core/CMinecraftApp.hpp"
 #include "game/core/CConsoleMinecraftApp.hpp"
@@ -33,6 +35,71 @@ const int64_t cUnjoinedTimeoutMs = 10000;
 const int64_t cQueryTimeoutMs = 6000;
 const int64_t cServerProbeIntervalMs = 5000;
 const int64_t cBeaconRefreshMs = 1000;
+
+struct LiveEntry { std::string address; std::wstring name; };
+std::vector<LiveEntry> g_liveEntries;
+std::string g_liveSnapshot;
+std::string g_liveWorld;
+int64_t g_liveUpdated = 0;
+unsigned int g_liveRevision = 0;
+unsigned int g_liveReportedRevision = 0;
+
+FILE* LiveFile(const wchar_t* file, const wchar_t* mode)
+{
+#ifdef _WIN32
+    const wchar_t* directory = _wgetenv(L"LCE_LIVE_DIR");
+    if (directory == 0 || *directory == 0) return 0;
+    const std::wstring path = std::wstring(directory) + L"\\" + file;
+    FILE* result = 0;
+    _wfopen_s(&result, path.c_str(), mode);
+    return result;
+#else
+    (void)file; (void)mode;
+    return 0;
+#endif
+}
+
+std::wstring LiveName(const char* utf8)
+{
+    std::wstring result;
+    const unsigned char* p = reinterpret_cast<const unsigned char*>(utf8);
+    while (*p && result.size() < 31)
+    {
+        unsigned int code = *p++;
+        if (code >= 0xc2 && code <= 0xdf && (p[0] & 0xc0) == 0x80)
+            { code = ((code & 31) << 6) | (p[0] & 63); ++p; }
+        else if (code >= 0xe0 && code <= 0xef && p[0] && p[1] && (p[0] & 0xc0) == 0x80 && (p[1] & 0xc0) == 0x80)
+            { code = ((code & 15) << 12) | ((p[0] & 63) << 6) | (p[1] & 63); p += 2; }
+        else if (code >= 0x80) code = '?';
+        result.push_back(static_cast<wchar_t>(code));
+    }
+    return result.empty() ? L"Live world" : result;
+}
+
+std::vector<LiveEntry> ReadLiveEntries(std::string& snapshot)
+{
+    std::vector<LiveEntry> entries;
+    FILE* file = LiveFile(L"servers.txt", L"rb");
+    if (!file) return entries;
+    char line[512];
+    while (entries.size() < 128 && fgets(line, sizeof(line), file))
+    {
+        snapshot += line;
+        char* separator = strchr(line, '\t');
+        if (!separator) continue;
+        *separator++ = 0;
+        char* end = 0;
+        long port = strtol(line, &end, 10);
+        if (*end || port <= 0 || port > 65535) continue;
+        separator[strcspn(separator, "\r\n")] = 0;
+        LiveEntry entry;
+        entry.address = std::string("127.0.0.1:") + line;
+        entry.name = LiveName(separator);
+        entries.push_back(entry);
+    }
+    fclose(file);
+    return entries;
+}
 
 bool SameName(const std::wstring& left, const std::wstring& right)
 {
@@ -226,6 +293,31 @@ void CPlatformNetworkManagerLan::DoWork()
     FinishJoining();
     ProcessStateChanges();
     UpdateBeacon();
+    const int64_t liveNow = lcenet::NowMs();
+    if (liveNow - g_liveUpdated >= 1000)
+    {
+        g_liveUpdated = liveNow;
+        char state[64] = "0";
+        EnterCriticalSection(&m_lock);
+        if (m_host && m_listening && !m_localGame && m_internalState == eState_Playing && m_sessionData.m_bGameStarted)
+            snprintf(state, sizeof(state), "1\t%u\t%d", (unsigned int)m_listenPort, m_privateGame ? 1 : 0);
+        LeaveCriticalSection(&m_lock);
+        if (g_liveWorld != state)
+        {
+            FILE* file = LiveFile(L"world.txt", L"wb");
+            if (file) { fputs(state, file); fclose(file); g_liveWorld = state; }
+        }
+        std::string snapshot;
+        std::vector<LiveEntry> entries = ReadLiveEntries(snapshot);
+        EnterCriticalSection(&m_lock);
+        if (snapshot != g_liveSnapshot)
+        {
+            g_liveSnapshot.swap(snapshot);
+            g_liveEntries.swap(entries);
+            ++g_liveRevision;
+        }
+        LeaveCriticalSection(&m_lock);
+    }
     UpdateLanSessions();
 
     EnterCriticalSection(&m_lock);
@@ -503,6 +595,8 @@ bool CPlatformNetworkManagerLan::SessionHasMii(int userIndex)
 
 void CPlatformNetworkManagerLan::SendInviteGUI(int)
 {
+    FILE* file = LiveFile(L"invite.txt", L"wb");
+    if (file) { fputs("invite", file); fclose(file); }
 }
 
 bool CPlatformNetworkManagerLan::IsAddingPlayer()
@@ -899,6 +993,22 @@ std::vector<FriendSessionInfo*>* CPlatformNetworkManagerLan::GetSessionList(int,
         }
         sessions->push_back(info);
     }
+    for (unsigned int index = 0; index < g_liveEntries.size(); ++index)
+    {
+        const LiveEntry& entry = g_liveEntries[index];
+        unsigned int id = RememberServer(entry.address);
+        FriendSessionInfo* info = new FriendSessionInfo;
+        info->m_displayName = new wchar_t[32];
+        memset(info->m_displayName, 0, 32 * sizeof(wchar_t));
+        entry.name.copy(info->m_displayName, 31);
+        info->m_displayNameLength = (unsigned char)wcslen(info->m_displayName);
+        info->m_sessionId = id;
+        memset(&info->m_searchResult, 0, sizeof(info->m_searchResult));
+        info->m_searchResult.m_sessionId = id;
+        KnownSession* known = FindKnownSession(id);
+        if (known) { info->m_serverStatus = known->status; info->m_pingMs = known->pingMs; CopySessionDetails(info, known->session); }
+        sessions->push_back(info);
+    }
     for (unsigned int index = 0; index < found.size(); ++index)
     {
         const GameSessionData& data = found[index].session.data;
@@ -1012,6 +1122,12 @@ void CPlatformNetworkManagerLan::ProbeSavedServers()
         if (known->lastProbe != 0 && now - known->lastProbe < cServerProbeIntervalMs)
             continue;
         StartSessionQuery(*known, 0, 0, 0);
+    }
+    for (unsigned int index = 0; index < g_liveEntries.size(); ++index)
+    {
+        KnownSession* known = FindKnownSession(RememberServer(g_liveEntries[index].address));
+        if (known && !known->probing && (known->lastProbe == 0 || now - known->lastProbe >= cServerProbeIntervalMs))
+            StartSessionQuery(*known, 0, 0, 0);
     }
     for (unsigned int index = 0; index < found.size(); ++index)
     {
@@ -1654,7 +1770,7 @@ void CPlatformNetworkManagerLan::StartListening()
     if (m_listening)
         return;
     std::string error;
-    if (!m_listenSocket.Listen(m_listenPort, error))
+    if (!m_listenSocket.Listen(m_listenPort, error, getenv("LCE_LIVE_DIR") != 0))
     {
         NET_LOG_WARN("Other players can't join this game: %s", error.c_str());
         return;
@@ -2240,7 +2356,7 @@ void CPlatformNetworkManagerLan::FinishJoining()
 void CPlatformNetworkManagerLan::UpdateBeacon()
 {
     EnterCriticalSection(&m_lock);
-    bool advertise = m_host && m_listening && !m_localGame && m_internalState == eState_Playing
+    bool advertise = getenv("LCE_LIVE_DIR") == 0 && m_host && m_listening && !m_localGame && m_internalState == eState_Playing
                      && m_sessionData.m_bPublicGame && m_sessionData.m_bGameStarted;
     if (advertise)
     {
@@ -2366,7 +2482,9 @@ void CPlatformNetworkManagerLan::UpdateLanSessions()
     ProbeSavedServers();
     unsigned int revision = m_scanner.Revision();
     EnterCriticalSection(&m_lock);
-    bool changed = revision != m_scannerRevision || m_probeRevision != m_reportedProbeRevision;
+    bool changed = revision != m_scannerRevision || m_probeRevision != m_reportedProbeRevision
+                   || g_liveRevision != g_liveReportedRevision;
+    g_liveReportedRevision = g_liveRevision;
     m_scannerRevision = revision;
     m_reportedProbeRevision = m_probeRevision;
     void (*callback)(void*) = m_sessionsUpdatedCallback;

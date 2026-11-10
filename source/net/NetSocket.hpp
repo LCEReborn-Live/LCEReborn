@@ -42,7 +42,7 @@ public:
     ~TcpSocket();
 
     bool Connect(const Address& address, int timeoutMs, const CancelFlag& cancel, std::string& error);
-    bool Listen(unsigned short port, std::string& error);
+    bool Listen(unsigned short port, std::string& error, bool loopbackOnly = false);
     bool Accept(int timeoutMs, TcpSocket& accepted, Address& peer);
     bool SendAll(const void* data, size_t size);
     int Receive(void* data, size_t size, int timeoutMs);

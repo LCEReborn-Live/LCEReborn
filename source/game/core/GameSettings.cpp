@@ -23,12 +23,49 @@
 #include "platform/CStorage.hpp"
 #include "platform/CProfile.hpp"
 #include "game/core/VideoSettings.hpp"
+#include <algorithm>
+#include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <vector>
 extern C4JStorage* gStorage;
 
 GameSettings* gGameSettings[4] = {NULL, NULL, NULL, NULL};
 unsigned char gDefaultActionMappings[3][25];
 unsigned char gSecondaryActionMappings[3][25];
 extern CInput* g_pInput;
+
+namespace
+{
+uint32_t LiveCosmeticId()
+{
+    const char* value = std::getenv("LCE_LIVE_USER_ID");
+    if (value == NULL || *value == '\0')
+        return 0;
+    char* end = NULL;
+    const unsigned long long userId = std::strtoull(value, &end, 10);
+    if (end == value || *end != '\0' || userId == 0)
+        return 0;
+    const uint32_t id = static_cast<uint32_t>((userId * 2654435761ULL) & 0x7fffffffULL);
+    return 0x80000000u | (id == 0 ? 1u : id);
+}
+
+void LoadLiveTexture(const char* variable, const std::wstring& textureName)
+{
+    const char* path = std::getenv(variable);
+    if (path == NULL || *path == '\0' || gApp.IsFileInMemoryTextures(textureName))
+        return;
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+        return;
+    std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    if (bytes.empty() || bytes.size() > 512 * 1024)
+        return;
+    unsigned char* owned = new unsigned char[bytes.size()];
+    std::copy(bytes.begin(), bytes.end(), owned);
+    gApp.AddMemoryTextureFile(textureName, owned, static_cast<unsigned int>(bytes.size()));
+}
+}
 
 void DefineActions()
 {
@@ -1073,6 +1110,12 @@ void GameSettings::SetDefaultGameOptions(C4JStorage::PROFILESETTINGS* values, in
 }
 void GameSettings::InitGameSettings()
 {
+    const uint32_t liveId = LiveCosmeticId();
+    if (liveId != 0)
+    {
+        LoadLiveTexture("LCE_LIVE_SKIN_PATH", CMinecraftApp::getSkinPathFromId(liveId));
+        LoadLiveTexture("LCE_LIVE_CAPE_PATH", Player::getCapePathFromId(liveId));
+    }
     for (int profile = 0; profile < 4; ++profile)
     {
         gGameSettings[profile] = reinterpret_cast<GameSettings*>(gStorage->GetGameDefinedProfileData(profile));
@@ -1164,11 +1207,14 @@ void GameSettings::SetPlayerCape(int profile, const std::wstring& path)
 }
 std::wstring GameSettings::GetPlayerCapeName(int profile)
 {
-    return Player::getCapePathFromId(gGameSettings[profile]->mCapeId);
+    return Player::getCapePathFromId(GetPlayerCapeId(profile));
 }
 uint32_t GameSettings::IsAllowedSkin(int profile)
 {
     GameSettings* settings = gGameSettings[profile];
+    const uint32_t liveId = LiveCosmeticId();
+    if (liveId != 0 && gApp.IsFileInMemoryTextures(CMinecraftApp::getSkinPathFromId(liveId)))
+        return 1;
     if (static_cast<int32_t>(settings->mSkinId) >= 0)
         return 1;
 
@@ -1189,6 +1235,9 @@ uint32_t GameSettings::IsAllowedSkin(int profile)
 }
 uint32_t GameSettings::GetPlayerCapeId(int profile)
 {
+    const uint32_t liveId = LiveCosmeticId();
+    if (liveId != 0 && gApp.IsFileInMemoryTextures(Player::getCapePathFromId(liveId)))
+        return liveId;
     unsigned int id = 0;
     if (IsAllowedSkin(profile))
         id = gGameSettings[profile]->mCapeId;
@@ -1216,10 +1265,13 @@ void GameSettings::SetPlayerSkin(int profile, const std::wstring& path)
 }
 std::wstring GameSettings::GetPlayerSkinName(int profile)
 {
-    return CMinecraftApp::getSkinPathFromId(gGameSettings[profile]->mSkinId);
+    return CMinecraftApp::getSkinPathFromId(GetPlayerSkinId(profile));
 }
 uint32_t GameSettings::GetPlayerSkinId(int profile)
 {
+    const uint32_t liveId = LiveCosmeticId();
+    if (liveId != 0 && gApp.IsFileInMemoryTextures(CMinecraftApp::getSkinPathFromId(liveId)))
+        return liveId;
     unsigned int id = 0;
     if (IsAllowedSkin(profile))
         id = gGameSettings[profile]->mSkinId;

@@ -1,6 +1,7 @@
 #include "platform/pc/PcStartWorld.hpp"
 
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -51,6 +52,30 @@ const Logger sLog("StartWorld");
 StartWorldState sState = StartWorldState_Idle;
 int sMenuFrames = 0;
 double sStateStart = 0.0;
+std::string sLiveInvite;
+
+std::string ReadLiveInvite()
+{
+#ifdef _WIN32
+    const wchar_t* directory = _wgetenv(L"LCE_LIVE_DIR");
+    if (!directory || !*directory) return std::string();
+    const std::wstring path = std::wstring(directory) + L"\\join.txt";
+    FILE* file = NULL;
+    _wfopen_s(&file, path.c_str(), L"rb");
+    if (!file) return std::string();
+    char text[16] = {};
+    const bool read = fgets(text, sizeof(text), file) != NULL;
+    fclose(file);
+    _wremove(path.c_str());
+    if (!read) return std::string();
+    char* end = NULL;
+    long port = strtol(text, &end, 10);
+    if (*end != '\0' || port < 1 || port > 65535) return std::string();
+    return std::string("127.0.0.1:") + text;
+#else
+    return std::string();
+#endif
+}
 
 double NowSeconds()
 {
@@ -66,7 +91,7 @@ void Enter(StartWorldState state)
 void Fail(const char* message, const std::string& detail)
 {
     LOG_ERROR(sLog, "%s: %s", message, detail.c_str());
-    PcRequestExit();
+    if (sLiveInvite.empty()) PcRequestExit();
     Enter(StartWorldState_Done);
 }
 
@@ -200,9 +225,16 @@ bool PcInWorld()
 void PcStartWorldTick()
 {
     const PcLaunchOptions& options = PcGetLaunchOptions();
-    if (options.world.empty() && options.join.empty())
+    if ((sState == StartWorldState_Idle || sState == StartWorldState_Done) && !PcInWorld()
+        && gConsoleUIController.IsSceneInStack(gProfile->GetPrimaryPad(), EUIScene_MainMenu))
+    {
+        const std::string invite = ReadLiveInvite();
+        if (!invite.empty()) { sLiveInvite = invite; sMenuFrames = 0; Enter(StartWorldState_Idle); }
+    }
+    if (sLiveInvite.empty() && options.world.empty() && options.join.empty())
         return;
-    const std::string& target = options.world.empty() ? options.join : options.world;
+    const bool joining = !sLiveInvite.empty() || options.world.empty();
+    const std::string& target = !sLiveInvite.empty() ? sLiveInvite : (joining ? options.join : options.world);
 
     switch (sState)
     {
@@ -227,18 +259,18 @@ void PcStartWorldTick()
         gProfile->SetPrimaryPad(g_pInput->LastInputPad());
         {
             std::string error;
-            if (!options.world.empty() && !LoadWorld(options.world, error))
+            if (!joining && !LoadWorld(options.world, error))
             {
                 Fail("The world could not be loaded", error);
                 break;
             }
-            if (options.world.empty() && CGameNetworkManager::sInstance.JoinServerAddress(options.join) != 0)
+            if (joining && CGameNetworkManager::sInstance.JoinServerAddress(target) != 0)
             {
-                Fail("Could not join", options.join);
+                Fail("Could not join", target);
                 break;
             }
         }
-        LOG_INFO(sLog, options.world.empty() ? "Joining %s" : "Loading %s", target.c_str());
+        LOG_INFO(sLog, joining ? "Joining %s" : "Loading %s", target.c_str());
         Enter(StartWorldState_Loading);
         break;
     case StartWorldState_Loading:

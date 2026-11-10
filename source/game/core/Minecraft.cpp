@@ -8,6 +8,10 @@
 
 #include <wchar.h>
 #include <cmath>
+#include <chrono>
+#include <cstdlib>
+#include <fstream>
+#include <string>
 
 #include "game/client/audio/ConsoleSoundEngine.hpp"
 #include "game/client/audio/SoundEngine.hpp"
@@ -128,6 +132,7 @@
 #include "game/item/ItemInstance.hpp"
 #include "game/item/Items.hpp"
 #include "game/minigame/MiniGameDef.hpp"
+#include "game/minigame/EMiniGameId.hpp"
 #include "game/minigame/CheckpointRuleDefinition.hpp"
 #include "game/minigame/MiniGameMedals.hpp"
 #include "game/minigame/Tutorial.hpp"
@@ -269,6 +274,37 @@ static bool sCheckForNewLocalPlayers = true;
 bool gFancyGraphics = true;
 static File sWorkingDirectory;
 static C4JCriticalSection sTextureRequestLock;
+
+namespace
+{
+void WriteLiveGameActivity()
+{
+    const char* directory = std::getenv("LCE_LIVE_DIR");
+    if (directory == NULL || *directory == '\0') return;
+    static std::chrono::steady_clock::time_point lastWrite;
+    const auto now = std::chrono::steady_clock::now();
+    if (lastWrite.time_since_epoch().count() != 0 && now - lastWrite < std::chrono::seconds(2)) return;
+    lastWrite = now;
+
+    const MiniGameDef* selectedMiniGame = Minecraft::GetInstance()->GetMiniGame();
+    const bool miniGame = selectedMiniGame != NULL && Minecraft::InMiniGame(eMiniGameId_Any, true);
+    const char* activity = "world";
+    if (miniGame)
+    {
+        switch (Minecraft::GetMiniGameId())
+        {
+        case eMiniGameId_Battle: activity = "battle"; break;
+        case eMiniGameId_Tumble: activity = "tumble"; break;
+        case eMiniGameId_Glide: activity = "glide"; break;
+        case eMiniGameId_Build: activity = "build"; break;
+        default: activity = "world"; break;
+        }
+    }
+    const std::string path = std::string(directory) + "/presence.json";
+    std::ofstream file(path.c_str(), std::ios::binary | std::ios::trunc);
+    if (file) file << "{\"activity\":\"" << activity << "\"}";
+}
+}
 
 struct ScoreboardMenuData
 {
@@ -1450,6 +1486,7 @@ void Minecraft::tickAllConnections()
 
 void Minecraft::tick(bool handleInput, bool lastTickOfFrame)
 {
+    WriteLiveGameActivity();
     int playerIdx = mPlayer->mUserIndex;
 
     mStats[playerIdx]->tick(playerIdx);

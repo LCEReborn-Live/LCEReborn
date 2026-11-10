@@ -19,7 +19,9 @@ public:
     static QString CheckGameReady();
     static QStringList Arguments(const Profile& profile);
 
-    bool Start(const Profile& profile, QString* error);
+    bool Start(const Profile& profile, QString* error, const QString& liveDirectory = QString(),
+               const QString& liveUserId = QString(), const QString& liveSkinPath = QString(),
+               const QString& liveCapePath = QString());
     bool StartDetached(const Profile& profile, QString* error);
     bool IsRunning() const { return mProcess.state() != QProcess::NotRunning; }
     void Stop();

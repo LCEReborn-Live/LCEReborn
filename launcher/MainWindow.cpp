@@ -1,19 +1,54 @@
-#include "MainWindow.hpp"
+﻿#include "MainWindow.hpp"
 
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
+#include <QSaveFile>
+#include <QFrame>
+#include <QDateTime>
+#include <QDataStream>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QPropertyAnimation>
+#include <QEasingCurve>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPointer>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QInputDialog>
+#include <QImage>
+#include <QLineEdit>
+#include <QScrollArea>
 #include <QMessageBox>
+#include <QMap>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QPainter>
 #include <QPushButton>
 #include <QSettings>
 #include <QStackedWidget>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QProcess>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <memory>
+
+#ifdef Q_OS_WIN
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <wincrypt.h>
+#pragma comment(lib, "Crypt32.lib")
+#endif
 
 #include "BuildVersion.hpp"
 #include "GameArt.hpp"
@@ -35,15 +70,142 @@ enum Page
     NewsPage,
     LogPage,
     ProfilesPage,
+    FriendsPage,
     PageCount
 };
 
-const char* const kPageNames[PageCount] = {"News", "Game Log", "Profiles"};
+const char* const kPageNames[PageCount] = {"News", "Game Log", "Profiles", "Friends"};
 const int kBottomRowHeight = 62;
+
+bool SaveLiveToken(const QString& token)
+{
+    QSettings settings(LauncherPaths::SettingsFile(), QSettings::IniFormat);
+    if (token.isEmpty()) { settings.remove("live/protectedSession"); settings.sync(); return settings.status() == QSettings::NoError; }
+#ifdef Q_OS_WIN
+    QByteArray bytes = token.toUtf8();
+    DATA_BLOB input{static_cast<DWORD>(bytes.size()), reinterpret_cast<BYTE*>(bytes.data())};
+    DATA_BLOB output{};
+    if (!CryptProtectData(&input, L"LCE Live", nullptr, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &output)) return false;
+    const QByteArray encrypted(reinterpret_cast<const char*>(output.pbData), static_cast<int>(output.cbData));
+    LocalFree(output.pbData);
+    settings.setValue("live/protectedSession", QString::fromLatin1(encrypted.toBase64()));
+    settings.sync();
+    return settings.status() == QSettings::NoError;
+#else
+    return false;
+#endif
+}
+
+static void WritePckString(QDataStream& stream, const QString& value)
+{
+    stream << static_cast<quint32>(value.size());
+    for (const QChar character : value)
+        stream << static_cast<quint16>(character.unicode());
+    stream << static_cast<quint32>(0);
+}
+
+static void WritePckParameter(QDataStream& stream, quint32 index, const QString& value)
+{
+    stream << index;
+    WritePckString(stream, value);
+}
+
+static quint32 LiveSkinModelFlag(const QByteArray& bytes)
+{
+    const QImage skin = QImage::fromData(bytes).convertToFormat(QImage::Format_ARGB32);
+    if (skin.size() != QSize(64, 64)) return 0x00040000u;
+    const QRect armRegions[] = {QRect(50, 16, 2, 4), QRect(54, 20, 2, 12), QRect(42, 48, 2, 4),
+                                QRect(46, 52, 2, 12)};
+    for (const QRect& region : armRegions)
+    {
+        for (int y = region.top(); y <= region.bottom(); ++y)
+        {
+            for (int x = region.left(); x <= region.right(); ++x)
+            {
+                if (qAlpha(skin.pixel(x, y)) < 255) return 0x00080000u;
+            }
+        }
+    }
+    return 0x00040000u;
+}
+
+static QByteArray BuildLiveCosmeticPck(qint64 userId, const QString& username, const QByteArray& skin,
+                                       const QByteArray& cape)
+{
+    if (userId <= 0 || (skin.isEmpty() && cape.isEmpty()))
+        return {};
+
+    const quint32 skinId = static_cast<quint32>((static_cast<quint64>(userId) * 2654435761ULL) & 0x7fffffffULL);
+    const QString id = QString::number(skinId == 0 ? 1 : skinId).rightJustified(8, QChar('0'));
+    const QString skinPath = "dlcskin" + id + ".png";
+    const QString capePath = "dlccape" + id + ".png";
+    QStringList properties{"DISPLAYNAME", "GAME_FLAGS", "FREE"};
+    if (!skin.isEmpty()) properties.append("ANIM");
+    if (!cape.isEmpty()) properties.append("CAPEPATH");
+    const QHash<QString, quint32> propertyIndex{{"DISPLAYNAME", 0}, {"GAME_FLAGS", 1}, {"FREE", 2},
+                                                {"ANIM", 3}, {"CAPEPATH", 4}};
+
+    QByteArray bytes;
+    QDataStream stream(&bytes, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream << quint32(3) << static_cast<quint32>(properties.size());
+    for (quint32 index = 0; index < static_cast<quint32>(properties.size()); ++index)
+    {
+        stream << index;
+        WritePckString(stream, properties.at(static_cast<int>(index)));
+    }
+    stream << static_cast<quint32>((!skin.isEmpty() ? 1 : 0) + (!cape.isEmpty() ? 1 : 0));
+    if (!skin.isEmpty())
+    {
+        stream << static_cast<quint32>(skin.size()) << quint32(0);
+        WritePckString(stream, skinPath);
+    }
+    if (!cape.isEmpty())
+    {
+        stream << static_cast<quint32>(cape.size()) << quint32(1);
+        WritePckString(stream, capePath);
+    }
+    if (!skin.isEmpty())
+    {
+        stream << static_cast<quint32>(cape.isEmpty() ? 4 : 5);
+        WritePckParameter(stream, propertyIndex.value("DISPLAYNAME"), username);
+        WritePckParameter(stream, propertyIndex.value("GAME_FLAGS"), "0x00");
+        WritePckParameter(stream, propertyIndex.value("FREE"), "1");
+        WritePckParameter(stream, propertyIndex.value("ANIM"),
+                          QString("0x%1").arg(LiveSkinModelFlag(skin), 8, 16, QChar('0')));
+        if (!cape.isEmpty()) WritePckParameter(stream, propertyIndex.value("CAPEPATH"), capePath);
+        stream.writeRawData(skin.constData(), skin.size());
+    }
+    if (!cape.isEmpty())
+    {
+        stream << quint32(0);
+        stream.writeRawData(cape.constData(), cape.size());
+    }
+    return stream.status() == QDataStream::Ok ? bytes : QByteArray();
+}
+
+QString LoadLiveToken()
+{
+#ifdef Q_OS_WIN
+    QSettings settings(LauncherPaths::SettingsFile(), QSettings::IniFormat);
+    QByteArray encrypted = QByteArray::fromBase64(settings.value("live/protectedSession").toByteArray());
+    if (encrypted.isEmpty()) return QString();
+    DATA_BLOB input{static_cast<DWORD>(encrypted.size()), reinterpret_cast<BYTE*>(encrypted.data())};
+    DATA_BLOB output{};
+    if (!CryptUnprotectData(&input, nullptr, nullptr, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &output)) return QString();
+    const QString token = QString::fromUtf8(reinterpret_cast<const char*>(output.pbData), static_cast<int>(output.cbData));
+    SecureZeroMemory(output.pbData, output.cbData);
+    LocalFree(output.pbData);
+    return token;
+#else
+    return QString();
+#endif
+}
 }
 
 MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
-    : QMainWindow(parent), mStore(store), mRunner(new GameRunner(this)), mPanorama(new Panorama(this)),
+    : QMainWindow(parent), mStore(store), mRunner(new GameRunner(this)), mLiveNetwork(new QNetworkAccessManager(this)),
+      mLiveButton(new GameButton("Live Sign In", this)), mPanorama(new Panorama(this)),
       mRoot(new QStackedWidget(mPanorama)), mShellLayout(nullptr), mTabs(new TabbedPanel(this)),
       mPages(new QStackedWidget(this)), mSetup(new SetupPage(this)), mNews(new NewsTab(this)),
       mLog(new GameLogTab(this)), mProfileButton(new GameButton(QString(), this)), mPlay(new PlayButton(this)),
@@ -57,6 +219,7 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     mPages->addWidget(mLog);
     auto* profiles = new ProfilesTab(mStore, this);
     mPages->addWidget(profiles);
+    mPages->addWidget(CreateLiveFriendsPage());
     for (const char* name : kPageNames)
         mTabs->AddTab(name);
     mTabs->SetContent(mPages);
@@ -70,6 +233,10 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     mark->setPixmap(QPixmap(":/launcher/mark.png").scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     mark->setFixedSize(32, 32);
     cornerLayout->addStretch(1);
+    mLiveButton->SetPixelSize(14);
+    mLiveButton->SetReadableFont(true);
+    mLiveButton->setFixedSize(150, 40);
+    cornerLayout->addWidget(mLiveButton);
     cornerLayout->addWidget(mark);
     cornerLayout->addWidget(new ShadowLabel("LCE Reborn", 24, corner));
     mTabs->SetCorner(corner);
@@ -112,6 +279,23 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     connect(&mStore, &ProfileStore::Changed, this, &MainWindow::RefreshProfiles);
     connect(mProfileButton, &GameButton::clicked, this, &MainWindow::ShowProfileMenu);
     connect(mPlay, &PlayButton::clicked, this, &MainWindow::Play);
+    connect(mLiveButton, &GameButton::clicked, this, &MainWindow::LiveAccount);
+    QTimer* liveInvites = new QTimer(this);
+    liveInvites->setInterval(4000);
+    connect(liveInvites, &QTimer::timeout, this, &MainWindow::PollLiveInvites);
+    liveInvites->start();
+    QTimer* friendsRefresh = new QTimer(this);
+    friendsRefresh->setInterval(15000);
+    connect(friendsRefresh, &QTimer::timeout, this, &MainWindow::RefreshLiveFriends);
+    friendsRefresh->start();
+    QTimer* presence = new QTimer(this);
+    presence->setInterval(15000);
+    connect(presence, &QTimer::timeout, this, &MainWindow::SendLivePresence);
+    presence->start();
+    QTimer* cosmetics = new QTimer(this);
+    cosmetics->setInterval(5 * 60 * 1000);
+    connect(cosmetics, &QTimer::timeout, this, [this] { if (!mLiveToken.isEmpty()) RefreshLiveCosmetics(); });
+    cosmetics->start();
     connect(mRunner, &GameRunner::Output, mLog, &GameLogTab::Add);
     connect(mRunner, &GameRunner::Started, this, &MainWindow::OnGameStarted);
     connect(mRunner, &GameRunner::Finished, this, &MainWindow::OnGameFinished);
@@ -145,12 +329,607 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
         QTimer::singleShot(0, this, &MainWindow::ShowPacksNotice);
 
     RefreshProfiles();
+    RenderLiveFriends();
+    RestoreLiveSession();
 }
 
 void MainWindow::ShowPage(int index)
 {
     mTabs->SetCurrent(index);
     mPages->setCurrentIndex(index);
+}
+
+void MainWindow::LiveAccount()
+{
+    if (!mLiveToken.isEmpty())
+    {
+        QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/sessions/current")};
+        request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
+        QNetworkReply* reply = mLiveNetwork->deleteResource(request);
+        connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
+        mLiveToken.clear();
+        SaveLiveToken(QString());
+        mLiveName.clear();
+        mLiveUserId = 0; mLiveSkinCachePath.clear(); mLiveCapeCachePath.clear();
+        mFriends = {}; mIncomingFriends = {}; mSentFriends = {};
+        RenderLiveFriends();
+        mSeenInvites.clear();
+        if (mInvitePopup) mInvitePopup->close();
+        mLiveButton->setText("Live Sign In");
+        RefreshProfiles();
+        return;
+    }
+
+    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/device/start")};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setTransferTimeout(10000);
+    mLiveButton->setEnabled(false);
+    QNetworkReply* reply = mLiveNetwork->post(request, "{}");
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        const QJsonObject data = QJsonDocument::fromJson(reply->readAll()).object();
+        const QString deviceCode = data.value("device_code").toString();
+        const QString userCode = data.value("user_code").toString();
+        if (reply->error() != QNetworkReply::NoError || deviceCode.size() != 64 || userCode.size() != 12)
+        {
+            mLiveButton->setEnabled(true);
+            QMessageBox::warning(this, "LCE Live", "Could not start browser sign-in.");
+            reply->deleteLater();
+            return;
+        }
+        reply->deleteLater();
+        QUrl url("https://api.kerneldev.qzz.io/authorize");
+        url.setQuery("v=2");
+        url.setFragment(userCode);
+        if (!QDesktopServices::openUrl(url))
+        {
+            mLiveButton->setEnabled(true);
+            QMessageBox::warning(this, "LCE Live", "Could not open the browser.");
+            return;
+        }
+        auto* notice = new QMessageBox(QMessageBox::Information, "LCE Live",
+            QString("Confirm sign-in in your browser. Verify this code: %1").arg(userCode), QMessageBox::Cancel, this);
+        notice->setAttribute(Qt::WA_DeleteOnClose);
+        auto* timer = new QTimer(notice);
+        timer->setInterval(3000);
+        connect(notice, &QObject::destroyed, this, [this] { mLiveButton->setEnabled(true); });
+        connect(timer, &QTimer::timeout, this, [this, timer, notice, deviceCode] {
+            if (timer->property("waiting").toBool()) return;
+            timer->setProperty("waiting", true);
+            QNetworkRequest poll{QUrl("https://api.kerneldev.qzz.io/v1/device/token")};
+            poll.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+            poll.setTransferTimeout(10000);
+            QJsonObject body;
+            body.insert("device_code", deviceCode);
+            QNetworkReply* result = mLiveNetwork->post(poll, QJsonDocument(body).toJson(QJsonDocument::Compact));
+            QPointer<QTimer> safeTimer(timer);
+            QPointer<QMessageBox> safeNotice(notice);
+            connect(result, &QNetworkReply::finished, this, [this, result, safeTimer, safeNotice] {
+                const QJsonObject answer = QJsonDocument::fromJson(result->readAll()).object();
+                const int status = result->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                result->deleteLater();
+                if (!safeTimer || !safeNotice) return;
+                safeTimer->setProperty("waiting", false);
+                if (status == 202) return;
+                safeTimer->stop();
+                const QString name = answer.value("user").toObject().value("username").toString();
+                const QString token = answer.value("token").toString();
+                safeNotice->close();
+                if (status != 201 || name.isEmpty() || token.isEmpty())
+                {
+                    QMessageBox::warning(this, "LCE Live", "Sign-in was declined, expired, or could not be completed.");
+                    return;
+                }
+                mLiveName = name;
+                mLiveToken = token;
+                mLiveUserId = answer.value("user").toObject().value("id").toVariant().toLongLong();
+                if (!SaveLiveToken(token)) mLog->AddLauncherMessage(LogLevel::Warn, "Could not save the Live session securely.");
+                mLiveButton->setText("Live Sign Out");
+                RefreshProfiles();
+                SendLivePresence();
+                RefreshLiveFriends();
+                RefreshLiveCosmetics();
+                PollLiveInvites();
+            });
+        });
+        notice->show();
+        timer->start();
+    });
+}
+
+void MainWindow::RestoreLiveSession()
+{
+    const QString token = LoadLiveToken();
+    if (token.isEmpty()) return;
+    mLiveButton->setEnabled(false);
+    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/me")};
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
+    request.setTransferTimeout(10000);
+    QNetworkReply* reply = mLiveNetwork->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, token] {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QJsonObject account = QJsonDocument::fromJson(reply->readAll()).object();
+        const QString name = account.value("username").toString();
+        reply->deleteLater();
+        mLiveButton->setEnabled(true);
+        if (status == 401) { SaveLiveToken(QString()); return; }
+        if (status != 200 || name.isEmpty()) { mLog->AddLauncherMessage(LogLevel::Warn, "Could not restore Live session. Check your connection."); return; }
+        mLiveName = name;
+        mLiveUserId = account.value("id").toVariant().toLongLong();
+        mLiveToken = token;
+        mLiveButton->setText("Live Sign Out");
+        RefreshProfiles(); SendLivePresence(); RefreshLiveFriends(); RefreshLiveCosmetics(); PollLiveInvites();
+    });
+}
+
+void MainWindow::RefreshLiveCosmetics(std::function<void()> completion)
+{
+    if (mLiveToken.isEmpty())
+    {
+        if (completion) completion();
+        return;
+    }
+    if (mCosmeticsRefreshPending)
+    {
+        if (completion) mCosmeticsReadyCallback = completion;
+        return;
+    }
+    mCosmeticsRefreshPending = true;
+    const QString session = mLiveToken;
+    auto finish = [this, completion] {
+        mCosmeticsRefreshPending = false;
+        if (completion) completion();
+        if (mCosmeticsReadyCallback)
+        {
+            std::function<void()> waiting = std::move(mCosmeticsReadyCallback);
+            mCosmeticsReadyCallback = std::function<void()>();
+            waiting();
+        }
+    };
+
+    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/me/cosmetics")};
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
+    request.setTransferTimeout(10000);
+    QNetworkReply* metadataReply = mLiveNetwork->get(request);
+    connect(metadataReply, &QNetworkReply::finished, this, [this, metadataReply, session, finish] {
+        const int status = metadataReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QJsonObject metadata = QJsonDocument::fromJson(metadataReply->readAll()).object();
+        metadataReply->deleteLater();
+        if (session != mLiveToken) { finish(); return; }
+        const qint64 userId = metadata.value("user_id").toVariant().toLongLong();
+        if (status != 200 || userId < 1)
+        {
+            if (status == 401)
+            {
+                mLiveToken.clear(); mLiveName.clear(); mLiveUserId = 0;
+                SaveLiveToken(QString());
+                mLiveButton->setText("Live Sign In");
+                RefreshProfiles();
+            }
+            else mLog->AddLauncherMessage(LogLevel::Warn, "Could not load your Live skin and cape.");
+            finish();
+            return;
+        }
+        mLiveUserId = userId;
+        const QString folder = LauncherPaths::DataDir() + "/live/cosmetics/" + QString::number(userId);
+        if (!QDir().mkpath(folder)) { finish(); return; }
+        const QString skinPath = folder + "/skin.png";
+        const QString capePath = folder + "/cape.png";
+        mLiveSkinCachePath = QFileInfo::exists(skinPath) ? skinPath : QString();
+        mLiveCapeCachePath = QFileInfo::exists(capePath) ? capePath : QString();
+        const bool hasSkin = metadata.value("skin").toBool();
+        const bool hasCape = metadata.value("cape").toBool();
+        auto remaining = std::make_shared<int>(2);
+        auto oneFinished = [this, remaining, finish] {
+            if (--(*remaining) == 0) finish();
+        };
+        const auto download = [this, session, userId, oneFinished](const QString& kind, const QString& path, bool present) {
+            const bool skinAsset = kind == "skin";
+            if (!present)
+            {
+                QFile::remove(path);
+                if (skinAsset) mLiveSkinCachePath.clear();
+                else mLiveCapeCachePath.clear();
+                oneFinished();
+                return;
+            }
+            QNetworkRequest assetRequest{QUrl(QString("https://api.kerneldev.qzz.io/v1/users/%1/%2").arg(userId).arg(kind))};
+            assetRequest.setTransferTimeout(10000);
+            QNetworkReply* assetReply = mLiveNetwork->get(assetRequest);
+            connect(assetReply, &QNetworkReply::finished, this, [this, assetReply, session, path, skinAsset, oneFinished] {
+                const int assetStatus = assetReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                const QByteArray bytes = assetReply->readAll();
+                assetReply->deleteLater();
+                if (session == mLiveToken && assetStatus == 200 && !bytes.isEmpty())
+                {
+                    QSaveFile file(path);
+                    if (file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size() && file.commit())
+                    {
+                        if (skinAsset) mLiveSkinCachePath = path;
+                        else mLiveCapeCachePath = path;
+                    }
+                }
+                oneFinished();
+            });
+        };
+        download("skin", skinPath, hasSkin);
+        download("cape", capePath, hasCape);
+    });
+}
+
+QWidget* MainWindow::CreateLiveFriendsPage()
+{
+    QWidget* page = new QWidget(this);
+    page->setFont(GameFont(15));
+    QVBoxLayout* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(24, 20, 24, 20);
+    QLabel* heading = new QLabel("LCE Live Friends", page);
+    heading->setFont(GameFont(22));
+    heading->setStyleSheet("color:#ffffff; background:rgba(20,18,18,210); padding:7px 10px; border-left:4px solid #bd3434;");
+    layout->addWidget(heading);
+    QHBoxLayout* add = new QHBoxLayout;
+    mFriendName = new QLineEdit(page);
+    mFriendName->setPlaceholderText("Player username");
+    mFriendName->setMaxLength(20);
+    mFriendName->setFont(GameFont(15));
+    mFriendName->setStyleSheet("QLineEdit { background:rgba(20,18,18,235); color:#ffffff; border:2px solid #8f3434; padding:8px; selection-background-color:#bd3434; }");
+    GameButton* send = new GameButton("Add Friend", page);
+    GameButton* refresh = new GameButton("Refresh", page);
+    send->SetPixelSize(15); refresh->SetPixelSize(15);
+    send->SetReadableFont(false); refresh->SetReadableFont(false);
+    send->setFixedSize(135, 40); refresh->setFixedSize(135, 40);
+    add->addWidget(mFriendName, 1); add->addWidget(send); add->addWidget(refresh);
+    layout->addLayout(add);
+    mFriendsMessage = new QLabel(page);
+    mFriendsMessage->setWordWrap(true);
+    mFriendsMessage->setFont(GameFont(14));
+    mFriendsMessage->setStyleSheet("color:#ffffff; background:rgba(20,18,18,220); padding:5px 8px;");
+    layout->addWidget(mFriendsMessage);
+    QScrollArea* scroll = new QScrollArea(page);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setStyleSheet("QScrollArea { background:transparent; border:0; }");
+    mFriendsList = new QWidget(scroll);
+    mFriendsList->setStyleSheet("background:transparent;");
+    QVBoxLayout* list = new QVBoxLayout(mFriendsList);
+    list->setContentsMargins(0, 0, 6, 0);
+    scroll->setWidget(mFriendsList);
+    layout->addWidget(scroll, 1);
+    connect(refresh, &GameButton::clicked, this, &MainWindow::RefreshLiveFriends);
+    auto addFriend = [this] {
+        const QString name = mFriendName->text().trimmed();
+        if (name.isEmpty()) { mFriendsMessage->setText("Enter your friend's username."); return; }
+        LiveFriendAction("POST", "/friends/requests", QJsonObject{{"username", name}});
+    };
+    connect(send, &GameButton::clicked, this, addFriend);
+    connect(mFriendName, &QLineEdit::returnPressed, this, addFriend);
+    return page;
+}
+
+void MainWindow::SendLivePresence()
+{
+    if (mLiveToken.isEmpty()) return;
+    QString status = "launcher";
+    QString activity;
+    if (mRunner->IsRunning())
+    {
+        status = "game";
+        QFile stateFile(mLiveDirectory + "/presence.json");
+        if (stateFile.open(QIODevice::ReadOnly))
+        {
+            const QString reported = QJsonDocument::fromJson(stateFile.readAll()).object().value("activity").toString();
+            if (QStringList{"battle", "tumble", "glide", "build"}.contains(reported))
+            {
+                status = "minigame";
+                activity = reported;
+            }
+        }
+    }
+    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/presence")};
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setTransferTimeout(10000);
+    const QByteArray body = QJsonDocument(QJsonObject{{"status", status}, {"activity", activity}}).toJson(QJsonDocument::Compact);
+    QNetworkReply* reply = mLiveNetwork->post(request, body);
+    connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
+}
+
+void MainWindow::RefreshLiveFriends()
+{
+    if (mLiveToken.isEmpty()) { RenderLiveFriends(); return; }
+    const QString session = mLiveToken;
+    const QStringList paths = {"/friends", "/friends/requests", "/friends/requests/sent"};
+    for (int index = 0; index < paths.size(); ++index)
+    {
+        QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1" + paths[index])};
+        request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
+        request.setTransferTimeout(10000);
+        QNetworkReply* reply = mLiveNetwork->get(request);
+        connect(reply, &QNetworkReply::finished, this, [this, reply, session, index] {
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const QJsonObject data = QJsonDocument::fromJson(reply->readAll()).object();
+            reply->deleteLater();
+            if (session != mLiveToken) return;
+            if (status != 200) { mFriendsMessage->setText("Could not refresh friends. Check your connection."); return; }
+            if (index == 0) mFriends = data.value("friends").toArray();
+            else if (index == 1) mIncomingFriends = data.value("incoming").toArray();
+            else mSentFriends = data.value("sent").toArray();
+            RenderLiveFriends();
+        });
+    }
+}
+
+void MainWindow::LiveFriendAction(const QByteArray& method, const QString& path, const QJsonObject& body)
+{
+    if (mLiveToken.isEmpty()) { mFriendsMessage->setText("Sign in to LCE Live to manage friends."); return; }
+    const QString session = mLiveToken;
+    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1" + path)};
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setTransferTimeout(10000);
+    QNetworkReply* reply = method == "DELETE" ? mLiveNetwork->deleteResource(request)
+        : mLiveNetwork->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, session, path] {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QString error = QJsonDocument::fromJson(reply->readAll()).object().value("error").toString();
+        reply->deleteLater();
+        if (session != mLiveToken) return;
+        if (status < 200 || status >= 300)
+        {
+            QString message = "Could not complete this action. Please try again.";
+            if (error == "User not found") message = "Player not found.";
+            else if (error == "Already friends") message = "You are already friends.";
+            else if (error == "Request already sent") message = "Friend request already sent.";
+            else if (error == "Accept the incoming request") message = "This player sent you a request. Accept it below.";
+            else if (error == "Cannot add yourself") message = "You cannot add yourself.";
+            mFriendsMessage->setText(message);
+            return;
+        }
+        if (path == "/friends/requests") mFriendName->clear();
+        mFriendsMessage->setText("Done.");
+        RefreshLiveFriends();
+    });
+}
+
+void MainWindow::RenderLiveFriends()
+{
+    if (!mFriendsList) return;
+    QLayout* layout = mFriendsList->layout();
+    while (QLayoutItem* item = layout->takeAt(0)) { delete item->widget(); delete item; }
+    if (mLiveToken.isEmpty())
+    {
+        mFriendsMessage->setText("Sign in to LCE Live to see friends and requests.");
+        return;
+    }
+    if (mFriendsMessage->text().startsWith("Sign in")) mFriendsMessage->clear();
+    auto section = [this, layout](const QString& title, const QJsonArray& entries, int type) {
+        QLabel* label = new QLabel(QString("%1 (%2)").arg(title).arg(entries.size()), mFriendsList);
+        label->setFont(GameFont(18));
+        label->setStyleSheet("color:#ffffff; background:rgba(18,16,16,225); border-left:4px solid #bd3434; font-weight:bold; padding:7px 9px; margin-top:8px;");
+        layout->addWidget(label);
+        if (entries.isEmpty())
+        {
+            QLabel* empty = new QLabel("Nothing here yet", mFriendsList);
+            empty->setFont(GameFont(14));
+            empty->setStyleSheet("color:#e1e1e1; background:rgba(18,16,16,195); padding:6px 10px;"); layout->addWidget(empty); return;
+        }
+        for (const QJsonValue& value : entries)
+        {
+            const QJsonObject entry = value.toObject();
+            const qint64 id = entry.value("id").toVariant().toLongLong();
+            if (id <= 0) continue;
+            QWidget* row = new QWidget(mFriendsList);
+            row->setStyleSheet("background:rgba(20,18,18,220); border-bottom:1px solid rgba(255,255,255,35);");
+            QHBoxLayout* line = new QHBoxLayout(row); line->setContentsMargins(8, 5, 8, 5); line->setSpacing(10);
+            QString name = entry.value("username").toString();
+            if (type == 0)
+            {
+                QString presence = "Offline";
+                if (entry.value("online").toBool())
+                {
+                    const QString status = entry.value("presence").toString();
+                    const QString activity = entry.value("activity").toString();
+                    const QMap<QString, QString> games{{"battle", "Battle"}, {"tumble", "Tumble"}, {"glide", "Glide"}, {"build", "Build"}};
+                    if (status == "game" || status == "minigame") presence = "Online | In Game";
+                    else presence = "Online | In Launcher";
+                    if (status == "minigame" && games.contains(activity)) presence += " | " + games.value(activity);
+                }
+                name += "  |  " + presence;
+            }
+            QLabel* face = new QLabel(name.left(1).toUpper(), row);
+            face->setAlignment(Qt::AlignCenter);
+            face->setFixedSize(36, 36);
+            face->setFont(GameFont(16));
+            face->setStyleSheet("color:#ffffff; background:#55504d; border:2px solid #a83232;");
+            LoadLiveFriendFace(id, face);
+            line->addWidget(face);
+            QLabel* player = new QLabel(name, row); player->setFont(GameFont(15)); player->setStyleSheet("color:#ffffff; background:transparent; border:0;");
+            line->addWidget(player, 1);
+            auto button = [this, line, row, id](const QString& text, const QByteArray& method, const QString& path) {
+                GameButton* action = new GameButton(text, row); action->SetPixelSize(14); action->SetReadableFont(false); action->setFixedSize(125, 36);
+                line->addWidget(action);
+                connect(action, &GameButton::clicked, this, [this, id, method, path] { LiveFriendAction(method, path.arg(id)); });
+            };
+            if (type == 0) button("Remove", "DELETE", "/friends/%1");
+            else if (type == 1) {
+                button("Accept", "POST", "/friends/requests/%1/accept");
+                button("Decline", "DELETE", "/friends/requests/%1");
+            } else button("Cancel", "DELETE", "/friends/requests/sent/%1");
+            layout->addWidget(row);
+        }
+    };
+    section("Friends", mFriends, 0);
+    section("Incoming requests", mIncomingFriends, 1);
+    section("Sent requests", mSentFriends, 2);
+    static_cast<QVBoxLayout*>(layout)->addStretch(1);
+}
+
+void MainWindow::LoadLiveFriendFace(qint64 userId, QLabel* target)
+{
+    if (userId <= 0 || !target) return;
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    if (mFriendFaceFetchedAt.value(userId, 0) + 180 > now)
+    {
+        const QPixmap cached = mFriendFaceCache.value(userId);
+        if (!cached.isNull()) { target->setText(QString()); target->setPixmap(cached); }
+        return;
+    }
+    if (mFriendFacesPending.contains(userId)) return;
+
+    mFriendFacesPending.insert(userId);
+    QNetworkRequest request{QUrl(QString("https://api.kerneldev.qzz.io/v1/users/%1/skin").arg(userId))};
+    request.setTransferTimeout(8000);
+    QNetworkReply* reply = mLiveNetwork->get(request);
+    QPointer<QLabel> safeTarget(target);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, safeTarget, userId] {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QByteArray bytes = reply->readAll();
+        reply->deleteLater();
+        mFriendFacesPending.remove(userId);
+        mFriendFaceFetchedAt.insert(userId, QDateTime::currentSecsSinceEpoch());
+
+        QPixmap facePixmap;
+        if (status == 200)
+        {
+            const QImage skin = QImage::fromData(bytes).convertToFormat(QImage::Format_ARGB32);
+            if (!skin.isNull() && skin.width() >= 64 && skin.height() >= 16 && skin.width() % 64 == 0)
+            {
+                const int scale = skin.width() / 64;
+                if (skin.height() >= 16 * scale)
+                {
+                    QImage face = skin.copy(8 * scale, 8 * scale, 8 * scale, 8 * scale);
+                    QPainter painter(&face);
+                    painter.drawImage(0, 0, skin.copy(40 * scale, 8 * scale, 8 * scale, 8 * scale));
+                    painter.end();
+                    facePixmap = QPixmap::fromImage(face.scaled(36, 36, Qt::IgnoreAspectRatio, Qt::FastTransformation));
+                }
+            }
+        }
+        mFriendFaceCache.insert(userId, facePixmap);
+        if (safeTarget && !facePixmap.isNull())
+        {
+            safeTarget->setText(QString());
+            safeTarget->setPixmap(facePixmap);
+        }
+    });
+}
+
+void MainWindow::PollLiveInvites()
+{
+    if (mLiveToken.isEmpty() || mInvitePollPending || mInvitePopup) return;
+    mInvitePollPending = true;
+    const QString session = mLiveToken;
+    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/game-invites")};
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
+    request.setTransferTimeout(10000);
+    QNetworkReply* reply = mLiveNetwork->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, session] {
+        mInvitePollPending = false;
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QJsonArray invitations = QJsonDocument::fromJson(reply->readAll()).object().value("invitations").toArray();
+        reply->deleteLater();
+        if (status != 200 || session != mLiveToken || mInvitePopup) return;
+        for (const QJsonValue& value : invitations)
+        {
+            const QJsonObject invite = value.toObject();
+            const qint64 id = invite.value("owner_id").toVariant().toLongLong();
+            const QString owner = invite.value("owner").toString();
+            const QString key = QString::number(id) + ":" + invite.value("expires_at").toVariant().toString();
+            if (id <= 0 || owner.isEmpty() || mSeenInvites.contains(key)) continue;
+            mSeenInvites.insert(key);
+            ShowLiveInvite(id, owner, invite.value("name").toString());
+            break;
+        }
+    });
+}
+
+void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world)
+{
+    QFrame* toast = new QFrame(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    toast->setAttribute(Qt::WA_DeleteOnClose);
+    toast->setAttribute(Qt::WA_ShowWithoutActivating);
+    toast->setFixedWidth(340);
+    toast->setStyleSheet("QFrame { background:#251d1d; border:2px solid #b43232; border-radius:8px; }"
+                         "QLabel { color:white; border:0; background:transparent; }"
+                         "QPushButton { background:#b43232; color:white; border:0; border-radius:4px; padding:8px; }"
+                         "QPushButton:hover { background:#d44646; }");
+    QVBoxLayout* layout = new QVBoxLayout(toast);
+    toast->setFont(QFont("Segoe UI", 10));
+    QLabel* title = new QLabel("Game invitation", toast);
+    title->setStyleSheet("font-weight:bold; font-size:16px; color:white; border:0;");
+    QLabel* detail = new QLabel(QString("%1 invited you to %2").arg(owner, world.isEmpty() ? "their world" : world), toast);
+    detail->setWordWrap(true);
+    QHBoxLayout* actions = new QHBoxLayout;
+    GameButton* accept = new GameButton("Accept", toast);
+    GameButton* decline = new GameButton("Decline", toast);
+    accept->SetPixelSize(15); decline->SetPixelSize(15);
+    accept->SetReadableFont(true); decline->SetReadableFont(true);
+    accept->setFixedHeight(36); decline->setFixedHeight(36);
+    actions->addWidget(accept); actions->addWidget(decline);
+    layout->addWidget(title); layout->addWidget(detail); layout->addLayout(actions);
+    connect(accept, &GameButton::clicked, this, [this, toast, title, detail, accept, decline, owner] {
+        const bool running = mRunner->IsRunning();
+        AcceptLiveInvite(owner);
+        if (!running) { toast->close(); return; }
+        title->setText("Connecting");
+        detail->setText("If you are in a world, return to the main menu to join.");
+        accept->hide(); decline->hide();
+        QTimer::singleShot(5000, toast, &QWidget::close);
+    });
+    connect(decline, &GameButton::clicked, this, [this, toast, ownerId] {
+        toast->close();
+        QNetworkRequest request{QUrl(QString("https://api.kerneldev.qzz.io/v1/game-invites/%1").arg(ownerId))};
+        request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
+        request.setTransferTimeout(10000);
+        QNetworkReply* reply = mLiveNetwork->deleteResource(request);
+        connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
+    });
+    mInvitePopup = toast;
+    toast->adjustSize();
+    QPoint destination = toast->pos();
+    if (QScreen* screen = QGuiApplication::primaryScreen())
+    {
+        const QRect available = screen->availableGeometry();
+        destination = QPoint(available.right() - toast->width() - 16, available.bottom() - toast->height() - 16);
+        toast->move(available.right() + 4, destination.y());
+    }
+    QApplication::beep();
+    toast->show();
+    toast->raise();
+    QPropertyAnimation* animation = new QPropertyAnimation(toast, "pos", toast);
+    animation->setDuration(400);
+    animation->setEasingCurve(QEasingCurve::OutCubic);
+    animation->setStartValue(toast->pos());
+    animation->setEndValue(destination);
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
+void MainWindow::AcceptLiveInvite(const QString& owner)
+{
+    if (!mRunner->IsRunning()) Play();
+    if (!mRunner->IsRunning() || mLiveDirectory.isEmpty()) return;
+    WaitForLiveJoin(owner);
+}
+
+void MainWindow::WaitForLiveJoin(const QString& owner, int attempt)
+{
+    if (!mRunner->IsRunning() || mLiveDirectory.isEmpty()) return;
+    QFile file(mLiveDirectory + "/directory.json");
+    if (file.open(QIODevice::ReadOnly))
+    {
+        const QJsonArray servers = QJsonDocument::fromJson(file.readAll()).array();
+        for (const QJsonValue& value : servers)
+        {
+            const QJsonObject server = value.toObject();
+            const int port = server.value("port").toInt();
+            if (server.value("owner").toString().compare(owner, Qt::CaseInsensitive) != 0 || port < 1 || port > 65535) continue;
+            QSaveFile command(mLiveDirectory + "/join.txt");
+            if (command.open(QIODevice::WriteOnly) && command.write(QByteArray::number(port)) > 0 && command.commit())
+                return;
+            break;
+        }
+    }
+    if (attempt < 20) QTimer::singleShot(1000, this, [this, owner, attempt] { WaitForLiveJoin(owner, attempt + 1); });
+    else QMessageBox::warning(this, "LCE Live", QString("%1's world is unavailable. Try opening the Join list.").arg(owner));
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event)
@@ -183,8 +962,8 @@ void MainWindow::RefreshProfiles()
 {
     if (const Profile* profile = mStore.Selected())
     {
-        mProfileButton->setText(profile->username);
-        mProfileButton->SetSubtitle(profile->name);
+        mProfileButton->setText(mLiveName.isEmpty() ? profile->username : mLiveName);
+        mProfileButton->SetSubtitle(mLiveName.isEmpty() ? profile->name : QString("LCE Live Â· %1").arg(profile->name));
         mProfileButton->SetIcon(Skins::FaceFor(*profile, kSlotIconSize), true);
         mProfileButton->setToolTip(QString("Playing as %1 with the profile %2").arg(profile->username, profile->name));
         mLog->SetLogsFolder(ProfileStore::GameDirFor(*profile) + "/logs");
@@ -202,7 +981,7 @@ void MainWindow::SetStatus(const QString& text, const QColor& colour)
 void MainWindow::RefreshStatus()
 {
     const Profile* profile = mStore.Selected();
-    const QString who = profile != nullptr ? QString("Play as %1").arg(profile->username) : QString();
+    const QString who = profile != nullptr ? QString("Play as %1").arg(mLiveName.isEmpty() ? profile->username : mLiveName) : QString();
     mTabs->SetMarked(LogPage, mRunner->IsRunning());
     if (mRunner->IsRunning())
     {
@@ -226,6 +1005,16 @@ void MainWindow::RefreshStatus()
 
 void MainWindow::Play()
 {
+    if (mLiveToken.isEmpty()) { StartGame(); return; }
+    mPlay->setEnabled(false);
+    RefreshLiveCosmetics([this] {
+        mPlay->setEnabled(true);
+        StartGame();
+    });
+}
+
+void MainWindow::StartGame()
+{
     const QString problem = GameRunner::CheckGameReady();
     if (!problem.isEmpty())
     {
@@ -237,13 +1026,160 @@ void MainWindow::Play()
     if (profile == nullptr)
         return;
 
-    mLog->AddLauncherMessage(LogLevel::Info, QString("Starting the game as %1 with the profile %2.")
-                                                 .arg(profile->username, profile->name));
-    QString error;
-    // An AppImage's files go away when the launcher exits, so there the launcher waits hidden for the game instead.
-    if (profile->afterLaunch == AfterLaunch::Close && !LauncherPaths::RunsFromAppImage())
+    Profile activeProfile = *profile;
+    if (!mLiveName.isEmpty())
+        activeProfile.username = mLiveName;
+    QString liveSkinPath;
+    QString liveCapePath;
+    if (!mLiveToken.isEmpty() && mLiveUserId > 0)
     {
-        if (!mRunner->StartDetached(*profile, &error))
+        const QString liveAssetDir = ProfileStore::GameDirFor(activeProfile) + "/live";
+        if (QDir().mkpath(liveAssetDir))
+        {
+            const QString localSkin = liveAssetDir + "/skin.png";
+            const QString localCape = liveAssetDir + "/cape.png";
+            QFile::remove(localSkin);
+            QFile::remove(localCape);
+            if (!mLiveSkinCachePath.isEmpty() && QFile::copy(mLiveSkinCachePath, localSkin))
+                liveSkinPath = "live/skin.png";
+            if (!mLiveCapeCachePath.isEmpty() && QFile::copy(mLiveCapeCachePath, localCape))
+                liveCapePath = "live/cape.png";
+        }
+    }
+    const QString packsDir = ProfileStore::GameDirFor(activeProfile) + "/packs";
+    const QString livePackPath = packsDir + "/LCE-Live-Cosmetics.pck";
+    QByteArray skinBytes;
+    QByteArray capeBytes;
+    if (!mLiveSkinCachePath.isEmpty())
+    {
+        QFile skinFile(mLiveSkinCachePath);
+        if (skinFile.open(QIODevice::ReadOnly)) skinBytes = skinFile.readAll();
+    }
+    if (!mLiveCapeCachePath.isEmpty())
+    {
+        QFile capeFile(mLiveCapeCachePath);
+        if (capeFile.open(QIODevice::ReadOnly)) capeBytes = capeFile.readAll();
+    }
+    const QByteArray livePack = BuildLiveCosmeticPck(mLiveUserId, activeProfile.username, skinBytes, capeBytes);
+    if (!livePack.isEmpty() && QDir().mkpath(packsDir))
+    {
+        QSaveFile file(livePackPath);
+        if (!file.open(QIODevice::WriteOnly) || file.write(livePack) != livePack.size() || !file.commit())
+            mLog->AddLauncherMessage(LogLevel::Warn, "Could not create the Live skin and cape PCK.");
+    }
+    else
+    {
+        QFile::remove(livePackPath);
+        if ((!skinBytes.isEmpty() || !capeBytes.isEmpty()) && !QDir(packsDir).exists())
+            mLog->AddLauncherMessage(LogLevel::Warn, "Could not create the game's packs folder for Live cosmetics.");
+    }
+    mLog->AddLauncherMessage(LogLevel::Info, QString("Starting the game as %1 with the profile %2.")
+                                                 .arg(activeProfile.username, activeProfile.name));
+    QString error;
+    QString liveDirectory;
+    if (!mLiveToken.isEmpty())
+    {
+        if (mLiveBridge && mLiveBridge->state() != QProcess::NotRunning)
+        {
+            QMessageBox::warning(this, "Live", "The previous Live session is still closing. Try again in a moment.");
+            return;
+        }
+        const QString livePath = QCoreApplication::applicationDirPath() + "/live";
+        QString node = livePath + "/node.exe";
+        if (!QFileInfo::exists(node)) node = QStandardPaths::findExecutable("node");
+        const QString script = livePath + "/game-session.js";
+        if (node.isEmpty() || !QFileInfo::exists(script))
+        {
+            QMessageBox::warning(this, "Live", "Live networking files are missing. Reinstall the Live client.");
+            return;
+        }
+        QTemporaryDir* directory = new QTemporaryDir(QDir::tempPath() + "/lcereborn-live-XXXXXX");
+        if (!directory->isValid())
+        {
+            delete directory;
+            QMessageBox::warning(this, "Live", "Could not create a temporary Live session.");
+            return;
+        }
+        liveDirectory = directory->path();
+        mLiveDirectory = liveDirectory;
+        QProcess* bridge = new QProcess(this);
+        mLiveBridge = bridge;
+        connect(bridge, &QProcess::readyReadStandardError, this, [this, bridge] {
+            const QString message = QString::fromUtf8(bridge->readAllStandardError()).trimmed();
+            if (!message.isEmpty()) mLog->AddLauncherMessage(LogLevel::Warn, message);
+        });
+        connect(bridge, &QProcess::finished, this, [this, bridge, directory](int, QProcess::ExitStatus) {
+            if (mLiveBridge == bridge) { mLiveBridge = nullptr; mLiveDirectory.clear(); }
+            delete directory;
+            bridge->deleteLater();
+        });
+        bridge->setProgram(node);
+        bridge->setArguments(QStringList() << script);
+        bridge->start();
+        if (!bridge->waitForStarted(5000))
+        {
+            mLiveBridge = nullptr;
+            mLiveDirectory.clear();
+            delete directory;
+            bridge->deleteLater();
+            QMessageBox::warning(this, "Live", "Could not start Live networking.");
+            return;
+        }
+        const QJsonObject init{{"apiUrl", "https://api.kerneldev.qzz.io"}, {"token", mLiveToken},
+                               {"username", mLiveName}, {"directory", liveDirectory}};
+        bridge->write(QJsonDocument(init).toJson(QJsonDocument::Compact) + '\n');
+        QTimer* inviteTimer = new QTimer(bridge);
+        inviteTimer->setInterval(1000);
+        connect(inviteTimer, &QTimer::timeout, this, [this, inviteTimer, liveDirectory] {
+            const QString inviteFile = liveDirectory + "/invite.txt";
+            if (inviteTimer->property("busy").toBool() || !QFile::exists(inviteFile)) return;
+            QFile::remove(inviteFile);
+            if (mLiveToken.isEmpty()) return;
+            inviteTimer->setProperty("busy", true);
+            QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/friends")};
+            request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
+            request.setTransferTimeout(10000);
+            QNetworkReply* reply = mLiveNetwork->get(request);
+            QPointer<QTimer> safeTimer(inviteTimer);
+            connect(reply, &QNetworkReply::finished, this, [this, reply, safeTimer] {
+                const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                const QJsonArray friends = QJsonDocument::fromJson(reply->readAll()).object().value("friends").toArray();
+                reply->deleteLater();
+                if (!safeTimer) return;
+                QStringList names;
+                for (const QJsonValue& value : friends) names << value.toObject().value("username").toString();
+                names.removeAll(QString());
+                if (status != 200 || names.isEmpty())
+                {
+                    safeTimer->setProperty("busy", false);
+                    QMessageBox::information(this, "LCE Live", status == 200 ? "You have no friends to invite." : "Could not load your friends.");
+                    return;
+                }
+                bool accepted = false;
+                const QString name = QInputDialog::getItem(this, "LCE Live", "Invite a friend to your world:", names,
+                                                           0, false, &accepted, Qt::WindowStaysOnTopHint);
+                if (!safeTimer) return;
+                safeTimer->setProperty("busy", false);
+                if (!accepted || name.isEmpty()) return;
+                QNetworkRequest invite{QUrl("https://api.kerneldev.qzz.io/v1/servers/mine/invites")};
+                invite.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
+                invite.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+                invite.setTransferTimeout(10000);
+                QNetworkReply* sent = mLiveNetwork->post(invite, QJsonDocument(QJsonObject{{"username", name}}).toJson(QJsonDocument::Compact));
+                connect(sent, &QNetworkReply::finished, this, [this, sent, name] {
+                    const int status = sent->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                    sent->deleteLater();
+                    QMessageBox::information(this, "LCE Live", status == 201
+                        ? QString("Invitation sent to %1.").arg(name) : QString("Could not send the invitation. Check that your online world is open."));
+                });
+            });
+        });
+        inviteTimer->start();
+    }
+    // An AppImage's files go away when the launcher exits, so there the launcher waits hidden for the game instead.
+    if (profile->afterLaunch == AfterLaunch::Close && !LauncherPaths::RunsFromAppImage() && mLiveToken.isEmpty())
+    {
+        if (!mRunner->StartDetached(activeProfile, &error))
         {
             mLog->AddLauncherMessage(LogLevel::Error, error);
             QMessageBox::warning(this, "Play", error);
@@ -253,8 +1189,10 @@ void MainWindow::Play()
         return;
     }
     ShowPage(LogPage);
-    if (!mRunner->Start(*profile, &error))
+    if (!mRunner->Start(activeProfile, &error, liveDirectory,
+                        mLiveUserId > 0 ? QString::number(mLiveUserId) : QString(), liveSkinPath, liveCapePath))
     {
+        if (mLiveBridge) mLiveBridge->closeWriteChannel();
         mLog->AddLauncherMessage(LogLevel::Error, error);
         QMessageBox::warning(this, "Play", error);
         RefreshStatus();
@@ -275,6 +1213,7 @@ void MainWindow::OnGameStarted()
 
 void MainWindow::OnGameFinished(int exitCode, bool crashed)
 {
+    if (mLiveBridge) mLiveBridge->closeWriteChannel();
     if (crashed || exitCode != 0)
         mLog->AddLauncherMessage(LogLevel::Error, crashed ? QString("The game crashed.")
                                                           : QString("The game exited with code %1.").arg(exitCode));
@@ -282,7 +1221,12 @@ void MainWindow::OnGameFinished(int exitCode, bool crashed)
         mLog->AddLauncherMessage(LogLevel::Info, "The game closed.");
     if (mCloseAfterGame && !crashed && exitCode == 0)
     {
-        QApplication::quit();
+        if (mLiveBridge && mLiveBridge->state() != QProcess::NotRunning)
+        {
+            connect(mLiveBridge, &QProcess::finished, qApp, &QApplication::quit);
+            QTimer::singleShot(12000, qApp, &QApplication::quit);
+        }
+        else QApplication::quit();
         return;
     }
     mCloseAfterGame = false;
@@ -373,3 +1317,4 @@ void MainWindow::closeEvent(QCloseEvent* event)
     SaveProfiles();
     event->accept();
 }
+

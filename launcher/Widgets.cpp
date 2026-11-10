@@ -499,6 +499,22 @@ void GameButton::SetPixelSize(int pixelSize)
     update();
 }
 
+void GameButton::SetReadableFont(bool readable)
+{
+    mReadableFont = readable;
+    updateGeometry();
+    update();
+}
+
+static QFont ButtonFont(int size, bool readable)
+{
+    if (!readable) return GameFont(size);
+    QFont font("Segoe UI");
+    font.setPixelSize(size);
+    font.setWeight(QFont::DemiBold);
+    return font;
+}
+
 void GameButton::SetIcon(const QImage& icon, bool inSlot)
 {
     mIcon = icon;
@@ -516,7 +532,7 @@ void GameButton::SetSubtitle(const QString& subtitle)
 
 QSize GameButton::sizeHint() const
 {
-    const QFontMetrics metrics(GameFont(mPixelSize));
+    const QFontMetrics metrics(ButtonFont(mPixelSize, mReadableFont));
     const int height = mSubtitle.isEmpty() ? qMax(40, metrics.height() + 18) : 62;
     const int icon = mIcon.isNull() ? 0 : height - 14;
     return QSize(metrics.horizontalAdvance(text()) + icon + 44, height);
@@ -563,12 +579,12 @@ void GameButton::paintEvent(QPaintEvent*)
     if (!mSubtitle.isEmpty())
     {
         const QRect lines(iconRight, content.top(), content.right() - iconRight, content.height());
-        painter.setFont(GameFont(mPixelSize));
+        painter.setFont(ButtonFont(mPixelSize, mReadableFont));
         const QRect title(lines.left(), lines.top() + 6, lines.width(), lines.height() / 2);
         DrawGameText(painter, title, Qt::AlignLeft | Qt::AlignVCenter,
                      painter.fontMetrics().elidedText(text(), Qt::ElideRight, lines.width()), ink,
                      state != FaceState::Disabled);
-        painter.setFont(GameFont(mPixelSize - 4));
+        painter.setFont(ButtonFont(mPixelSize - 4, mReadableFont));
         const QRect subtitle(lines.left(), title.bottom(), lines.width(), lines.height() / 2 - 6);
         DrawGameText(painter, subtitle, Qt::AlignLeft | Qt::AlignVCenter,
                      painter.fontMetrics().elidedText(mSubtitle, Qt::ElideRight, lines.width()),
@@ -576,7 +592,7 @@ void GameButton::paintEvent(QPaintEvent*)
         return;
     }
 
-    painter.setFont(GameFont(mPixelSize));
+    painter.setFont(ButtonFont(mPixelSize, mReadableFont));
     const QRect label = mIcon.isNull() ? content : QRect(iconRight, content.top(), content.right() - iconRight, content.height());
     DrawGameText(painter, label, (mIcon.isNull() ? Qt::AlignHCenter : Qt::AlignLeft) | Qt::AlignVCenter,
                  painter.fontMetrics().elidedText(text(), Qt::ElideRight, label.width()), ink,

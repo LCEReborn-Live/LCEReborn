@@ -772,7 +772,7 @@ bool TcpSocket::Connect(const Address& address, int timeoutMs, const CancelFlag&
     return true;
 }
 
-bool TcpSocket::Listen(unsigned short port, std::string& error)
+bool TcpSocket::Listen(unsigned short port, std::string& error, bool loopbackOnly)
 {
     Close();
     if (!EnsureConnected())
@@ -793,6 +793,7 @@ bool TcpSocket::Listen(unsigned short port, std::string& error)
 #endif
     Address any;
     any.port = port;
+    if (loopbackOnly) any.ip = 0x7f000001;
     if (BindNative(socket, ToNative(any)) != 0)
     {
         int code = LastError();

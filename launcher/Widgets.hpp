@@ -159,6 +159,7 @@ public:
 
     void SetPrimary(bool primary);
     void SetPixelSize(int pixelSize);
+    void SetReadableFont(bool readable);
     void SetIcon(const QImage& icon, bool inSlot);
     void SetSubtitle(const QString& subtitle);
     QSize sizeHint() const override;
@@ -172,6 +173,7 @@ private:
     bool mPrimary = false;
     bool mHover = false;
     bool mInSlot = false;
+    bool mReadableFont = false;
     int mPixelSize = 18;
     QImage mIcon;
     QString mSubtitle;

@@ -1,7 +1,9 @@
 #include "GameRunner.hpp"
 
 #include <QDir>
+#include <QCoreApplication>
 #include <QFileInfo>
+#include <QProcessEnvironment>
 
 #include "LauncherPaths.hpp"
 
@@ -76,15 +78,33 @@ bool GameRunner::Prepare(const Profile& profile, QString* error)
     return true;
 }
 
-bool GameRunner::Start(const Profile& profile, QString* error)
+bool GameRunner::Start(const Profile& profile, QString* error, const QString& liveDirectory,
+                       const QString& liveUserId, const QString& liveSkinPath, const QString& liveCapePath)
 {
     if (!Prepare(profile, error))
         return false;
     mOutput = LogParser(LogLevel::Info);
     mErrors = LogParser(LogLevel::Warn);
-    mProcess.setProgram(LauncherPaths::GameExecutable());
+    const QString executable = liveDirectory.isEmpty() ? LauncherPaths::GameExecutable()
+        : QCoreApplication::applicationDirPath() + "/LCEReborn-Live.exe";
+    if (!QFileInfo(executable).isFile())
+    {
+        *error = QString("The Live game executable is missing: %1").arg(QDir::toNativeSeparators(executable));
+        return false;
+    }
+    mProcess.setProgram(executable);
     mProcess.setArguments(Arguments(profile));
     mProcess.setWorkingDirectory(ProfileStore::GameDirFor(profile));
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.remove("LCE_LIVE_DIR");
+    environment.remove("LCE_LIVE_USER_ID");
+    environment.remove("LCE_LIVE_SKIN_PATH");
+    environment.remove("LCE_LIVE_CAPE_PATH");
+    if (!liveDirectory.isEmpty()) environment.insert("LCE_LIVE_DIR", liveDirectory);
+    if (!liveUserId.isEmpty()) environment.insert("LCE_LIVE_USER_ID", liveUserId);
+    if (!liveSkinPath.isEmpty()) environment.insert("LCE_LIVE_SKIN_PATH", liveSkinPath);
+    if (!liveCapePath.isEmpty()) environment.insert("LCE_LIVE_CAPE_PATH", liveCapePath);
+    mProcess.setProcessEnvironment(environment);
     mProcess.start();
     if (!mProcess.waitForStarted(10000))
     {

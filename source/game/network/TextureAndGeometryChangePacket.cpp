@@ -23,10 +23,11 @@ TextureAndGeometryChangePacket::TextureAndGeometryChangePacket(boost::shared_ptr
     std::wstring identifier = geometryName.substr(7, geometryName.length());
     identifier = identifier.substr(0, identifier.find(L'.'));
 
+    const bool dlcSkin = geometryName.substr(0, 3).compare(L"dlc") == 0;
     std::wstringstream stream;
-    stream << std::dec << identifier.c_str();
+    stream << (dlcSkin ? std::dec : std::hex) << identifier.c_str();
     stream >> geometryId;
-    geometryId |= 0x80000000u;
+    if (dlcSkin) geometryId |= 0x80000000u;
 }
 
 int TextureAndGeometryChangePacket::getPacketId()

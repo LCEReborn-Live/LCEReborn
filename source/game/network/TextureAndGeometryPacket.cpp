@@ -26,11 +26,12 @@ TextureAndGeometryPacket::TextureAndGeometryPacket(const std::wstring& textureNa
     std::wstring identifier = textureName.substr(7, textureName.length());
     identifier = identifier.substr(0, identifier.find(L'.'));
 
+    const bool dlcSkin = textureName.substr(0, 3).compare(L"dlc") == 0;
     std::wstringstream stream;
-    stream << std::dec << identifier.c_str();
+    stream << (dlcSkin ? std::dec : std::hex) << identifier.c_str();
     stream >> geometryId;
     this->data = data;
-    geometryId |= 0x80000000u;
+    if (dlcSkin) geometryId |= 0x80000000u;
     this->length = length;
     additionalBoxCount = 0;
     additionalBoxes = NULL;
@@ -45,11 +46,12 @@ TextureAndGeometryPacket::TextureAndGeometryPacket(const std::wstring& textureNa
     std::wstring identifier = textureName.substr(7, textureName.length());
     identifier = identifier.substr(0, identifier.find(L'.'));
 
+    const bool dlcSkin = textureName.substr(0, 3).compare(L"dlc") == 0;
     std::wstringstream stream;
-    stream << std::dec << identifier.c_str();
+    stream << (dlcSkin ? std::dec : std::hex) << identifier.c_str();
     stream >> geometryId;
     this->data = data;
-    geometryId |= 0x80000000u;
+    if (dlcSkin) geometryId |= 0x80000000u;
     this->length = length;
 
     skinAdjustments = skinFile->getSkinAdjustments();
@@ -81,11 +83,12 @@ TextureAndGeometryPacket::TextureAndGeometryPacket(const std::wstring& textureNa
     std::wstring identifier = textureName.substr(7, textureName.length());
     identifier = identifier.substr(0, identifier.find(L'.'));
 
+    const bool dlcSkin = textureName.substr(0, 3).compare(L"dlc") == 0;
     std::wstringstream stream;
-    stream << std::dec << identifier.c_str();
+    stream << (dlcSkin ? std::dec : std::hex) << identifier.c_str();
     stream >> geometryId;
     this->data = data;
-    geometryId |= 0x80000000u;
+    if (dlcSkin) geometryId |= 0x80000000u;
     this->length = length;
     this->skinAdjustments = skinAdjustments;
 

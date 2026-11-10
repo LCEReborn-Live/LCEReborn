@@ -28,13 +28,13 @@ namespace
 const long long kServerTimeoutMs = 5000;
 const long long kLiveTimeoutMs = 15000;
 
+#ifdef _WIN32
 int LiveBoardIndex(LeaderboardManager::EStatsType type)
 {
     const int board = static_cast<int>(type);
     return board >= 0 && board < 4 ? board : -1;
 }
 
-#ifdef _WIN32
 std::wstring LiveDirectory()
 {
     const wchar_t* directory = _wgetenv(L"LCE_LIVE_DIR");
@@ -71,8 +71,6 @@ bool WriteLiveFile(const std::wstring& path, const std::string& contents)
     return true;
 }
 
-#endif
-
 std::vector<std::string> SplitTabs(const std::string& line)
 {
     std::vector<std::string> parts;
@@ -92,6 +90,7 @@ std::wstring AsciiWide(const std::string& value)
 {
     return std::wstring(value.begin(), value.end());
 }
+#endif
 }
 
 LceLeaderboardManager::LceLeaderboardManager()

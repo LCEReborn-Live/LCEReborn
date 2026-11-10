@@ -20,7 +20,7 @@
 - Friends, launcher and in-game presence, invitations, and a list of joinable worlds.
 - Direct connections with NAT traversal when possible, with relay fallback.
 - Live account skins and capes in game.
-- The original LCE leaderboard menu; global score syncing is currently being integrated.
+- The original LCE leaderboard menu with global, friends, and personal score filters.
 - Keyboard, mouse, and controller support; single-player and split-screen play.
 
 ### Installation
@@ -39,9 +39,11 @@ Sign in to Live in the launcher, add friends by username, and open a world with 
 
 Client build instructions are in [`docs/pc-platform.md`](docs/pc-platform.md). Release build details are in [`docs/live-release.md`](docs/live-release.md).
 
-### Credits and license
+## Disclaimers
 
-LCEReborn is based on reconstructed Minecraft: Wii U Edition source and other open-source components. This project is not affiliated with or endorsed by Mojang Studios, Microsoft, 4J Studios, or Nintendo. Minecraft is a trademark of Mojang Studios and Microsoft; Wii U is a trademark of Nintendo.
+LCEReborn is a community reconstruction project and is not affiliated with or endorsed by Mojang Studios, Microsoft, 4J Studios, or Nintendo. Minecraft is a trademark of Mojang Studios and Microsoft; Wii U is a trademark of Nintendo.
+
+## Credits and license
 
 LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party components retain their respective licenses. Game files and assets are not included in this repository or installer.
 
@@ -57,7 +59,7 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 - Друзья, статусы «в лаунчере» и «в игре», приглашения и список доступных миров.
 - Подключение напрямую с обходом NAT, когда это возможно, и через relay в остальных случаях.
 - Скины и плащи Live-аккаунта в игре.
-- Оригинальное меню таблиц рекордов LCE; глобальная синхронизация результатов сейчас интегрируется.
+- Оригинальное меню таблиц рекордов LCE с глобальными результатами, результатами друзей и личным рекордом.
 - Клавиатура, мышь и геймпады; одиночная игра и разделённый экран.
 
 ### Установка

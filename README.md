@@ -81,3 +81,11 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 LCEReborn основан на восстановленном коде Minecraft: Wii U Edition и других открытых компонентах. Проект не связан с Mojang Studios, Microsoft, 4J Studios или Nintendo и не одобрен ими. Minecraft — товарный знак Mojang Studios и Microsoft; Wii U — товарный знак Nintendo.
 
 Код LCEReborn распространяется по лицензии [GNU GPL v3 или новее](LICENSE). Лицензии сторонних компонентов остаются за их авторами. Игровые файлы и ресурсы в репозитории и установщике отсутствуют.
+
+## Contributors
+
+- [@kkerneldev](https://github.com/kkerneldev)
+
+## Контрибьюторы
+
+- [@kkerneldev](https://github.com/kkerneldev)

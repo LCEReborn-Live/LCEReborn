@@ -339,11 +339,13 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     connect(mSetup, &SetupPage::Message, mLog, &GameLogTab::AddLauncherMessage);
     connect(mSetup, &SetupPage::Imported, this, &MainWindow::OnImported);
     connect(mSetup, &SetupPage::BackRequested, this, [this] { mRoot->setCurrentIndex(1); });
-    connect(mNews, &NewsTab::UpdateChecked, this, [this, update](const QString& newerName, const QString& installerUrl) {
+    connect(mNews, &NewsTab::UpdateChecked, this,
+            [this, update](const QString& newerName, const QString& installerUrl, const QString& releaseUrl) {
         mUpdateName = newerName;
         mUpdateInstallerUrl = installerUrl;
+        mUpdateReleaseUrl = releaseUrl;
         update->setVisible(!newerName.isEmpty());
-        update->setEnabled(!installerUrl.isEmpty());
+        update->setEnabled(!installerUrl.isEmpty() || !releaseUrl.isEmpty());
         update->setToolTip(installerUrl.isEmpty() ? QString("%1 is available; its installer is not published yet.").arg(newerName)
                                                    : QString("Download and install %1.").arg(newerName));
     });
@@ -375,8 +377,24 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
 void MainWindow::DownloadLauncherUpdate()
 {
 #ifdef Q_OS_WIN
-    if (mUpdateName.isEmpty() || mUpdateInstallerUrl.isEmpty())
+    if (mUpdateName.isEmpty())
         return;
+    const QString installedPath = QDir::cleanPath(LauncherPaths::InstallDir());
+    const QString setupPath = QDir::cleanPath(QDir(qEnvironmentVariable("LOCALAPPDATA"))
+                                                   .filePath("Programs/LCEReborn Live"));
+    if (installedPath.compare(setupPath, Qt::CaseInsensitive) != 0)
+    {
+        QMessageBox::information(this, "Update LCEReborn Live",
+                                 "This is a portable copy. The release page will open so you can download the new portable archive.");
+        if (!mUpdateReleaseUrl.isEmpty())
+            QDesktopServices::openUrl(QUrl(mUpdateReleaseUrl));
+        return;
+    }
+    if (mUpdateInstallerUrl.isEmpty())
+    {
+        QMessageBox::information(this, "Update LCEReborn Live", "The installer is not attached to this release yet.");
+        return;
+    }
     if (mRunner->IsRunning())
     {
         QMessageBox::information(this, "Update LCEReborn Live", "Close the game before updating the launcher.");

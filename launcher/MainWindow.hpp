@@ -74,6 +74,7 @@ private:
     QPointer<GameButton> mUpdateButton;
     QString mUpdateName;
     QString mUpdateInstallerUrl;
+    QString mUpdateReleaseUrl;
     GameButton* mLiveButton;
     QString mLiveName;
     QString mLiveToken;

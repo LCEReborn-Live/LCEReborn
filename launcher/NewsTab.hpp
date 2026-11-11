@@ -22,7 +22,7 @@ public:
     void Refresh();
 
 signals:
-    void UpdateChecked(const QString& newerName, const QString& installerUrl);
+    void UpdateChecked(const QString& newerName, const QString& installerUrl, const QString& releaseUrl);
 
 private:
     void OnReply(QNetworkReply* reply);

@@ -313,7 +313,7 @@ void NewsTab::RenderReleases()
     mNote->setText(mWarnings.join(" "));
     mNote->setVisible(!mWarnings.isEmpty());
     const NewerRelease newer = FindNewerRelease(mLiveReleases, BuildTag(), BuildTimestamp());
-    emit UpdateChecked(newer.name, newer.installerUrl);
+    emit UpdateChecked(newer.name, newer.installerUrl, newer.url);
 }
 
 void NewsTab::ShowSelected()
@@ -354,5 +354,5 @@ void NewsTab::ShowOffline(const QString& note)
     mBody->clear();
     mNote->setText(note);
     mNote->setVisible(!note.isEmpty());
-    emit UpdateChecked(QString(), QString());
+    emit UpdateChecked(QString(), QString(), QString());
 }

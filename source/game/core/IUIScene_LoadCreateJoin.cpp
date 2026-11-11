@@ -61,13 +61,15 @@ struct LoadMenuSceneData
     LevelGenerationOptions* generationOptions;
     _SaveListDetails* saveDetails;
     EMiniGameId gameMode;
+    bool quickJoin;
 
     LoadMenuSceneData()
         : playerId(0),
           saveIndex(0),
           generationOptions(NULL),
           saveDetails(NULL),
-          gameMode(eMiniGameId_Any)
+          gameMode(eMiniGameId_Any),
+          quickJoin(false)
     {
     }
 };
@@ -186,6 +188,30 @@ void IUIScene_LoadCreateJoin::UpdateGamesList()
     if (selectedRow == cJoinRowAddServer)
         selection = position;
     ++position;
+
+    if (m_miniGames && m_onlinePlayAllowed)
+    {
+        struct MatchOption { EMiniGameId id; int row; const wchar_t* icon; };
+        const MatchOption options[] = {
+            {eMiniGameId_Battle, cJoinRowFindMatchBattle, L"BattleModeIcon"},
+            {eMiniGameId_Tumble, cJoinRowFindMatchTumble, L"MG02icon"},
+            {eMiniGameId_Glide, cJoinRowFindMatchGlide, L"MG03icon"}
+        };
+        for (unsigned int index = 0; index < sizeof(options) / sizeof(options[0]); ++index)
+        {
+            MiniGameDef* game = MiniGameDef::GetCustomGameModeById(options[index].id, true);
+            if (game == NULL)
+                continue;
+            const std::wstring label = std::wstring(L10N::GetString(IDS_MG_FIND_MATCH)) + L": "
+                                       + L10N::GetString(static_cast<int>(game->GetName()));
+            const std::wstring icon = options[index].icon;
+            const std::wstring path = std::wstring(L"Graphics\\") + icon + L".png";
+            AddJoinListAction(label, options[index].row, path, icon);
+            if (selectedRow == options[index].row)
+                selection = position;
+            ++position;
+        }
+    }
 
     for (int pass = 0; pass < 2; ++pass)
     {
@@ -811,6 +837,19 @@ void IUIScene_LoadCreateJoin::LoadGameMode(EMiniGameId gameMode)
                                          EUIGroup_PlayerDefault);
 }
 
+void IUIScene_LoadCreateJoin::LoadMiniGameMatch(EMiniGameId gameMode)
+{
+    LoadMenuSceneData* sceneData = new LoadMenuSceneData();
+    sceneData->playerId = GetPad();
+    sceneData->saveIndex = -1;
+    sceneData->generationOptions = NULL;
+    sceneData->saveDetails = NULL;
+    sceneData->gameMode = gameMode;
+    sceneData->quickJoin = true;
+    gConsoleUIController.NavigateToScene(gProfile->GetPrimaryPad(), EUIScene_LoadMenu, sceneData, EUILayer_Scene,
+                                         EUIGroup_PlayerDefault);
+}
+
 void IUIScene_LoadCreateJoin::HandleLoadListPress(int index)
 {
     m_ignoreInput = true;
@@ -912,6 +951,27 @@ void IUIScene_LoadCreateJoin::CheckAndJoinGame(int index)
 
 void IUIScene_LoadCreateJoin::HandleGamesListPressed(int index)
 {
+    if (m_miniGames && index == cJoinRowFindMatchBattle)
+    {
+        gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+        m_ignoreInput = true;
+        LoadMiniGameMatch(eMiniGameId_Battle);
+        return;
+    }
+    if (m_miniGames && index == cJoinRowFindMatchTumble)
+    {
+        gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+        m_ignoreInput = true;
+        LoadMiniGameMatch(eMiniGameId_Tumble);
+        return;
+    }
+    if (m_miniGames && index == cJoinRowFindMatchGlide)
+    {
+        gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+        m_ignoreInput = true;
+        LoadMiniGameMatch(eMiniGameId_Glide);
+        return;
+    }
     if (index == cJoinRowScanning)
         return;
     if (index == cJoinRowAddServer)

@@ -77,6 +77,7 @@ private:
     unsigned char* m_thumbnailData;
     unsigned int m_thumbnailSize;
     std::wstring m_thumbnailName;
+    bool m_autoFindMatch;
 };
 
 #endif

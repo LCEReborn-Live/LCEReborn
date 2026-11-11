@@ -24,6 +24,9 @@ class IUIScene_LoadCreateJoin : public IUIPartial_OnlineRestricted
 public:
     static const int cJoinRowAddServer = 0x10000;
     static const int cJoinRowScanning = 0x10001;
+    static const int cJoinRowFindMatchBattle = 0x10002;
+    static const int cJoinRowFindMatchTumble = 0x10003;
+    static const int cJoinRowFindMatchGlide = 0x10004;
 
     enum EPendingAction
     {
@@ -52,6 +55,7 @@ public:
     void LoadLevelGen(LevelGenerationOptions*);
     void LoadSaveFromDisk(File*, ESavePlatform);
     void LoadGameMode(EMiniGameId);
+    void LoadMiniGameMatch(EMiniGameId);
     void HandleLoadListPress(int);
     void HandleNewListPress(int, int);
     void CheckAndJoinGame(int);

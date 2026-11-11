@@ -18,7 +18,7 @@ Packs you own don't load from the game files. Copy their folders from `content/W
 
 ## Profiles
 
-Each profile has its own name, game folder and language, and can turn split screen and the join prompt on or off. Game Log shows the game's output, News shows releases, and an Update button appears when a new one is out.
+Each profile has its own name, game folder and language, and can turn split screen and the join prompt on or off. Game Log shows the game's output. News combines releases from LCEReborn Live and the original LCEReborn project. When a newer Live release is available, **Update** downloads and opens its Windows installer.
 
 ## Where files go
 

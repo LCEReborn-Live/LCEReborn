@@ -17,7 +17,17 @@ QString BuildCommit()
     return LCE_BUILD_COMMIT;
 }
 
+QString BuildTag()
+{
+    return LCE_BUILD_TAG;
+}
+
 QDate BuildDate()
 {
     return QDate::fromString(LCE_BUILD_DATE, Qt::ISODate);
+}
+
+QDateTime BuildTimestamp()
+{
+    return QDateTime::fromString(LCE_BUILD_TIMESTAMP, Qt::ISODate);
 }

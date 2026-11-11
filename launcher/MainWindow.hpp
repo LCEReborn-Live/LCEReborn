@@ -46,6 +46,7 @@ private:
     void RefreshProfiles();
     void RefreshStatus();
     void Play();
+    void DownloadLauncherUpdate();
     void StartGame();
     void RefreshLiveCosmetics(std::function<void()> completion = std::function<void()>());
     void LiveAccount();
@@ -70,6 +71,9 @@ private:
     ProfileStore& mStore;
     GameRunner* mRunner;
     QNetworkAccessManager* mLiveNetwork;
+    QPointer<GameButton> mUpdateButton;
+    QString mUpdateName;
+    QString mUpdateInstallerUrl;
     GameButton* mLiveButton;
     QString mLiveName;
     QString mLiveToken;

@@ -2,6 +2,8 @@
 #define LAUNCHER_NEWSTAB_HPP
 
 #include <QByteArray>
+#include <QJsonArray>
+#include <QStringList>
 #include <QWidget>
 
 class QLabel;
@@ -20,11 +22,12 @@ public:
     void Refresh();
 
 signals:
-    void UpdateChecked(const QString& newerName, const QString& newerUrl);
+    void UpdateChecked(const QString& newerName, const QString& installerUrl);
 
 private:
     void OnReply(QNetworkReply* reply);
-    bool ShowReleases(const QByteArray& json, const QString& note);
+    void RenderReleases();
+    bool ParseReleases(const QByteArray& json, QJsonArray* releases) const;
     void ShowOffline(const QString& note);
     void ShowSelected();
 
@@ -34,6 +37,9 @@ private:
     QLabel* mDate;
     QTextBrowser* mBody;
     QLabel* mNote;
+    QJsonArray mLiveReleases;
+    QJsonArray mUpstreamReleases;
+    QStringList mWarnings;
 };
 
 #endif

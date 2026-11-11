@@ -35,6 +35,7 @@
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QTemporaryFile>
 #include <QProcess>
 #include <QTimer>
 #include <QUrl>
@@ -280,6 +281,7 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     mProfileButton->setFixedSize(360, kBottomRowHeight);
     mPlay->setFixedSize(280, kBottomRowHeight);
     auto* update = new GameButton("Update", this);
+    mUpdateButton = update;
     update->SetPixelSize(20);
     update->setFixedSize(150, kBottomRowHeight);
     update->hide();
@@ -337,13 +339,15 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     connect(mSetup, &SetupPage::Message, mLog, &GameLogTab::AddLauncherMessage);
     connect(mSetup, &SetupPage::Imported, this, &MainWindow::OnImported);
     connect(mSetup, &SetupPage::BackRequested, this, [this] { mRoot->setCurrentIndex(1); });
-    connect(mNews, &NewsTab::UpdateChecked, this, [update](const QString& newerName, const QString& newerUrl) {
+    connect(mNews, &NewsTab::UpdateChecked, this, [this, update](const QString& newerName, const QString& installerUrl) {
+        mUpdateName = newerName;
+        mUpdateInstallerUrl = installerUrl;
         update->setVisible(!newerName.isEmpty());
-        update->setToolTip(QString("%1 is out. Open its download page.").arg(newerName));
-        update->setProperty("url", newerUrl);
+        update->setEnabled(!installerUrl.isEmpty());
+        update->setToolTip(installerUrl.isEmpty() ? QString("%1 is available; its installer is not published yet.").arg(newerName)
+                                                   : QString("Download and install %1.").arg(newerName));
     });
-    connect(update, &GameButton::clicked, this,
-            [update] { QDesktopServices::openUrl(QUrl(update->property("url").toString())); });
+    connect(update, &GameButton::clicked, this, &MainWindow::DownloadLauncherUpdate);
     connect(profiles, &ProfilesTab::ReimportRequested, this, [this] {
         if (mRunner->IsRunning())
         {
@@ -366,6 +370,89 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     RefreshProfiles();
     RenderLiveFriends();
     RestoreLiveSession();
+}
+
+void MainWindow::DownloadLauncherUpdate()
+{
+#ifdef Q_OS_WIN
+    if (mUpdateName.isEmpty() || mUpdateInstallerUrl.isEmpty())
+        return;
+    if (mRunner->IsRunning())
+    {
+        QMessageBox::information(this, "Update LCEReborn Live", "Close the game before updating the launcher.");
+        return;
+    }
+    const auto answer = QMessageBox::question(
+        this, "Update LCEReborn Live",
+        QString("Download and open the installer for %1? The launcher will close while it is installed.").arg(mUpdateName),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (answer != QMessageBox::Yes)
+        return;
+
+    const QUrl url(mUpdateInstallerUrl);
+    if (!url.isValid() || url.scheme() != "https" || url.host() != "github.com")
+    {
+        QMessageBox::warning(this, "Update LCEReborn Live", "The release download URL is invalid.");
+        return;
+    }
+
+    auto* file = new QTemporaryFile(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation))
+                                        .filePath("LCEReborn-Live-Update-XXXXXX.exe"), this);
+    file->setAutoRemove(false);
+    if (!file->open())
+    {
+        file->deleteLater();
+        QMessageBox::warning(this, "Update LCEReborn Live", "Could not create a temporary installer file.");
+        return;
+    }
+    if (mUpdateButton) mUpdateButton->setEnabled(false);
+    SetStatus("Downloading launcher update…", GameColours::kWarning);
+
+    QNetworkRequest request(url);
+    request.setRawHeader("User-Agent", "LCEReborn-Launcher");
+    request.setRawHeader("Accept", "application/octet-stream");
+    request.setTransferTimeout(60000);
+    QNetworkReply* reply = mLiveNetwork->get(request);
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply, file] {
+        if (file->write(reply->readAll()) < 0)
+            reply->abort();
+    });
+    connect(reply, &QNetworkReply::downloadProgress, this, [this](qint64 received, qint64 total) {
+        if (total > 0)
+            SetStatus(QString("Downloading update… %1%").arg((received * 100) / total), GameColours::kWarning);
+    });
+    connect(reply, &QNetworkReply::finished, this, [this, reply, file] {
+        const QByteArray remaining = reply->readAll();
+        bool saved = remaining.isEmpty() || file->write(remaining) == remaining.size();
+        const QString error = reply->errorString();
+        reply->deleteLater();
+        saved = saved && reply->error() == QNetworkReply::NoError && file->flush() && file->size() > 1024;
+        file->seek(0);
+        saved = saved && file->read(2) == QByteArray("MZ", 2);
+        const QString installerPath = file->fileName();
+        file->close();
+        file->deleteLater();
+        if (!saved)
+        {
+            if (mUpdateButton) mUpdateButton->setEnabled(true);
+            QFile::remove(installerPath);
+            SetStatus("Update download failed", GameColours::kWarning);
+            QMessageBox::warning(this, "Update LCEReborn Live", QString("The installer could not be downloaded: %1").arg(error));
+            return;
+        }
+        if (!QProcess::startDetached(installerPath, {}))
+        {
+            if (mUpdateButton) mUpdateButton->setEnabled(true);
+            QFile::remove(installerPath);
+            SetStatus("Could not start the installer", GameColours::kWarning);
+            QMessageBox::warning(this, "Update LCEReborn Live", "The installer downloaded, but Windows could not start it.");
+            return;
+        }
+        close();
+    });
+#else
+    QMessageBox::information(this, "Update LCEReborn Live", "In-launcher updates are currently available for Windows releases.");
+#endif
 }
 
 void MainWindow::ShowPage(int index)

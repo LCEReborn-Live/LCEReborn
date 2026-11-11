@@ -18,6 +18,8 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QStandardPaths>
+#include <QDir>
 #include <QTextBlock>
 #include <QTextBrowser>
 #include <QTextCursor>
@@ -32,15 +34,25 @@
 
 namespace
 {
-const char* const kReleasesUrl = "https://api.github.com/repos/LCEReborn/LCEReborn/releases?per_page=10";
-const char* const kRepositoryUrl = "https://github.com/LCEReborn/LCEReborn";
+const char* const kLiveReleasesUrl = "https://api.github.com/repos/LCEReborn-Live/LCEReborn/releases?per_page=10";
+const char* const kUpstreamReleasesUrl = "https://api.github.com/repos/LCEReborn/LCEReborn/releases?per_page=10";
+const char* const kLiveRepositoryUrl = "https://github.com/LCEReborn-Live/LCEReborn";
+const char* const kUpstreamRepositoryUrl = "https://github.com/LCEReborn/LCEReborn";
 const int kTagRole = Qt::UserRole + 1;
 const int kTitleRole = Qt::UserRole + 2;
 const int kUrlRole = Qt::UserRole + 3;
 const int kPublishedRole = Qt::UserRole + 4;
 const int kBodyRole = Qt::UserRole + 5;
 const int kPrereleaseRole = Qt::UserRole + 6;
+const int kRepositoryRole = Qt::UserRole + 7;
+const int kLiveFeed = 1;
+const int kUpstreamFeed = 2;
 const int kBlockSize = 40;
+
+QString NewsCachePath(const QString& fileName)
+{
+    return QDir(LauncherPaths::DataDir()).filePath(fileName);
+}
 
 QString CommitOf(const QString& tag, const QString& title)
 {
@@ -107,16 +119,19 @@ NewsTab::NewsTab(QWidget* parent)
     auto* refresh = new QPushButton("Refresh", this);
     auto* links = new QPushButton("Links", this);
     auto* linkMenu = new QMenu(links);
-    const QString repository = kRepositoryUrl;
+    const QString liveRepository = kLiveRepositoryUrl;
+    const QString upstreamRepository = kUpstreamRepositoryUrl;
     const struct
     {
         const char* label;
         QString url;
     } entries[] = {
-        {"GitHub", repository},
-        {"All releases", repository + "/releases"},
-        {"Report a bug", repository + "/issues"},
-        {"Documentation", repository + "/tree/main/docs"},
+        {"LCEReborn Live GitHub", liveRepository},
+        {"LCEReborn Live releases", liveRepository + "/releases"},
+        {"Original LCEReborn GitHub", upstreamRepository},
+        {"Original LCEReborn releases", upstreamRepository + "/releases"},
+        {"Report a bug", liveRepository + "/issues"},
+        {"Documentation", liveRepository + "/tree/main/docs"},
     };
     for (const auto& entry : entries)
     {
@@ -171,49 +186,70 @@ NewsTab::NewsTab(QWidget* parent)
 
 void NewsTab::Refresh()
 {
-    QFile cache(LauncherPaths::NewsCacheFile());
-    if (!cache.open(QIODevice::ReadOnly) || !ShowReleases(cache.readAll(), QString()))
-        ShowOffline(QString());
+    mWarnings.clear();
+    QFile liveCache(NewsCachePath("launcher_news_live.json"));
+    if (liveCache.open(QIODevice::ReadOnly)) ParseReleases(liveCache.readAll(), &mLiveReleases);
+    QFile upstreamCache(NewsCachePath("launcher_news_upstream.json"));
+    if (upstreamCache.open(QIODevice::ReadOnly)) ParseReleases(upstreamCache.readAll(), &mUpstreamReleases);
+    RenderReleases();
 
-    QNetworkRequest request{QUrl(kReleasesUrl)};
-    request.setRawHeader("Accept", "application/vnd.github+json");
-    request.setRawHeader("User-Agent", "LCEReborn-Launcher");
-    request.setTransferTimeout(10000);
-    mNetwork->get(request);
+    const auto requestFeed = [this](const char* url, int feed) {
+        QNetworkRequest request{QUrl(url)};
+        request.setRawHeader("Accept", "application/vnd.github+json");
+        request.setRawHeader("User-Agent", "LCEReborn-Launcher");
+        request.setTransferTimeout(10000);
+        request.setAttribute(QNetworkRequest::User, feed);
+        mNetwork->get(request);
+    };
+    requestFeed(kLiveReleasesUrl, kLiveFeed);
+    requestFeed(kUpstreamReleasesUrl, kUpstreamFeed);
 }
 
 void NewsTab::OnReply(QNetworkReply* reply)
 {
+    const int feed = reply->request().attribute(QNetworkRequest::User).toInt();
+    QJsonArray* releases = feed == kLiveFeed ? &mLiveReleases : &mUpstreamReleases;
+    const QString cacheName = feed == kLiveFeed ? "launcher_news_live.json" : "launcher_news_upstream.json";
+    const QString feedName = feed == kLiveFeed ? "LCEReborn Live" : "original LCEReborn";
     reply->deleteLater();
     if (reply->error() != QNetworkReply::NoError)
     {
-        const QString reason = QString("Couldn't reach GitHub (%1).").arg(reply->errorString());
-        QFile cache(LauncherPaths::NewsCacheFile());
-        const QString saved = QLocale().toString(QFileInfo(cache).lastModified(), QLocale::ShortFormat);
-        if (!cache.open(QIODevice::ReadOnly) ||
-            !ShowReleases(cache.readAll(), reason + " Showing the news saved " + saved + "."))
-            ShowOffline(reason);
+        mWarnings.append(QString("Couldn't reach %1 releases (%2).").arg(feedName, reply->errorString()));
+        RenderReleases();
         return;
     }
     const QByteArray json = reply->readAll();
-    if (!ShowReleases(json, QString()))
+    if (!ParseReleases(json, releases))
     {
-        ShowOffline(QString());
+        mWarnings.append(QString("Couldn't read %1 releases.").arg(feedName));
+        RenderReleases();
         return;
     }
-    QSaveFile cache(LauncherPaths::NewsCacheFile());
+    QSaveFile cache(NewsCachePath(cacheName));
     if (cache.open(QIODevice::WriteOnly))
     {
         cache.write(json);
         cache.commit();
     }
+    RenderReleases();
 }
 
-bool NewsTab::ShowReleases(const QByteArray& json, const QString& note)
+bool NewsTab::ParseReleases(const QByteArray& json, QJsonArray* releases) const
 {
     const QJsonDocument document = QJsonDocument::fromJson(json);
-    if (!document.isArray() || document.array().isEmpty())
+    if (!document.isArray())
         return false;
+    *releases = document.array();
+    return true;
+}
+
+void NewsTab::RenderReleases()
+{
+    if (mLiveReleases.isEmpty() && mUpstreamReleases.isEmpty())
+    {
+        ShowOffline(mWarnings.join(" "));
+        return;
+    }
 
     const QString selectedTag = mReleases->currentItem() != nullptr
                                     ? mReleases->currentItem()->data(kTagRole).toString()
@@ -222,11 +258,19 @@ bool NewsTab::ShowReleases(const QByteArray& json, const QString& note)
     mReleases->blockSignals(true);
     mReleases->clear();
     int selectRow = 0;
-    for (const QJsonValue& value : NewestFirst(document.array()))
+    QJsonArray combined = mLiveReleases;
+    for (const QJsonValue& value : mUpstreamReleases)
+    {
+        QJsonObject release = value.toObject();
+        release.insert("_lce_feed", "upstream");
+        combined.append(release);
+    }
+    for (const QJsonValue& value : NewestFirst(combined))
     {
         const QJsonObject release = value.toObject();
         if (release.value("draft").toBool())
             continue;
+        const bool isLive = release.value("_lce_feed").toString() != "upstream";
         const QString tag = release.value("tag_name").toString();
         QString title = release.value("name").toString().trimmed();
         if (title.isEmpty())
@@ -235,15 +279,18 @@ bool NewsTab::ShowReleases(const QByteArray& json, const QString& note)
         const QString commit = CommitOf(tag, title);
         const bool prerelease = release.value("prerelease").toBool();
 
-        const QString label = commit.isEmpty() || !published.isValid()
-                                  ? title
-                                  : QString("%1 - %2").arg(commit, QLocale().toString(published.toLocalTime().date(), "d MMM"));
+        const QString source = isLive ? "Live" : "Original";
+        const QString label = QString("%1  |  %2%3")
+                                  .arg(source, title,
+                                       published.isValid()
+                                           ? QString("  -  %1").arg(QLocale().toString(published.toLocalTime().date(), "d MMM"))
+                                           : QString());
         auto* item = new QListWidgetItem(label, mReleases);
         item->setData(Qt::DecorationRole, BlockIcons::Render(commit.isEmpty() ? tag : commit, kBlockSize));
         QStringList notes;
         if (prerelease)
             notes.append("Pre-release");
-        if (!commit.isEmpty() && commit == installed)
+        if (isLive && !commit.isEmpty() && commit == installed)
             notes.append("This build");
         item->setData(GameRowDelegate::kSubtitleRole, notes.join(", "));
         item->setData(kTagRole, tag);
@@ -252,21 +299,21 @@ bool NewsTab::ShowReleases(const QByteArray& json, const QString& note)
         item->setData(kPublishedRole, published);
         item->setData(kBodyRole, release.value("body").toString());
         item->setData(kPrereleaseRole, prerelease);
+        item->setData(kRepositoryRole, isLive ? kLiveRepositoryUrl : kUpstreamRepositoryUrl);
         item->setToolTip(title);
         if (tag == selectedTag)
             selectRow = mReleases->count() - 1;
     }
     mReleases->blockSignals(false);
     if (mReleases->count() == 0)
-        return false;
+        return;
     mReleases->setCurrentRow(selectRow);
     ShowSelected();
 
-    mNote->setText(note);
-    mNote->setVisible(!note.isEmpty());
-    const NewerRelease newer = FindNewerRelease(document.array(), BuildCommit(), BuildDate());
-    emit UpdateChecked(newer.name, newer.url);
-    return true;
+    mNote->setText(mWarnings.join(" "));
+    mNote->setVisible(!mWarnings.isEmpty());
+    const NewerRelease newer = FindNewerRelease(mLiveReleases, BuildTag(), BuildTimestamp());
+    emit UpdateChecked(newer.name, newer.installerUrl);
 }
 
 void NewsTab::ShowSelected()
@@ -286,8 +333,10 @@ void NewsTab::ShowSelected()
     QString when = published.isValid() ? HowLongAgo(published) : QString();
     if (item->data(kPrereleaseRole).toBool())
         when += when.isEmpty() ? "Pre-release" : ", pre-release";
-    mDate->setText(when);
-    mDate->setVisible(!when.isEmpty());
+    const QString repository = item->data(kRepositoryRole).toString();
+    const QString source = repository.contains("LCEReborn-Live") ? "LCEReborn Live" : "Original LCEReborn";
+    mDate->setText(when.isEmpty() ? source : source + " - " + when);
+    mDate->setVisible(true);
 
     QString body = item->data(kBodyRole).toString();
     body.remove(images);
@@ -300,7 +349,7 @@ void NewsTab::ShowOffline(const QString& note)
 {
     mReleases->clear();
     mTitle->setText("No news yet");
-    mDate->setText("The releases appear here once the launcher reaches GitHub.");
+    mDate->setText("LCEReborn Live and original LCEReborn releases will appear here.");
     mDate->show();
     mBody->clear();
     mNote->setText(note);

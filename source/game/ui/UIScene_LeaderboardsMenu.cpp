@@ -2,7 +2,6 @@
 #include "game/core/StringIds.hpp"
 
 #include <cwchar>
-#include <cstdlib>
 #include <cstring>
 
 #include "game/core/CMinecraftApp.hpp"
@@ -29,15 +28,6 @@
 static std::vector<UIScene_LeaderboardsMenu::LeaderboardDescriptor> gLeaderboardDescriptors[4];
 static int gLeaderboardIconIds[UIScene_LeaderboardsMenu::LEADERBOARD_ICON_COUNT];
 
-namespace
-{
-bool LiveLeaderboardAvailable()
-{
-    const char* directory = std::getenv("LCE_LIVE_DIR");
-    return directory != NULL && *directory != '\0';
-}
-}
-
 UIScene_LeaderboardsMenu::UIScene_LeaderboardsMenu(int type, void* data, UILayer* layer)
     : UIScene(type, layer),
       m_leaderboardInterface(g_pLeaderboardManager)
@@ -55,6 +45,7 @@ UIScene_LeaderboardsMenu::UIScene_LeaderboardsMenu(int type, void* data, UILayer
     SetLeaderboardHeader();
     m_readType = m_worldLeaderboard ? LeaderboardManager::eReadType_TopRank : LeaderboardManager::eReadType_Friends;
     m_filterLabel.init(UIString(FilterText()));
+    updateTooltips();
     wchar_t entriesText[40];
     swprintf(entriesText, 40, L"%ls%i", L10N::GetString(IDS_LEADERBOARD_ENTRIES), 0);
     m_entriesLabel.init(UIString(entriesText));
@@ -512,7 +503,7 @@ unsigned int UIScene_LeaderboardsMenu::mapElementsAndNames()
 void UIScene_LeaderboardsMenu::updateTooltips()
 {
     gConsoleUIController.SetTooltips(static_cast<unsigned int>(m_playerId), -1, IDS_TOOLTIPS_BACK,
-                                     (m_worldLeaderboard || LiveLeaderboardAvailable()) ? IDS_TOOLTIPS_CHANGE_FILTER : -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0,
+                                     IDS_TOOLTIPS_CHANGE_FILTER, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0,
                                      0);
 }
 
@@ -650,8 +641,7 @@ void UIScene_LeaderboardsMenu::handleInput(int playerId, int action, bool repeat
     case EControllerActions_MenuB:
         break;
     case EControllerActions_MenuX:
-        if ((m_worldLeaderboard || LiveLeaderboardAvailable()) && m_leaderboardPopulated
-            && g_pLeaderboardManager->isIdle())
+        if (m_leaderboardPopulated && g_pLeaderboardManager->isIdle())
         {
             gConsoleUIController.PlayUISFX(SoundEvents::UI_SCROLL);
             if (m_readType == LeaderboardManager::eReadType_TopRank)

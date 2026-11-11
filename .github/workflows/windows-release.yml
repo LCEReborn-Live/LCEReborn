@@ -129,5 +129,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $assets = @(Get-ChildItem build -Filter 'LCEReborn-Live-Portable-*.zip' | ForEach-Object FullName)
           $assets += @(Get-ChildItem build/release -Filter 'LCEReborn-Live-Installer-*.exe' | ForEach-Object FullName)
-          gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --generate-notes
+          $notesFile = "docs/releases/$($env:RELEASE_TAG).md"
+          if (Test-Path $notesFile) {
+            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --notes-file $notesFile
+          } else {
+            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --generate-notes
+          }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

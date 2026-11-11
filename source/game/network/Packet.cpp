@@ -84,6 +84,7 @@
 #include "game/network/ClientboundTeleportEntityPacket.hpp"
 #include "game/network/ClientboundUpdateAttributesPacket.hpp"
 #include "game/network/ClientboundUpdateMobEffectPacket.hpp"
+#include "game/network/ClientboundVoicePacket.hpp"
 #include "game/network/CraftItemPacket.hpp"
 #include "game/network/DebugOptionsPacket.hpp"
 #include "game/network/DisconnectPacket.hpp"
@@ -124,6 +125,7 @@
 #include "game/network/ServerboundTeleportToEntityPacket.hpp"
 #include "game/network/ServerboundUseItemOnPacket.hpp"
 #include "game/network/ServerboundUseItemPacket.hpp"
+#include "game/network/ServerboundVoicePacket.hpp"
 #include "game/network/TextureAndGeometryChangePacket.hpp"
 #include "game/network/TextureAndGeometryPacket.hpp"
 #include "game/network/TextureChangePacket.hpp"
@@ -405,6 +407,8 @@ void Packet::staticCtor()
         ClientboundMGPlayerSettingsUpdatePacket::create, L"MiniGameSettingsUpdate");
     map(250, true, true, true, false, typeid(ClientboundCustomPayloadPacket), ClientboundCustomPayloadPacket::create,
         L"CustomPayload");
+    map(251, false, true, false, false, typeid(ServerboundVoicePacket), ServerboundVoicePacket::create, L"Voice");
+    map(252, true, false, false, false, typeid(ClientboundVoicePacket), ClientboundVoicePacket::create, L"Voice");
     map(253, true, false, false, false, typeid(ClientboundChangeDifficultyPacket),
         ClientboundChangeDifficultyPacket::create, L"ChangeDifficulty");
     map(254, false, true, false, false, typeid(GetInfoPacket), GetInfoPacket::create, L"GetInfo");

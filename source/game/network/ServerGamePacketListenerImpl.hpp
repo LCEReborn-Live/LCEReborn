@@ -49,6 +49,7 @@ class ServerboundPlayerCommandPacket;
 class ServerboundClientCommandPacket;
 class ServerboundSetCreativeModeSlotPacket;
 class ServerboundKeepAlivePacket;
+class ServerboundVoicePacket;
 class PlayerInfoPacket;
 class CraftItemPacket;
 class TradeItemPacket;
@@ -120,6 +121,7 @@ public:
     virtual void handleSignUpdate(boost::shared_ptr<ServerboundSignUpdatePacket> packet);
     uint64_t getMilliseconds();
     virtual void handleKeepAlive(boost::shared_ptr<ServerboundKeepAlivePacket> packet);
+    virtual void handleVoice(boost::shared_ptr<ServerboundVoicePacket> packet);
     virtual void handlePlayerInfo(boost::shared_ptr<PlayerInfoPacket> packet);
     virtual void handlePlayerAbilities(boost::shared_ptr<ServerboundPlayerAbilitiesPacket> packet);
     void NameItemOnAnvil(const boost::shared_ptr<ServerboundCustomPayloadPacket>& packet, bool useName);

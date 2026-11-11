@@ -52,6 +52,7 @@ class ClientboundPlayerCombatPacket;
 class ClientboundPlayerPositionPacket;
 class ClientboundPlayerSleepPacket;
 class ClientboundPowerupPacket;
+class ClientboundVoicePacket;
 class ClientboundPreLoginPacket;
 class ClientboundRemoveEntitiesPacket;
 class ClientboundRemoveMobEffectPacket;
@@ -119,6 +120,7 @@ class ServerboundSwingPacket;
 class ServerboundTeleportToEntityPacket;
 class ServerboundUseItemOnPacket;
 class ServerboundUseItemPacket;
+class ServerboundVoicePacket;
 class TextureAndGeometryChangePacket;
 class TextureAndGeometryPacket;
 class TextureChangePacket;
@@ -238,6 +240,8 @@ public:
     virtual void handleMapSelectInfo(boost::shared_ptr<MapSelectInfoPacket> packet);
     virtual void handlePlayerReady(boost::shared_ptr<PlayerReadyPacket> packet);
     virtual void handlePowerup(boost::shared_ptr<ClientboundPowerupPacket> packet);
+    virtual void handleVoice(boost::shared_ptr<ClientboundVoicePacket> packet);
+    virtual void handleVoice(boost::shared_ptr<ServerboundVoicePacket> packet);
     virtual void handleDamageIndicator(boost::shared_ptr<ClientboundDamageIndicatorPacket> packet);
     virtual void handleMiniGamePlayerSettingsUpdatePacket(
         boost::shared_ptr<ClientboundMGPlayerSettingsUpdatePacket> packet);

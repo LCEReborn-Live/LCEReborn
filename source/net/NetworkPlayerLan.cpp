@@ -18,7 +18,9 @@ NetworkPlayerLan::NetworkPlayerLan(CPlatformNetworkManagerLan* manager, EType ty
       m_displayName(displayName),
       m_socket(0),
       m_lastChunkPacketTime(0),
-      m_rtt(0)
+      m_rtt(0),
+      m_hasVoice(false),
+      m_talking(false)
 {
     InitializeCriticalSection(&m_ackLock);
 }
@@ -106,7 +108,10 @@ int NetworkPlayerLan::GetSessionIndex()
 
 bool NetworkPlayerLan::IsTalking()
 {
-    return false;
+    EnterCriticalSection(&m_ackLock);
+    const bool talking = m_talking;
+    LeaveCriticalSection(&m_ackLock);
+    return talking;
 }
 
 bool NetworkPlayerLan::IsMutedByLocalUser(int)
@@ -116,7 +121,18 @@ bool NetworkPlayerLan::IsMutedByLocalUser(int)
 
 bool NetworkPlayerLan::HasVoice()
 {
-    return false;
+    EnterCriticalSection(&m_ackLock);
+    const bool hasVoice = m_hasVoice;
+    LeaveCriticalSection(&m_ackLock);
+    return hasVoice;
+}
+
+void NetworkPlayerLan::SetVoiceStatus(bool hasVoice, bool talking)
+{
+    EnterCriticalSection(&m_ackLock);
+    m_hasVoice = hasVoice;
+    m_talking = hasVoice && talking;
+    LeaveCriticalSection(&m_ackLock);
 }
 
 bool NetworkPlayerLan::HasCamera()

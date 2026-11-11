@@ -12,6 +12,9 @@
 #include "game/util/Random.hpp"
 #include "game/core/CMinecraftApp.hpp"
 #include "game/minigame/Tutorial.hpp"
+#if LCE_PLATFORM_PC
+#include "platform/pc/audio/PcVoiceChat.hpp"
+#endif
 
 class Minecraft;
 class Level;
@@ -21,6 +24,7 @@ class SavedDataMemoryStorage;
 class BlockPos;
 class ClientboundBlockEntityDataPacket;
 class ClientboundLoginPacket;
+class ClientboundVoicePacket;
 class ClientboundAddEntityPacket;
 class ClientboundAddExperienceOrbPacket;
 class ClientboundAddGlobalEntityPacket;
@@ -232,6 +236,7 @@ public:
     void handleMapSelectInfo(boost::shared_ptr<MapSelectInfoPacket> packet);
     void handlePlayerReady(boost::shared_ptr<PlayerReadyPacket> packet);
     virtual void handlePowerup(boost::shared_ptr<ClientboundPowerupPacket> packet);
+    virtual void handleVoice(boost::shared_ptr<ClientboundVoicePacket> packet);
     virtual void handleVote(boost::shared_ptr<VotePacket> packet);
     const std::vector<ChatCommands::CommandUsage>& getCommands() const;
     void applyNextGameMode();
@@ -265,6 +270,9 @@ private:
     std::vector<ChatCommands::CommandUsage> m_commands;
     int m_nextGameMode;
     int m_nextMap;
+#if LCE_PLATFORM_PC
+    PcVoiceChat m_voiceChat;
+#endif
 };
 
 #endif

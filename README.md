@@ -22,6 +22,10 @@
 - Direct connections with NAT traversal when possible, with relay fallback.
 - Live account skins and capes in game.
 - The original LCE leaderboard menu with global, friends, and personal score filters.
+- A launcher news feed for both LCEReborn Live and original LCEReborn releases.
+- Update notifications and in-launcher installer downloads for installed Windows copies.
+- A focused mini-game Join tab for Battle, Tumble, and Glide matchmaking.
+- Wii U-style open-mic Game Chat in online play, with automatic voice activity detection and no push-to-talk key.
 - Keyboard, mouse, and controller support; single-player and split-screen play.
 
 ### Installation
@@ -35,6 +39,8 @@ Game data, saves, and update files are not included in downloads. The launcher i
 ### Live networking
 
 Sign in to Live in the launcher, add friends by username, and open a world with online play enabled. Friends' available worlds appear in game automatically. Mini-game matchmaking searches visible Live sessions for a compatible open game. The client uses a direct connection when NAT traversal succeeds and falls back to the relay otherwise. Matchmaking currently searches open games; it does not keep players in a waiting queue.
+
+The launcher News page combines LCEReborn Live release notes with the original LCEReborn release feed. When a newer stable Live release is available, the launcher offers an update; installed Windows copies can download and start the installer from the launcher. Portable copies use the release page. In an online game, enabling **Game Chat** opens the default microphone and sends speech to the other players; silence is filtered automatically.
 
 ### Build from source
 
@@ -61,6 +67,10 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 - Подключение напрямую с обходом NAT, когда это возможно, и через relay в остальных случаях.
 - Скины и плащи Live-аккаунта в игре.
 - Оригинальное меню таблиц рекордов LCE с глобальными результатами, результатами друзей и личным рекордом.
+- Лента новостей с релизами LCEReborn Live и оригинального LCEReborn.
+- Уведомления об обновлениях и загрузка установщика из лаунчера для установленной версии Windows.
+- Вкладка Join с поиском игр Battle, Tumble и Glide.
+- Голосовой Game Chat в стиле Wii U: открытый микрофон в сетевой игре с автоматическим определением речи, без кнопки PTT.
 - Клавиатура, мышь и геймпады; одиночная игра и разделённый экран.
 
 ### Установка
@@ -74,6 +84,8 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 ### Сеть Live
 
 Войдите в Live в лаунчере, добавьте друзей по имени пользователя и откройте мир с включённой сетевой игрой. Доступные миры друзей появляются в игре автоматически. Прямое соединение используется, когда удаётся пройти NAT; иначе подключение идёт через relay.
+
+Вкладка News объединяет заметки о релизах LCEReborn Live и ленту оригинального LCEReborn. Когда выходит новая стабильная версия Live, лаунчер предлагает обновление. Установленные версии Windows могут скачать и запустить установщик из лаунчера; для portable-версии открывается страница релиза. Включите **Game Chat** в настройках звука во время сетевой игры: микрофон будет открыт, тишина автоматически отфильтровывается.
 
 ### Сборка из исходников
 

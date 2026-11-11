@@ -27,7 +27,7 @@ UninstallDisplayIcon={app}\LCERebornLauncher.exe
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
 [Files]
-Source: "..\build\installer-files\LCEReborn\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\build\installer-files\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\LCEReborn Live"; Filename: "{app}\LCERebornLauncher.exe"

@@ -20,6 +20,8 @@
 #include "game/network/ClientboundSetEquippedItemPacket.hpp"
 #include "game/network/ClientboundAddExperienceOrbPacket.hpp"
 #include "game/network/ClientboundPowerupPacket.hpp"
+#include "game/network/ClientboundVoicePacket.hpp"
+#include "game/network/ServerboundVoicePacket.hpp"
 #include "game/network/ClientboundBlockCollectionDestructionPacket.hpp"
 #include "game/network/ClientboundAddEntityPacket.hpp"
 #include "game/network/PlayerInfoPacket.hpp"
@@ -112,6 +114,7 @@
 #include "game/network/PlayerReadyPacket.hpp"
 #include "game/network/ChunkVisibilityPacket.hpp"
 #include "game/network/CGameNetworkManager.hpp"
+#include "net/NetworkPlayerLan.hpp"
 #include "game/world/generation/MultiPlayerLevel.hpp"
 #include "game/minigame/Tutorial.hpp"
 #include "game/network/ClientboundBlockEntityDataPacket.hpp"
@@ -450,6 +453,16 @@ void ClientPacketListener::tick()
     m_connection->flush();
     if (!m_closed && IsPrimaryPlayer())
         PackReceiver::Get().tick(this);
+#if LCE_PLATFORM_PC
+    if (IsPrimaryPlayer())
+    {
+        const bool voiceEnabled = !m_closed && CGameNetworkManager::sInstance.IsInSession()
+                                  && gApp.IsVoiceChatEnabled();
+        m_voiceChat.Tick(voiceEnabled, [this](bool hasVoice, bool talking, const std::vector<unsigned char>& audio) {
+            send(boost::shared_ptr<Packet>(new ServerboundVoicePacket(hasVoice, talking, audio)));
+        });
+    }
+#endif
 }
 
 void ClientPacketListener::sendViewDistance(int distance)
@@ -3554,6 +3567,33 @@ void ClientPacketListener::handlePlayerInfo(boost::shared_ptr<PlayerInfoPacket> 
         }
     }
 }
+
+#if LCE_PLATFORM_PC
+void ClientPacketListener::handleVoice(boost::shared_ptr<ClientboundVoicePacket> packet)
+{
+    if (packet == NULL)
+        return;
+    INetworkPlayer* player = CGameNetworkManager::sInstance.GetPlayerBySmallId(packet->PlayerId());
+    if (player == NULL || player->IsLocal())
+        return;
+    if (!gApp.IsVoiceChatEnabled())
+    {
+        NetworkPlayerLan* lanPlayer = dynamic_cast<NetworkPlayerLan*>(player);
+        if (lanPlayer != NULL)
+            lanPlayer->SetVoiceStatus(false, false);
+        m_voiceChat.Receive(packet->PlayerId(), false, false, std::vector<unsigned char>());
+        return;
+    }
+    NetworkPlayerLan* lanPlayer = dynamic_cast<NetworkPlayerLan*>(player);
+    if (lanPlayer != NULL)
+        lanPlayer->SetVoiceStatus(packet->HasVoice(), packet->IsTalking());
+    m_voiceChat.Receive(packet->PlayerId(), packet->HasVoice(), packet->IsTalking(), packet->Audio());
+}
+#else
+void ClientPacketListener::handleVoice(boost::shared_ptr<ClientboundVoicePacket>)
+{
+}
+#endif
 
 void ClientPacketListener::handleKeepAlive(boost::shared_ptr<ClientboundKeepAlivePacket> packet)
 {

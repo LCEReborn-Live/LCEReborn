@@ -5,6 +5,8 @@
 #include "game/network/ServerboundChatPacket.hpp"
 #include "game/network/ServerboundSwingPacket.hpp"
 #include "game/network/PacketListener.hpp"
+#include "game/network/ClientboundVoicePacket.hpp"
+#include "game/network/ServerboundVoicePacket.hpp"
 
 #include "game/network/BlockRegionUpdatePacket.hpp"
 #include "game/network/ChunkVisibilityAreaPacket.hpp"
@@ -758,6 +760,16 @@ void PacketListener::handleVote(boost::shared_ptr<VotePacket> packet)
 }
 
 void PacketListener::handleClientboundSetPlayerTeamPacket(boost::shared_ptr<ClientboundSetPlayerTeamPacket> packet)
+{
+    onUnhandledPacket(packet);
+}
+
+void PacketListener::handleVoice(boost::shared_ptr<ClientboundVoicePacket> packet)
+{
+    onUnhandledPacket(packet);
+}
+
+void PacketListener::handleVoice(boost::shared_ptr<ServerboundVoicePacket> packet)
 {
     onUnhandledPacket(packet);
 }

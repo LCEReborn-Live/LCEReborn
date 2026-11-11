@@ -41,12 +41,14 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <memory>
+#include <string>
 
 #ifdef Q_OS_WIN
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <shellapi.h>
 #include <wincrypt.h>
 #include <mmsystem.h>
 #pragma comment(lib, "Crypt32.lib")
@@ -458,14 +460,49 @@ void MainWindow::DownloadLauncherUpdate()
             QMessageBox::warning(this, "Update LCEReborn Live", QString("The installer could not be downloaded: %1").arg(error));
             return;
         }
+#ifdef Q_OS_WIN
+        SHELLEXECUTEINFOW executeInfo = {};
+        executeInfo.cbSize = sizeof(executeInfo);
+        executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI | SEE_MASK_NOASYNC;
+        executeInfo.lpVerb = L"open";
+        const std::wstring nativeInstallerPath = installerPath.toStdWString();
+        executeInfo.lpFile = nativeInstallerPath.c_str();
+        executeInfo.nShow = SW_SHOWNORMAL;
+        const bool started = ShellExecuteExW(&executeInfo) != FALSE;
+        const DWORD launchError = started ? ERROR_SUCCESS : GetLastError();
+        if (executeInfo.hProcess)
+            CloseHandle(executeInfo.hProcess);
+        if (!started)
+        {
+            wchar_t* systemMessage = nullptr;
+            FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
+                               | FORMAT_MESSAGE_IGNORE_INSERTS,
+                           nullptr, launchError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                           reinterpret_cast<LPWSTR>(&systemMessage), 0, nullptr);
+            const QString reason = systemMessage
+                                       ? QString::fromWCharArray(systemMessage).trimmed()
+                                       : QStringLiteral("Windows error %1").arg(launchError);
+            if (systemMessage)
+                LocalFree(systemMessage);
+            if (mUpdateButton) mUpdateButton->setEnabled(true);
+            SetStatus("Could not start the installer", GameColours::kWarning);
+            QMessageBox::warning(
+                this, "Update LCEReborn Live",
+                QString("The installer downloaded, but Windows could not start it.\n\n%1\n\nThe file was kept here:\n%2")
+                    .arg(reason, QDir::toNativeSeparators(installerPath)));
+            return;
+        }
+#else
         if (!QProcess::startDetached(installerPath, {}))
         {
             if (mUpdateButton) mUpdateButton->setEnabled(true);
-            QFile::remove(installerPath);
             SetStatus("Could not start the installer", GameColours::kWarning);
-            QMessageBox::warning(this, "Update LCEReborn Live", "The installer downloaded, but Windows could not start it.");
+            QMessageBox::warning(this, "Update LCEReborn Live",
+                                 QString("The installer downloaded, but could not be started. The file was kept here:\n%1")
+                                     .arg(QDir::toNativeSeparators(installerPath)));
             return;
         }
+#endif
         close();
     });
 #else

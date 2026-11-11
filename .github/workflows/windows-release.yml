@@ -98,6 +98,7 @@ jobs:
           $stage = Join-Path $env:GITHUB_WORKSPACE 'build/installer-files'
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
           Expand-Archive -LiteralPath $archive.FullName -DestinationPath $stage -Force
+          if (-not (Test-Path (Join-Path $stage 'LCERebornLauncher.exe'))) { throw 'The portable archive is missing LCERebornLauncher.exe at its root' }
           $compilerPath = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
           if (-not $compilerPath) {
             $candidate = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'

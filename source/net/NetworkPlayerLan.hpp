@@ -44,6 +44,7 @@ public:
     virtual bool IsTalking();
     virtual bool IsMutedByLocalUser(int userIndex);
     virtual bool HasVoice();
+    void SetVoiceStatus(bool hasVoice, bool talking);
     virtual bool HasCamera();
     virtual int GetUserIndex();
     virtual void SetSocket(Socket* socket);
@@ -77,6 +78,8 @@ private:
     C4JCriticalSection m_ackLock;
     std::deque<int64_t> m_ackSendTimes;
     int m_rtt;
+    bool m_hasVoice;
+    bool m_talking;
 };
 
 #endif

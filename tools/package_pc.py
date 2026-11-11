@@ -313,6 +313,7 @@ def game_components(build):
     stb_truetype = os.path.join(ROOT, "source", "vendor", "stb_truetype.hpp")
     rapidxml = os.path.join(TOOLS, "build", "third_party", "rapidxml", "rapidxml.hpp")
     bink = os.path.join(ROOT, "source", "platform", "pc", "audio", "BinkAudioDecoder.cpp")
+    opus_source = os.path.join(build, "_deps", "opus-src")
     boost_license = os.path.join(LICENSE_TEXTS, "BSL-1.0.txt")
     rapidxml_header = read(rapidxml)
     truetype_header = read(stb_truetype)
@@ -324,6 +325,14 @@ def game_components(build):
             "source": "https://github.com/libsdl-org/SDL",
             "license": ["Zlib"],
             "notice": read(os.path.join(sdl_source, "LICENSE.txt")).strip(),
+        },
+        {
+            "name": "Opus",
+            "version": match(r"([0-9]+\.[0-9]+\.[0-9]+)", read(os.path.join(opus_source, "package_version")),
+                             os.path.join(opus_source, "package_version")),
+            "source": "https://github.com/xiph/opus",
+            "license": ["BSD-3-Clause"],
+            "notice": read(os.path.join(opus_source, "COPYING")).strip(),
         },
         {
             "name": "zlib",
@@ -564,7 +573,9 @@ def write_zip(path, entries, date):
     stamp = date.timetuple()[:6]
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for arcname, content in entries:
-            info = zipfile.ZipInfo(TOP + "/" + arcname, stamp)
+            # Keep the launcher at the archive root so extracting into a folder already named
+            # LCEReborn doesn't create a second nested LCEReborn directory.
+            info = zipfile.ZipInfo(arcname, stamp)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
             if isinstance(content, str):

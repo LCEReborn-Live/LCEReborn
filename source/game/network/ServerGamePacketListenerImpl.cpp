@@ -31,6 +31,12 @@
 #include "game/network/KickPlayerPacket.hpp"
 #include "game/network/PlayerReadyPacket.hpp"
 #include "game/network/ServerboundKeepAlivePacket.hpp"
+#include "game/network/ServerboundVoicePacket.hpp"
+#include "game/network/ClientboundVoicePacket.hpp"
+#if LCE_PLATFORM_PC
+#include "net/NetworkPlayerLan.hpp"
+#endif
+#include "net/NetworkPlayerLan.hpp"
 #include "game/network/ServerboundPaddleBoatPacket.hpp"
 #include "game/network/ServerboundPlayerAbilitiesPacket.hpp"
 #include "game/network/ServerboundSetCarriedItemPacket.hpp"
@@ -1166,6 +1172,36 @@ void ServerGamePacketListenerImpl::handleKeepAlive(boost::shared_ptr<Serverbound
         mPlayer->latency = (mPlayer->latency * 3 + elapsed) / 4;
     }
 }
+
+void ServerGamePacketListenerImpl::handleVoice(boost::shared_ptr<ServerboundVoicePacket> packet)
+{
+    INetworkPlayer* sender = getNetworkPlayer();
+    if (sender == NULL)
+        return;
+
+    const bool hasVoice = packet->HasVoice();
+    const bool talking = hasVoice && packet->IsTalking() && !packet->Audio().empty()
+                         && packet->Audio().size() <= 1024;
+#if LCE_PLATFORM_PC
+    NetworkPlayerLan* lanSender = dynamic_cast<NetworkPlayerLan*>(sender);
+    if (lanSender != NULL)
+        lanSender->SetVoiceStatus(hasVoice, talking);
+#endif
+
+    const unsigned char playerId = sender->GetSmallId();
+    boost::shared_ptr<Packet> voice(new ClientboundVoicePacket(
+        playerId, hasVoice, talking, talking ? packet->Audio() : std::vector<unsigned char>()));
+    const std::vector<boost::shared_ptr<ServerPlayer> >* players = mServer->getPlayers()->getPlayers();
+    for (std::vector<boost::shared_ptr<ServerPlayer> >::const_iterator it = players->begin(); it != players->end(); ++it)
+    {
+        const boost::shared_ptr<ServerPlayer>& target = *it;
+        if (target == NULL || target == mPlayer || target->mConnection == NULL
+            || target->mConnection->isDisconnected())
+            continue;
+        target->mConnection->send(voice);
+    }
+}
+
 void ServerGamePacketListenerImpl::handlePlayerInfo(boost::shared_ptr<PlayerInfoPacket> packet)
 {
     INetworkPlayer* sender = getNetworkPlayer();

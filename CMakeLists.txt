@@ -70,6 +70,18 @@ FetchContent_Declare(SDL3
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(SDL3)
 
+# Opus keeps game voice traffic small enough for relay sessions while keeping end-to-end latency low.
+set(OPUS_BUILD_SHARED_LIBRARY OFF CACHE BOOL "" FORCE)
+set(OPUS_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(OPUS_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+set(OPUS_DISABLE_INTRINSICS ON CACHE BOOL "" FORCE)
+set(OPUS_INSTALL_PKG_CONFIG_MODULE OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(opus
+  URL https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz
+  URL_HASH SHA256=65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+FetchContent_MakeAvailable(opus)
+
 # The game core, in the C++ dialect it was written in.
 file(GLOB_RECURSE LCE_GAME_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/game/*.cpp")
 # Units under game/ that the PC build does not compile: the Miles sound engine and the game's glue to it (PC audio
@@ -141,7 +153,7 @@ endif()
 # Audio: the game's sound bank and Bink Audio, played through SDL.
 file(GLOB_RECURSE LCE_PC_AUDIO_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/platform/pc/audio/*.cpp")
 add_library(lce_audio OBJECT ${LCE_PC_AUDIO_SOURCES})
-target_link_libraries(lce_audio PRIVATE lce_common SDL3::SDL3-static)
+target_link_libraries(lce_audio PRIVATE lce_common SDL3::SDL3-static opus)
 set_target_properties(lce_audio PROPERTIES CXX_STANDARD 17)
 
 # zlib and libpng, the releases the game was built against (libpng with the game's own png.h and pngwrite.c).
@@ -166,7 +178,7 @@ endif()
 function(lce_add_program target main)
   add_executable(${target} "${LCE_SOURCE}/platform/pc/${main}" $<TARGET_OBJECTS:lce_game>
                  $<TARGET_OBJECTS:lce_platform> $<TARGET_OBJECTS:lce_audio>)
-  target_link_libraries(${target} PRIVATE lce_common lce_png lce_zlib SDL3::SDL3-static)
+  target_link_libraries(${target} PRIVATE lce_common lce_png lce_zlib SDL3::SDL3-static opus)
   set_target_properties(${target} PROPERTIES CXX_STANDARD 17)
   target_compile_definitions(${target} PRIVATE LCE_DISCORD_APP_ID="${LCE_DISCORD_APP_ID}")
   if(WIN32)

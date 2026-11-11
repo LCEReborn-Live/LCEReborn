@@ -189,7 +189,7 @@ void IUIScene_LoadCreateJoin::UpdateGamesList()
         selection = position;
     ++position;
 
-    if (m_miniGames && m_onlinePlayAllowed)
+    if (m_onlinePlayAllowed)
     {
         struct MatchOption { EMiniGameId id; int row; const wchar_t* icon; };
         const MatchOption options[] = {
@@ -951,21 +951,21 @@ void IUIScene_LoadCreateJoin::CheckAndJoinGame(int index)
 
 void IUIScene_LoadCreateJoin::HandleGamesListPressed(int index)
 {
-    if (m_miniGames && index == cJoinRowFindMatchBattle)
+    if (index == cJoinRowFindMatchBattle)
     {
         gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
         m_ignoreInput = true;
         LoadMiniGameMatch(eMiniGameId_Battle);
         return;
     }
-    if (m_miniGames && index == cJoinRowFindMatchTumble)
+    if (index == cJoinRowFindMatchTumble)
     {
         gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
         m_ignoreInput = true;
         LoadMiniGameMatch(eMiniGameId_Tumble);
         return;
     }
-    if (m_miniGames && index == cJoinRowFindMatchGlide)
+    if (index == cJoinRowFindMatchGlide)
     {
         gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
         m_ignoreInput = true;

@@ -17,8 +17,12 @@ export class GameBridge {
     const task = this.queue.then(async () => {
       if (this.closed) throw new Error('Bridge is closed');
       if (this.host) { await this.host.stop(); this.host = null; }
-      if (world) this.host = await this.hostFactory({ apiUrl: this.apiUrl, token: this.token,
-        name: world.name, visibility: world.private ? 'invite_only' : 'friends', gamePort: world.port });
+      if (world) {
+        const matchmaking = !world.private && world.matchmaking?.enabled ? world.matchmaking : {};
+        this.host = await this.hostFactory({ apiUrl: this.apiUrl, token: this.token,
+          name: world.name, visibility: matchmaking.enabled ? 'public' : (world.private ? 'invite_only' : 'friends'),
+          matchmaking, gamePort: world.port });
+      }
     });
     this.queue = task.catch(() => {});
     return task;
@@ -54,7 +58,8 @@ export class GameBridge {
       }
     }
     return [...desired].map(([id, entry]) => ({ ownerId: id, owner: entry.owner,
-      name: entry.name, address: '127.0.0.1', port: this.joins.get(id).server.address().port }));
+      name: entry.name, address: '127.0.0.1', port: this.joins.get(id).server.address().port,
+      matchmaking: entry.matchmaking || {} }));
   }
 
   async close() {

@@ -36,7 +36,15 @@ const int64_t cQueryTimeoutMs = 6000;
 const int64_t cServerProbeIntervalMs = 5000;
 const int64_t cBeaconRefreshMs = 1000;
 
-struct LiveEntry { std::string address; std::wstring name; };
+struct LiveEntry
+{
+    std::string address;
+    std::wstring name;
+    unsigned int miniGameId;
+    bool matchmaking;
+    unsigned int filters[2];
+    LiveEntry() : miniGameId(0), matchmaking(false) { filters[0] = filters[1] = 0; }
+};
 std::vector<LiveEntry> g_liveEntries;
 std::string g_liveSnapshot;
 std::string g_liveWorld;
@@ -91,10 +99,22 @@ std::vector<LiveEntry> ReadLiveEntries(std::string& snapshot)
         char* end = 0;
         long port = strtol(line, &end, 10);
         if (*end || port <= 0 || port > 65535) continue;
+        char* nameEnd = strchr(separator, '\t');
+        if (nameEnd) *nameEnd++ = 0;
         separator[strcspn(separator, "\r\n")] = 0;
         LiveEntry entry;
         entry.address = std::string("127.0.0.1:") + line;
         entry.name = LiveName(separator);
+        if (nameEnd)
+        {
+            entry.miniGameId = (unsigned int)strtoul(nameEnd, &nameEnd, 10);
+            if (*nameEnd == '\t')
+            {
+                entry.matchmaking = strtoul(nameEnd + 1, &nameEnd, 10) == 1;
+                if (*nameEnd == '\t') entry.filters[0] = (unsigned int)strtoul(nameEnd + 1, &nameEnd, 10);
+                if (*nameEnd == '\t') entry.filters[1] = (unsigned int)strtoul(nameEnd + 1, &nameEnd, 10);
+            }
+        }
         entries.push_back(entry);
     }
     fclose(file);
@@ -208,6 +228,7 @@ CPlatformNetworkManagerLan::CPlatformNetworkManagerLan()
       m_reportedProbeRevision(0),
       m_serverIconFixed(false)
 {
+    m_matchmakingAttributes[0] = m_matchmakingAttributes[1] = 0;
     InitializeCriticalSection(&m_lock);
     InitializeCriticalSection(&m_acceptLock);
     for (int index = 0; index < cMaxLocalPlayers; ++index)
@@ -297,10 +318,12 @@ void CPlatformNetworkManagerLan::DoWork()
     if (liveNow - g_liveUpdated >= 1000)
     {
         g_liveUpdated = liveNow;
-        char state[64] = "0";
+        char state[128] = "0";
         EnterCriticalSection(&m_lock);
         if (m_host && m_listening && !m_localGame && m_internalState == eState_Playing && m_sessionData.m_bGameStarted)
-            snprintf(state, sizeof(state), "1\t%u\t%d", (unsigned int)m_listenPort, m_privateGame ? 1 : 0);
+            snprintf(state, sizeof(state), "1\t%u\t%d\t%d\t%d\t%u\t%u",
+                     (unsigned int)m_listenPort, m_privateGame ? 1 : 0, m_matchmaking ? 1 : 0,
+                     (int)m_sessionData.m_miniGameId, m_matchmakingAttributes[0], m_matchmakingAttributes[1]);
         LeaveCriticalSection(&m_lock);
         if (g_liveWorld != state)
         {
@@ -611,6 +634,8 @@ void CPlatformNetworkManagerLan::HostGame(int userIndexMask, bool onlineGame, bo
     SetPrivateGame(privateGame);
     SystemFlagReset();
     m_matchmakingSession = worldId != 0;
+    m_matchmakingAttributes[0] = attributes != 0 && worldId > 0 ? attributes[0] : 0;
+    m_matchmakingAttributes[1] = attributes != 0 && worldId > 1 ? attributes[1] : 0;
     userIndexMask |= GetLocalPlayerMask(CGameNetworkManager::sInstance.GetPrimaryPad());
     _HostGame(userIndexMask, gameMode, miniGameId, worldId, attributes);
 }
@@ -662,9 +687,31 @@ int CPlatformNetworkManagerLan::JoinGame(FriendSessionInfo* sessionInfo, int use
     return 0;
 }
 
-int CPlatformNetworkManagerLan::FindAndJoinGame(int, int, EMiniGameId, unsigned int, unsigned int*, unsigned int*)
+int CPlatformNetworkManagerLan::FindAndJoinGame(int userIndexMask, int, EMiniGameId miniGameId,
+                                                unsigned int attributeCount, unsigned int* attributeValues,
+                                                unsigned int* attributeIds)
 {
-    return 1;
+    FriendSessionInfo selected;
+    bool found = false;
+    EnterCriticalSection(&m_lock);
+    for (unsigned int index = 0; index < g_liveEntries.size() && !found; ++index)
+    {
+        const LiveEntry& entry = g_liveEntries[index];
+        if (!entry.matchmaking || entry.miniGameId != (unsigned int)miniGameId)
+            continue;
+        bool compatible = true;
+        for (unsigned int filter = 0; filter < attributeCount && compatible; ++filter)
+            compatible = attributeIds[filter] < 2 && entry.filters[attributeIds[filter]] == attributeValues[filter];
+        if (!compatible)
+            continue;
+        selected.m_sessionId = RememberServer(entry.address);
+        selected.m_searchResult.m_sessionId = selected.m_sessionId;
+        found = true;
+    }
+    LeaveCriticalSection(&m_lock);
+    if (!found)
+        return 1;
+    return JoinGame(&selected, userIndexMask, 0, true);
 }
 
 bool CPlatformNetworkManagerLan::SetLocalGame(bool localGame)

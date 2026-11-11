@@ -301,6 +301,7 @@ private:
     bool m_privateGame;
     bool m_matchmakingSession;
     bool m_matchmaking;
+    unsigned int m_matchmakingAttributes[2];
     bool m_leavingGame;
     bool m_leavePending;
     GameSessionData m_sessionData;

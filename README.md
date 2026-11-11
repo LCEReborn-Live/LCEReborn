@@ -18,6 +18,7 @@
 
 - Browser-based Live sign-in with a persistent launcher session.
 - Friends, launcher and in-game presence, invitations, and a list of joinable worlds.
+- Live matchmaking for Battle, Tumble, Glide, and Build games with compatible open sessions.
 - Direct connections with NAT traversal when possible, with relay fallback.
 - Live account skins and capes in game.
 - The original LCE leaderboard menu with global, friends, and personal score filters.
@@ -33,7 +34,7 @@ Game data, saves, and update files are not included in downloads. The launcher i
 
 ### Live networking
 
-Sign in to Live in the launcher, add friends by username, and open a world with online play enabled. Friends' available worlds appear in game automatically. The client uses a direct connection when NAT traversal succeeds and falls back to the relay otherwise.
+Sign in to Live in the launcher, add friends by username, and open a world with online play enabled. Friends' available worlds appear in game automatically. Mini-game matchmaking searches visible Live sessions for a compatible open game. The client uses a direct connection when NAT traversal succeeds and falls back to the relay otherwise. Matchmaking currently searches open games; it does not keep players in a waiting queue.
 
 ### Build from source
 

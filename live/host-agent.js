@@ -4,7 +4,7 @@ import net from 'node:net';
 import { openTcpPort } from './nat.js';
 import { runAgent } from './relay-agent.js';
 
-export async function startHost({ apiUrl, token, name, visibility = 'friends', gamePort = 25570, proxyPort = 25572, openPort = openTcpPort }) {
+export async function startHost({ apiUrl, token, name, visibility = 'friends', matchmaking = {}, gamePort = 25570, proxyPort = 25572, openPort = openTcpPort }) {
   if (!/^https?:\/\//.test(apiUrl)) throw new Error('LIVE_API_URL must be an HTTP(S) URL');
   if (!/^[a-f0-9]{64}$/.test(token)) throw new Error('LIVE_TOKEN must be a session token');
   if (typeof name !== 'string' || !name.trim() || name.length > 64) throw new Error('Invalid server name');
@@ -68,7 +68,7 @@ export async function startHost({ apiUrl, token, name, visibility = 'friends', g
     proxy.listen(proxyPort, '0.0.0.0', () => { proxy.removeListener('error', reject); done(); });
   });
   let room;
-  try { room = await request('POST', '/relay/rooms', { name, visibility }); }
+  try { room = await request('POST', '/relay/rooms', { name, visibility, matchmaking }); }
   catch (error) { proxy.close(); throw error; }
   let stopped = false;
   let control = null;
@@ -90,7 +90,7 @@ export async function startHost({ apiUrl, token, name, visibility = 'friends', g
   }
 
   async function publishDirect() {
-    if (mapping) await request('PUT', '/servers/mine', { name, address: mapping.address, port: mapping.port, visibility, ticketed: true });
+    if (mapping) await request('PUT', '/servers/mine', { name, address: mapping.address, port: mapping.port, visibility, ticketed: true, matchmaking });
   }
 
   async function tryMapping() {
@@ -116,7 +116,7 @@ export async function startHost({ apiUrl, token, name, visibility = 'friends', g
     if (mapping && mapping.leaseSeconds) void mapping.renew().catch(async error => {
       console.error('Port mapping renewal:', error.message);
       mapping = null;
-      await request('PUT', `/relay/rooms/${room.id}/listing`, { name, visibility }).catch(() => {});
+      await request('PUT', `/relay/rooms/${room.id}/listing`, { name, visibility, matchmaking }).catch(() => {});
     });
   }, 30 * 60 * 1000));
 

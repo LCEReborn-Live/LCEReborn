@@ -108,15 +108,27 @@ async function tick() {
     if (/^0$/.test(world) && lastWorld !== '0') {
       await bridge.setWorld(null); lastWorld = '0';
     } else {
-      const match = /^1\t(\d{1,5})\t([01])$/.exec(world);
+      const match = /^1\t(\d{1,5})\t([01])(?:\t([01])\t(\d{1,2})\t(\d{1,2})\t(\d{1,2}))?$/.exec(world);
       if (match && Number(match[1]) > 0 && Number(match[1]) <= 65535 && world !== lastWorld) {
-        await bridge.setWorld({ name: `${username}'s world`.slice(0, 64), port: Number(match[1]), private: match[2] === '1' });
+        const matchmaking = match[3] === '1' && Number(match[4]) >= 1 && Number(match[4]) <= 4
+          ? { enabled: true, mini_game_id: Number(match[4]), filters: [Number(match[5]), Number(match[6])]
+            .map((value, id) => ({ id, value })).filter(filter => filter.value > 0) }
+          : {};
+        await bridge.setWorld({ name: `${username}'s world`.slice(0, 64), port: Number(match[1]),
+          private: match[2] === '1', matchmaking });
         lastWorld = world;
       }
     }
     const servers = await bridge.refresh();
     const lines = servers.filter(s => s.owner.toLowerCase() !== username.toLowerCase())
-      .map(s => `${s.port}\t${String(s.name || s.owner).replace(/[\r\n\t]/g, ' ').slice(0, 96)}`).join('\n');
+      .map(s => {
+        const match = s.matchmaking?.enabled ? s.matchmaking : {};
+        const filters = [0, 0];
+        if (Array.isArray(match.filters)) for (const filter of match.filters)
+          if (Number.isInteger(filter?.id) && filter.id >= 0 && filter.id < 2 && Number.isInteger(filter.value)) filters[filter.id] = filter.value;
+        const miniGame = Number.isInteger(match.mini_game_id) ? match.mini_game_id : 0;
+        return `${s.port}\t${String(s.name || s.owner).replace(/[\r\n\t]/g, ' ').slice(0, 96)}\t${miniGame}\t${match.enabled ? 1 : 0}\t${filters[0]}\t${filters[1]}`;
+      }).join('\n');
     const temporary = path.join(directory, 'servers.tmp');
     await fs.writeFile(temporary, lines, { encoding: 'utf8', mode: 0o600 });
     await fs.rename(temporary, path.join(directory, 'servers.txt'));

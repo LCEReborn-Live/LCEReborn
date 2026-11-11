@@ -27,7 +27,7 @@ signals:
 private:
     void OnReply(QNetworkReply* reply);
     void RenderReleases();
-    bool ParseReleases(const QByteArray& json, QJsonArray* releases) const;
+    bool ParseReleases(const QByteArray& data, QJsonArray* releases, bool liveFeed) const;
     void ShowOffline(const QString& note);
     void ShowSelected();
 

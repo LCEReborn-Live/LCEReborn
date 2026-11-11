@@ -23,6 +23,7 @@
 #include <QTextBlock>
 #include <QTextBrowser>
 #include <QTextCursor>
+#include <QXmlStreamReader>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -34,8 +35,8 @@
 
 namespace
 {
-const char* const kLiveReleasesUrl = "https://api.github.com/repos/LCEReborn-Live/LCEReborn/releases?per_page=10";
-const char* const kUpstreamReleasesUrl = "https://api.github.com/repos/LCEReborn/LCEReborn/releases?per_page=10";
+const char* const kLiveReleasesUrl = "https://github.com/LCEReborn-Live/LCEReborn/releases.atom";
+const char* const kUpstreamReleasesUrl = "https://github.com/LCEReborn/LCEReborn/releases.atom";
 const char* const kLiveRepositoryUrl = "https://github.com/LCEReborn-Live/LCEReborn";
 const char* const kUpstreamRepositoryUrl = "https://github.com/LCEReborn/LCEReborn";
 const int kTagRole = Qt::UserRole + 1;
@@ -188,14 +189,14 @@ void NewsTab::Refresh()
 {
     mWarnings.clear();
     QFile liveCache(NewsCachePath("launcher_news_live.json"));
-    if (liveCache.open(QIODevice::ReadOnly)) ParseReleases(liveCache.readAll(), &mLiveReleases);
+    if (liveCache.open(QIODevice::ReadOnly)) ParseReleases(liveCache.readAll(), &mLiveReleases, true);
     QFile upstreamCache(NewsCachePath("launcher_news_upstream.json"));
-    if (upstreamCache.open(QIODevice::ReadOnly)) ParseReleases(upstreamCache.readAll(), &mUpstreamReleases);
+    if (upstreamCache.open(QIODevice::ReadOnly)) ParseReleases(upstreamCache.readAll(), &mUpstreamReleases, false);
     RenderReleases();
 
     const auto requestFeed = [this](const char* url, int feed) {
         QNetworkRequest request{QUrl(url)};
-        request.setRawHeader("Accept", "application/vnd.github+json");
+        request.setRawHeader("Accept", "application/atom+xml, application/xml;q=0.9");
         request.setRawHeader("User-Agent", "LCEReborn-Launcher");
         request.setTransferTimeout(10000);
         request.setAttribute(QNetworkRequest::User, feed);
@@ -218,28 +219,90 @@ void NewsTab::OnReply(QNetworkReply* reply)
         RenderReleases();
         return;
     }
-    const QByteArray json = reply->readAll();
-    if (!ParseReleases(json, releases))
+    const QByteArray data = reply->readAll();
+    if (!ParseReleases(data, releases, feed == kLiveFeed))
     {
         mWarnings.append(QString("Couldn't read %1 releases.").arg(feedName));
         RenderReleases();
         return;
     }
+    const QByteArray normalizedJson = QJsonDocument(*releases).toJson(QJsonDocument::Compact);
     QSaveFile cache(NewsCachePath(cacheName));
     if (cache.open(QIODevice::WriteOnly))
     {
-        cache.write(json);
+        cache.write(normalizedJson);
         cache.commit();
     }
     RenderReleases();
 }
 
-bool NewsTab::ParseReleases(const QByteArray& json, QJsonArray* releases) const
+bool NewsTab::ParseReleases(const QByteArray& data, QJsonArray* releases, bool liveFeed) const
 {
-    const QJsonDocument document = QJsonDocument::fromJson(json);
-    if (!document.isArray())
+    QJsonParseError jsonError;
+    const QJsonDocument document = QJsonDocument::fromJson(data, &jsonError);
+    if (jsonError.error == QJsonParseError::NoError && document.isArray())
+    {
+        *releases = document.array();
+        return true;
+    }
+
+    QXmlStreamReader xml(data);
+    QJsonArray parsed;
+    while (!xml.atEnd())
+    {
+        xml.readNext();
+        if (!xml.isStartElement() || xml.name() != QLatin1String("entry"))
+            continue;
+
+        QString id;
+        QString title;
+        QString updated;
+        QString url;
+        QString body;
+        while (!(xml.isEndElement() && xml.name() == QLatin1String("entry")) && !xml.atEnd())
+        {
+            xml.readNext();
+            if (!xml.isStartElement())
+                continue;
+            const auto name = xml.name();
+            if (name == QLatin1String("id"))
+                id = xml.readElementText();
+            else if (name == QLatin1String("title"))
+                title = xml.readElementText();
+            else if (name == QLatin1String("updated"))
+                updated = xml.readElementText();
+            else if (name == QLatin1String("link")
+                     && xml.attributes().value(QLatin1String("rel")) == QLatin1String("alternate"))
+                url = xml.attributes().value(QLatin1String("href")).toString();
+            else if (name == QLatin1String("content"))
+                body = xml.readElementText();
+        }
+
+        const QString tag = id.section('/', -1);
+        if (tag.isEmpty() || title.isEmpty() || url.isEmpty())
+            continue;
+        QJsonObject release;
+        release.insert("tag_name", tag);
+        release.insert("name", title);
+        release.insert("html_url", url);
+        release.insert("published_at", updated);
+        release.insert("body", body);
+        release.insert("draft", false);
+        release.insert("prerelease", tag.contains('-'));
+        if (liveFeed && QRegularExpression("^v\\d+\\.\\d+\\.\\d+$").match(tag).hasMatch())
+        {
+            const QString version = tag.mid(1);
+            QJsonObject installer;
+            installer.insert("name", "LCEReborn-Live-Installer-" + version + ".exe");
+            installer.insert("browser_download_url", "https://github.com/LCEReborn-Live/LCEReborn/releases/download/"
+                                                        + tag + "/LCEReborn-Live-Installer-" + version + ".exe");
+            release.insert("assets", QJsonArray{installer});
+        }
+        parsed.append(release);
+    }
+    if (xml.hasError() || parsed.isEmpty())
         return false;
-    *releases = document.array();
+    *releases = parsed;
     return true;
 }
 
@@ -341,7 +404,12 @@ void NewsTab::ShowSelected()
     QString body = item->data(kBodyRole).toString();
     body.remove(images);
     body = body.trimmed();
-    mBody->setMarkdown(body.isEmpty() ? QString("No notes for this release.") : body);
+    if (body.isEmpty())
+        mBody->setPlainText("No notes for this release.");
+    else if (body.trimmed().startsWith('<'))
+        mBody->setHtml(body);
+    else
+        mBody->setMarkdown(body);
     UseGameText(mBody->document());
 }
 

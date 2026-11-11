@@ -61,6 +61,7 @@ set_target_properties(LCERebornLauncher PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 if(WIN32)
+  target_link_libraries(LCERebornLauncher PRIVATE winmm)
   set(LCE_LAUNCHER_ICON "${CMAKE_SOURCE_DIR}/resources/launcher/icon.ico")
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/LCERebornLauncher.rc" "1 ICON \"${LCE_LAUNCHER_ICON}\"\n")
   target_sources(LCERebornLauncher PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/LCERebornLauncher.rc")

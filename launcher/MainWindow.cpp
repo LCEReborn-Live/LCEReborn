@@ -47,6 +47,7 @@
 #endif
 #include <windows.h>
 #include <wincrypt.h>
+#include <mmsystem.h>
 #pragma comment(lib, "Crypt32.lib")
 #endif
 
@@ -62,6 +63,40 @@
 #include "SetupPage.hpp"
 #include "Skins.hpp"
 #include "Widgets.hpp"
+
+namespace
+{
+#ifdef Q_OS_WIN
+unsigned int gLiveInviteSoundGeneration = 0;
+#endif
+
+void PlayLiveInviteSound(QObject* context)
+{
+#ifdef Q_OS_WIN
+    const unsigned int generation = ++gLiveInviteSoundGeneration;
+    mciSendStringW(L"close LCEInviteSound", nullptr, 0, nullptr);
+    const QString soundPath = QDir::toNativeSeparators(
+        QDir(QCoreApplication::applicationDirPath()).filePath("resources/ps4-trophy.mp3"));
+    const QString open = QString("open \"%1\" type mpegvideo alias LCEInviteSound").arg(soundPath);
+    if (mciSendStringW(reinterpret_cast<LPCWSTR>(open.utf16()), nullptr, 0, nullptr) == 0
+        && mciSendStringW(L"play LCEInviteSound", nullptr, 0, nullptr) == 0)
+    {
+        QTimer::singleShot(10000, context, [generation] {
+            if (generation == gLiveInviteSoundGeneration)
+            {
+                mciSendStringW(L"stop LCEInviteSound", nullptr, 0, nullptr);
+                mciSendStringW(L"close LCEInviteSound", nullptr, 0, nullptr);
+            }
+        });
+        return;
+    }
+    mciSendStringW(L"close LCEInviteSound", nullptr, 0, nullptr);
+#else
+    Q_UNUSED(context);
+#endif
+    QApplication::beep();
+}
+}
 
 namespace
 {
@@ -847,25 +882,44 @@ void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QStr
     QFrame* toast = new QFrame(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     toast->setAttribute(Qt::WA_DeleteOnClose);
     toast->setAttribute(Qt::WA_ShowWithoutActivating);
-    toast->setFixedWidth(340);
-    toast->setStyleSheet("QFrame { background:#251d1d; border:2px solid #b43232; border-radius:8px; }"
-                         "QLabel { color:white; border:0; background:transparent; }"
-                         "QPushButton { background:#b43232; color:white; border:0; border-radius:4px; padding:8px; }"
-                         "QPushButton:hover { background:#d44646; }");
+    toast->setAttribute(Qt::WA_TranslucentBackground);
+    toast->setObjectName("liveInviteToast");
+    toast->setFixedWidth(380);
+    toast->setStyleSheet("QFrame#liveInviteToast { background:#36342f; border:2px solid #171614; border-radius:12px; }"
+                         "QLabel { color:#e7e3d8; border:0; background:transparent; }"
+                         "QLabel#liveInviteAvatar { background:#5a564e; border:2px solid #171614; border-radius:8px; "
+                         "color:#f2e5c4; font-weight:bold; }");
     QVBoxLayout* layout = new QVBoxLayout(toast);
+    layout->setContentsMargins(14, 12, 14, 12);
+    layout->setSpacing(12);
     toast->setFont(QFont("Segoe UI", 10));
+    auto* header = new QHBoxLayout;
+    header->setSpacing(12);
+    auto* avatar = new QLabel(owner.left(1).toUpper(), toast);
+    avatar->setObjectName("liveInviteAvatar");
+    avatar->setAlignment(Qt::AlignCenter);
+    avatar->setFixedSize(48, 48);
+    LoadLiveFriendFace(ownerId, avatar);
+    auto* message = new QVBoxLayout;
+    message->setSpacing(4);
     QLabel* title = new QLabel("Game invitation", toast);
-    title->setStyleSheet("font-weight:bold; font-size:16px; color:white; border:0;");
+    title->setStyleSheet("font-weight:bold; font-size:16px; color:#f2e5c4; border:0;");
     QLabel* detail = new QLabel(QString("%1 invited you to %2").arg(owner, world.isEmpty() ? "their world" : world), toast);
     detail->setWordWrap(true);
+    message->addWidget(title);
+    message->addWidget(detail);
+    header->addWidget(avatar, 0, Qt::AlignTop);
+    header->addLayout(message, 1);
     QHBoxLayout* actions = new QHBoxLayout;
     GameButton* accept = new GameButton("Accept", toast);
     GameButton* decline = new GameButton("Decline", toast);
     accept->SetPixelSize(15); decline->SetPixelSize(15);
-    accept->SetReadableFont(true); decline->SetReadableFont(true);
+    accept->SetReadableFont(false); decline->SetReadableFont(false);
+    accept->SetPrimary(true);
     accept->setFixedHeight(36); decline->setFixedHeight(36);
     actions->addWidget(accept); actions->addWidget(decline);
-    layout->addWidget(title); layout->addWidget(detail); layout->addLayout(actions);
+    layout->addLayout(header);
+    layout->addLayout(actions);
     connect(accept, &GameButton::clicked, this, [this, toast, title, detail, accept, decline, owner] {
         const bool running = mRunner->IsRunning();
         AcceptLiveInvite(owner);
@@ -892,7 +946,7 @@ void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QStr
         destination = QPoint(available.right() - toast->width() - 16, available.bottom() - toast->height() - 16);
         toast->move(available.right() + 4, destination.y());
     }
-    QApplication::beep();
+    PlayLiveInviteSound(this);
     toast->show();
     toast->raise();
     QPropertyAnimation* animation = new QPropertyAnimation(toast, "pos", toast);

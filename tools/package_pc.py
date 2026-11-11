@@ -61,12 +61,12 @@ if LINUX:
                       "tls", "wayland-decoration-client", "wayland-graphics-integration-client",
                       "wayland-shell-integration", "xcbglintegrations")
     QT_PLATFORMS = ("libqxcb.so", "libqwayland.so")
-    ALLOWED_NAME = re.compile(r"(^[^.]+$|\.so(\.\d+)*$|\.(png|ico|txt)$)")
+    ALLOWED_NAME = re.compile(r"(^[^.]+$|\.so(\.\d+)*$|\.(png|ico|txt|mp3)$)")
 else:
     SYSTEM = "pc"
     PROGRAMS = ("LCEReborn.exe", "LCERebornLauncher.exe", "LCERebornServer.exe")
     QT_PLUGIN_DIRS = ("generic", "imageformats", "networkinformation", "platforms", "styles", "tls")
-    ALLOWED_NAME = re.compile(r"\.(exe|dll|png|ico|txt|js|json)$", re.I)
+    ALLOWED_NAME = re.compile(r"\.(exe|dll|png|ico|txt|js|json|mp3)$", re.I)
 REDIST_URL = "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"
 
 

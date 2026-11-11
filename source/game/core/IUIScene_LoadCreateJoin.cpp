@@ -61,15 +61,13 @@ struct LoadMenuSceneData
     LevelGenerationOptions* generationOptions;
     _SaveListDetails* saveDetails;
     EMiniGameId gameMode;
-    bool quickJoin;
 
     LoadMenuSceneData()
         : playerId(0),
           saveIndex(0),
           generationOptions(NULL),
           saveDetails(NULL),
-          gameMode(eMiniGameId_Any),
-          quickJoin(false)
+          gameMode(eMiniGameId_Any)
     {
     }
 };
@@ -189,7 +187,7 @@ void IUIScene_LoadCreateJoin::UpdateGamesList()
         selection = position;
     ++position;
 
-    if (m_onlinePlayAllowed)
+    if (m_miniGames && m_onlinePlayAllowed)
     {
         struct MatchOption { EMiniGameId id; int row; const wchar_t* icon; };
         const MatchOption options[] = {
@@ -845,7 +843,6 @@ void IUIScene_LoadCreateJoin::LoadMiniGameMatch(EMiniGameId gameMode)
     sceneData->generationOptions = NULL;
     sceneData->saveDetails = NULL;
     sceneData->gameMode = gameMode;
-    sceneData->quickJoin = true;
     gConsoleUIController.NavigateToScene(gProfile->GetPrimaryPad(), EUIScene_LoadMenu, sceneData, EUILayer_Scene,
                                          EUIGroup_PlayerDefault);
 }

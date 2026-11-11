@@ -44,7 +44,6 @@ struct LoadMenuSceneData
     LevelGenerationOptions* generationOptions;
     _SaveListDetails* saveDetails;
     EMiniGameId miniGameId;
-    bool quickJoin;
 };
 
 const int sControlDescriptions[] = {-1,
@@ -85,8 +84,7 @@ UIScene_LoadMenu::UIScene_LoadMenu(int sceneType, void* data, UILayer* layer)
       m_loadSettings(),
       m_levelIcon(),
       m_list(),
-      m_thumbnailName(),
-      m_autoFindMatch(false)
+      m_thumbnailName()
 {
     initialiseMovie();
     m_publicGamesAllowed = true;
@@ -101,7 +99,6 @@ UIScene_LoadMenu::UIScene_LoadMenu(int sceneType, void* data, UILayer* layer)
     m_createdMode.init(UIString(L10N::GetString(IDS_CREATED_IN_SURVIVAL)));
 
     LoadMenuSceneData* sceneData = static_cast<LoadMenuSceneData*>(data);
-    m_autoFindMatch = sceneData->quickJoin;
     bool gameModeLobby = m_levelGenerationOptions != NULL && m_levelGenerationOptions->isGameModeLobby();
 
     EMiniGameId miniGameId = sceneData->miniGameId;
@@ -588,11 +585,6 @@ void UIScene_LoadMenu::tick()
     m_updateInProgress = true;
     IUIScene_StartGame::tick();
     m_updateInProgress = false;
-    if (m_autoFindMatch)
-    {
-        m_autoFindMatch = false;
-        StartSharedLaunchFlow();
-    }
     if (gConsoleUIController.IsSceneInStack(m_playerId, EUIScene_LaunchMoreOptionsMenu))
     {
         MiniGameDef* game = MiniGameDef::GetCustomGameModeById(m_launchData.mMiniGameId, true);

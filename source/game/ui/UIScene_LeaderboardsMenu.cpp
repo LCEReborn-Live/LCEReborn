@@ -503,7 +503,7 @@ unsigned int UIScene_LeaderboardsMenu::mapElementsAndNames()
 void UIScene_LeaderboardsMenu::updateTooltips()
 {
     gConsoleUIController.SetTooltips(static_cast<unsigned int>(m_playerId), -1, IDS_TOOLTIPS_BACK,
-                                     IDS_TOOLTIPS_CHANGE_FILTER, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0,
+                                     IDS_TOOLTIPS_CHANGE_FILTER, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0,
                                      0);
 }
 

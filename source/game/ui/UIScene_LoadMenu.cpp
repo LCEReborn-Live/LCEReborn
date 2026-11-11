@@ -229,7 +229,7 @@ void UIScene_LoadMenu::AddVariantButtons(bool alternate)
     }
     else
     {
-        unsigned int label = m_launchData.mJoinMiniGame ? IDS_MG_FIND_MATCH : GetVariantPlayLabel(0, false);
+        unsigned int label = GetVariantPlayLabel(0, false);
         m_list.AddNewButton(std::wstring(L10N::GetString(static_cast<int>(label))), 0x11, true);
     }
 }

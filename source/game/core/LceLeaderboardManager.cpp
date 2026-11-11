@@ -100,6 +100,7 @@ LceLeaderboardManager::LceLeaderboardManager()
       m_board(0),
       m_pad(0),
       m_totalRows(0),
+      m_fallbackToLocal(false),
       m_sentAt(0),
       m_requestId(0)
 {
@@ -118,7 +119,7 @@ void LceLeaderboardManager::Tick()
             return;
 #endif
         if (System::processTimeInMilliSecs() - m_sentAt > kLiveTimeoutMs)
-            Finish(eStatsReturn_Failed);
+            Finish(m_fallbackToLocal && AddLocalScore() ? eStatsReturn_Success : eStatsReturn_Failed);
         return;
     }
     if (m_pending == ePending_Server && System::processTimeInMilliSecs() - m_sentAt > kServerTimeoutMs)
@@ -204,6 +205,31 @@ void LceLeaderboardManager::Begin(LeaderboardReadListener* listener, int userInd
     m_board = static_cast<int>(board);
     m_rows.clear();
     m_totalRows = 0;
+    m_fallbackToLocal = false;
+}
+
+bool LceLeaderboardManager::AddLocalScore()
+{
+    const int pad = m_pad;
+    Minecraft* minecraft = Minecraft::GetInstance();
+    StatsCounter* counter = minecraft != NULL && pad >= 0 && pad < 4 ? minecraft->mStats[pad] : NULL;
+    const int columns = LeaderboardBoards::ColumnCount(m_board);
+    if (counter == NULL || columns == 0)
+        return false;
+
+    ReadScore score;
+    std::memset(score.m_auiStats, 0, sizeof(score.m_auiStats));
+    gProfile->GetXUID(pad, &score.m_uid, false);
+    score.m_uiRank = 1;
+    score.m_wsGamertag = gProfile->GetDisplayName(pad);
+    score.m_uiRating = 0;
+    score.m_usNumStats = static_cast<unsigned short>(columns);
+    score.m_iMessageStringId = 0;
+    for (int column = 0; column < columns; ++column)
+        score.m_auiStats[column] = LeaderboardBoards::CounterValue(counter, m_board, column);
+    m_rows.push_back(score);
+    m_totalRows = 1;
+    return true;
 }
 
 void LceLeaderboardManager::Finish(eStatsReturn result)
@@ -220,31 +246,16 @@ bool LceLeaderboardManager::ReadStats_Friends(LeaderboardReadListener* pReadList
 #ifdef _WIN32
     if (!LiveDirectory().empty())
     {
+        m_fallbackToLocal = true;
         RequestFromLive("friends", uiStartRank, uiNumRows);
         return true;
     }
 #endif
-    const int pad = m_pad;
-    Minecraft* minecraft = Minecraft::GetInstance();
-    StatsCounter* counter = minecraft != NULL && pad >= 0 && pad < 4 ? minecraft->mStats[pad] : NULL;
-    const int columns = LeaderboardBoards::ColumnCount(m_board);
-    if (counter == NULL || columns == 0)
+    if (!AddLocalScore())
     {
         Finish(eStatsReturn_Failed);
         return true;
     }
-    ReadScore score;
-    std::memset(score.m_auiStats, 0, sizeof(score.m_auiStats));
-    gProfile->GetXUID(pad, &score.m_uid, false);
-    score.m_uiRank = 1;
-    score.m_wsGamertag = gProfile->GetDisplayName(pad);
-    score.m_uiRating = 0;
-    score.m_usNumStats = static_cast<unsigned short>(columns);
-    score.m_iMessageStringId = 0;
-    for (int column = 0; column < columns; ++column)
-        score.m_auiStats[column] = LeaderboardBoards::CounterValue(counter, m_board, column);
-    m_rows.push_back(score);
-    m_totalRows = 1;
     Finish(eStatsReturn_Success);
     return true;
 }
@@ -256,6 +267,7 @@ bool LceLeaderboardManager::ReadStats_MyScore(LeaderboardReadListener* pReadList
 #ifdef _WIN32
     if (!LiveDirectory().empty())
     {
+        m_fallbackToLocal = true;
         RequestFromLive("mine", 1, uiNumRows);
         return true;
     }
@@ -296,7 +308,7 @@ void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int sta
     _wremove(LivePath(L"leaderboard.response").c_str());
     if (!WriteLiveFile(LivePath(L"leaderboard.request"), request.str()))
     {
-        Finish(eStatsReturn_Failed);
+        Finish(m_fallbackToLocal && AddLocalScore() ? eStatsReturn_Success : eStatsReturn_Failed);
         return;
     }
     m_sentAt = System::processTimeInMilliSecs();
@@ -334,7 +346,7 @@ bool LceLeaderboardManager::ReadLiveResponse()
         return false;
     if (header[1] == "-1")
     {
-        Finish(eStatsReturn_Failed);
+        Finish(m_fallbackToLocal && AddLocalScore() ? eStatsReturn_Success : eStatsReturn_Failed);
         return true;
     }
     const unsigned int total = static_cast<unsigned int>(std::strtoul(header[1].c_str(), NULL, 10));
@@ -363,6 +375,8 @@ bool LceLeaderboardManager::ReadLiveResponse()
         m_rows.push_back(score);
     }
     m_totalRows = total;
+    if (m_rows.empty() && m_fallbackToLocal && AddLocalScore())
+        m_totalRows = 1;
     Finish(eStatsReturn_Success);
     return true;
 #else

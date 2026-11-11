@@ -268,7 +268,8 @@ void StatsCounter::award(Stat* stat, ESubTypes subtype, unsigned int amount, boo
             mLeaderboardPending[static_cast<unsigned int>(flagIt->second)] = true;
             if (mLeaderboardDelay == 0)
             {
-                mLeaderboardDelay = 9000;
+                // Coalesce rapid stat changes, then send leaderboard updates promptly.
+                mLeaderboardDelay = 20;
             }
         }
     }

@@ -40,6 +40,7 @@ private:
 
     void Begin(LeaderboardReadListener* listener, int userIndex, EStatsType board);
     void Finish(eStatsReturn result);
+    bool AddLocalScore();
     void RequestFromServer(bool aroundMe, unsigned int startRank, unsigned int count);
     void RequestFromLive(const char* filter, unsigned int startRank, unsigned int count);
     bool ReadLiveResponse();
@@ -50,6 +51,7 @@ private:
     int m_board;
     int m_pad;
     unsigned int m_totalRows;
+    bool m_fallbackToLocal;
     long long m_sentAt;
     unsigned int m_requestId;
     std::vector<ReadScore> m_rows;

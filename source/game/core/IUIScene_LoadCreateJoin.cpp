@@ -182,10 +182,13 @@ void IUIScene_LoadCreateJoin::UpdateGamesList()
 
     unsigned int position = 0;
     unsigned int selection = 0;
-    AddJoinListAction(L"Add Server", cJoinRowAddServer, L"Graphics\\CreateWorldIcon.png", L"CreateWorldIcon");
-    if (selectedRow == cJoinRowAddServer)
-        selection = position;
-    ++position;
+    if (!m_miniGames)
+    {
+        AddJoinListAction(L"Add Server", cJoinRowAddServer, L"Graphics\\CreateWorldIcon.png", L"CreateWorldIcon");
+        if (selectedRow == cJoinRowAddServer)
+            selection = position;
+        ++position;
+    }
 
     if (m_miniGames && m_onlinePlayAllowed)
     {
@@ -200,8 +203,7 @@ void IUIScene_LoadCreateJoin::UpdateGamesList()
             MiniGameDef* game = MiniGameDef::GetCustomGameModeById(options[index].id, true);
             if (game == NULL)
                 continue;
-            const std::wstring label = std::wstring(L10N::GetString(IDS_MG_FIND_MATCH)) + L": "
-                                       + L10N::GetString(static_cast<int>(game->GetName()));
+            const std::wstring label = L10N::GetString(static_cast<int>(game->GetName()));
             const std::wstring icon = options[index].icon;
             const std::wstring path = std::wstring(L"Graphics\\") + icon + L".png";
             AddJoinListAction(label, options[index].row, path, icon);

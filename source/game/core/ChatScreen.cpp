@@ -24,6 +24,7 @@
 #include "game/core/Minecraft.hpp"
 #include "game/core/StringConversion.hpp"
 #include "game/core/StringIds.hpp"
+#include "game/core/System.hpp"
 #include "game/entity/mob/EntityIO.hpp"
 #include "game/entity/mob/MobEffect.hpp"
 #include "game/item/Enchantment.hpp"
@@ -58,8 +59,8 @@ const int kPanelPadding = 6;
 const int kTabHeight = 18;
 const int kTabWidth = 100;
 const float kPixelsPerUnit = 2.0f;
-const int kRepeatDelay = 8;
-const int kRepeatRate = 2;
+const int kRepeatDelayMs = 133;
+const int kRepeatRateMs = 33;
 const int kPendingTicks = 40;
 const int kKeyColumns = 10;
 const int kKeyRows = 5;
@@ -134,7 +135,8 @@ struct State
     std::wstring lastSender;
     int ticks;
     int heldAction;
-    int heldTicks;
+    long long nextRepeatTime;
+    long long openedTime;
     int pendingTicks;
     int pendingMode;
     int tooltips[16];
@@ -807,15 +809,18 @@ int DirectionPressed(int pad, State& s)
         if (Pressed(pad, directions[index]))
         {
             s.heldAction = directions[index];
-            s.heldTicks = 0;
+            s.nextRepeatTime = System::processTimeInMilliSecs() + kRepeatDelayMs;
             return directions[index];
         }
     }
     if (s.heldAction >= 0 && g_pInput->ButtonDown(pad, static_cast<unsigned char>(s.heldAction)))
     {
-        ++s.heldTicks;
-        if (s.heldTicks >= kRepeatDelay && (s.heldTicks - kRepeatDelay) % kRepeatRate == 0)
+        const long long now = System::processTimeInMilliSecs();
+        if (now >= s.nextRepeatTime)
+        {
+            s.nextRepeatTime = now + kRepeatRateMs;
             return s.heldAction;
+        }
         return -1;
     }
     s.heldAction = -1;
@@ -1436,7 +1441,8 @@ bool OpenScreen(int pad, ChatScreen::EOpenMode mode, bool afterMenus)
     s.symbols = false;
     s.ticks = 0;
     s.heldAction = -1;
-    s.heldTicks = 0;
+    s.nextRepeatTime = 0;
+    s.openedTime = System::processTimeInMilliSecs();
     for (int index = 0; index < 16; ++index)
         s.tooltips[index] = -2;
     SetText(s, mode == ChatScreen::EOpenMode_Command ? L"/" : L"");
@@ -1515,7 +1521,7 @@ void Tick(int pad)
         Close(pad);
         return;
     }
-    ++s.ticks;
+    s.ticks = static_cast<int>((System::processTimeInMilliSecs() - s.openedTime) * 60 / 1000);
     if (s.justOpened)
     {
         s.justOpened = false;

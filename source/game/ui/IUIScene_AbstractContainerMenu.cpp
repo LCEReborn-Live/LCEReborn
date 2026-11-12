@@ -1,5 +1,6 @@
 #include "game/ui/IUIScene_AbstractContainerMenu.hpp"
 #include "game/core/StringIds.hpp"
+#include "game/core/System.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -71,6 +72,7 @@ IUIScene_AbstractContainerMenu::IUIScene_AbstractContainerMenu()
     m_pointerLabelSlot = NULL;
     m_pointerPos.x = 0.0f;
 #if LCE_PLATFORM_PC
+    m_lastPointerUpdate = 0;
     m_mousePointerPending = false;
     m_mousePointerActive = false;
     m_mousePointerX = 0.0f;
@@ -329,6 +331,13 @@ void IUIScene_AbstractContainerMenu::recalculateQuickCraftRemaining()
 
 void IUIScene_AbstractContainerMenu::onMouseTick()
 {
+    float frameScale = 1.0f;
+#if LCE_PLATFORM_PC
+    const long long now = System::processTimeInNanoSecs();
+    if (m_lastPointerUpdate != 0)
+        frameScale = std::max(0.0f, std::min(3.0f, static_cast<float>(now - m_lastPointerUpdate) * 60.0e-9f));
+    m_lastPointerUpdate = now;
+#endif
     Minecraft* minecraft = Minecraft::GetInstance();
     if (minecraft->mGameModes[getPad()] != NULL)
     {
@@ -374,17 +383,17 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
         else if (m_tapState < ETapState_NoMove && tapState != m_tapState && tapState != ETapState_None)
             m_tapState = ETapState_Cancelled;
 
-        float moveX = inputX * inputX * xDirection * 13.0f;
-        float moveY = inputY * inputY * yDirection * 13.0f;
+        float moveX = inputX * inputX * xDirection * 13.0f * frameScale;
+        float moveY = inputY * inputY * yDirection * 13.0f * frameScale;
         float speed = 1.0f;
         if (m_consecutiveInputTicks < 7)
         {
-            ++m_consecutiveInputTicks;
-            speed = (float)m_consecutiveInputTicks / 7.0f;
+            m_consecutiveInputTicks += frameScale;
+            speed = std::min(m_consecutiveInputTicks / 7.0f, 1.0f);
         }
         else if (m_consecutiveInputTicks < 15)
         {
-            ++m_consecutiveInputTicks;
+            m_consecutiveInputTicks += frameScale;
         }
         else
         {

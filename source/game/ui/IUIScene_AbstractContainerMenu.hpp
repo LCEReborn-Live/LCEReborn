@@ -168,9 +168,10 @@ public:
     float m_panelMaxX;
     float m_panelMinY;
     float m_panelMaxY;
-    int m_consecutiveInputTicks;
+    float m_consecutiveInputTicks;
     ETapState m_tapState;
 #if LCE_PLATFORM_PC
+    long long m_lastPointerUpdate;
     bool m_mousePointerPending;
     bool m_mousePointerActive;
     float m_mousePointerX;

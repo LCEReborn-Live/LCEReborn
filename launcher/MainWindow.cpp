@@ -1,6 +1,7 @@
 ﻿#include "MainWindow.hpp"
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDir>
@@ -404,7 +405,7 @@ void MainWindow::DownloadLauncherUpdate()
     }
     const auto answer = QMessageBox::question(
         this, "Update LCEReborn Live",
-        QString("Download and open the installer for %1? The launcher will close while it is installed.").arg(mUpdateName),
+        QString("Download %1? The launcher will close, install the update, and reopen automatically.").arg(mUpdateName),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
     if (answer != QMessageBox::Yes)
         return;
@@ -461,52 +462,27 @@ void MainWindow::DownloadLauncherUpdate()
             return;
         }
 #ifdef Q_OS_WIN
-        // Windows may briefly hold a freshly downloaded executable for scanning.
-        // Wait for that sharing lock to clear before reporting a launch failure.
-        auto* launchTimer = new QTimer(this);
-        connect(launchTimer, &QTimer::timeout, this, [this, launchTimer, installerPath, attempts = 0]() mutable {
-            ++attempts;
-            SHELLEXECUTEINFOW executeInfo = {};
-            executeInfo.cbSize = sizeof(executeInfo);
-            executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI | SEE_MASK_NOASYNC;
-            executeInfo.lpVerb = L"open";
-            const std::wstring nativeInstallerPath = installerPath.toStdWString();
-            executeInfo.lpFile = nativeInstallerPath.c_str();
-            executeInfo.nShow = SW_SHOWNORMAL;
-            const bool started = ShellExecuteExW(&executeInfo) != FALSE;
-            const DWORD launchError = started ? ERROR_SUCCESS : GetLastError();
-            if (executeInfo.hProcess)
-                CloseHandle(executeInfo.hProcess);
-            if (started)
-            {
-                launchTimer->stop();
-                launchTimer->deleteLater();
-                close();
-                return;
-            }
-            if ((launchError == ERROR_SHARING_VIOLATION || launchError == ERROR_LOCK_VIOLATION) && attempts < 20)
-                return;
-            launchTimer->stop();
-            launchTimer->deleteLater();
-            wchar_t* systemMessage = nullptr;
-            FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
-                               | FORMAT_MESSAGE_IGNORE_INSERTS,
-                           nullptr, launchError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                           reinterpret_cast<LPWSTR>(&systemMessage), 0, nullptr);
-            const QString reason = systemMessage
-                                       ? QString::fromWCharArray(systemMessage).trimmed()
-                                       : QStringLiteral("Windows error %1").arg(launchError);
-            if (systemMessage)
-                LocalFree(systemMessage);
+        QTemporaryDir helperDirectory(QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation))
+                                          .filePath("LCEReborn-Live-Updater-XXXXXX"));
+        const QString helperSource = QDir(LauncherPaths::InstallDir()).filePath("LCERebornUpdateHelper.exe");
+        const QString helperPath = QDir(helperDirectory.path()).filePath("LCERebornUpdateHelper.exe");
+        const QString launcherPath = QCoreApplication::applicationFilePath();
+        qint64 helperPid = 0;
+        if (!helperDirectory.isValid() || !QFile::copy(helperSource, helperPath)
+            || !QProcess::startDetached(helperPath,
+                                        { installerPath, launcherPath, QString::number(GetCurrentProcessId()) },
+                                        helperDirectory.path(), &helperPid))
+        {
             if (mUpdateButton) mUpdateButton->setEnabled(true);
-            SetStatus("Could not start the installer", GameColours::kWarning);
-            QMessageBox::warning(
-                this, "Update LCEReborn Live",
-                QString("The installer downloaded, but Windows could not start it.\n\n%1 (code %2)\n\nThe file was kept here:\n%3")
-                    .arg(reason).arg(launchError).arg(QDir::toNativeSeparators(installerPath)));
-        });
-        SetStatus("Waiting for Windows to release the installer…", GameColours::kWarning);
-        launchTimer->start(500);
+            SetStatus("Could not start the update helper", GameColours::kWarning);
+            QMessageBox::warning(this, "Update LCEReborn Live",
+                                 QString("The update was downloaded, but its helper could not start.\n\n"
+                                         "The installer was kept here:\n%1")
+                                     .arg(QDir::toNativeSeparators(installerPath)));
+            return;
+        }
+        helperDirectory.setAutoRemove(false);
+        QApplication::quit();
         return;
 #else
         if (!QProcess::startDetached(installerPath, {}))

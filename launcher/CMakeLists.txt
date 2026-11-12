@@ -61,6 +61,11 @@ set_target_properties(LCERebornLauncher PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 if(WIN32)
+  add_executable(LCERebornUpdateHelper WIN32 UpdateHelper.cpp)
+  target_compile_definitions(LCERebornUpdateHelper PRIVATE UNICODE _UNICODE)
+  target_link_libraries(LCERebornUpdateHelper PRIVATE shell32)
+  set_target_properties(LCERebornUpdateHelper PROPERTIES CXX_STANDARD 17
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
   target_link_libraries(LCERebornLauncher PRIVATE winmm shell32)
   set(LCE_LAUNCHER_ICON "${CMAKE_SOURCE_DIR}/resources/launcher/icon.ico")
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/LCERebornLauncher.rc" "1 ICON \"${LCE_LAUNCHER_ICON}\"\n")

@@ -64,7 +64,7 @@ if LINUX:
     ALLOWED_NAME = re.compile(r"(^[^.]+$|\.so(\.\d+)*$|\.(png|ico|txt|mp3)$)")
 else:
     SYSTEM = "pc"
-    PROGRAMS = ("LCEReborn.exe", "LCERebornLauncher.exe", "LCERebornServer.exe")
+    PROGRAMS = ("LCEReborn.exe", "LCERebornLauncher.exe", "LCERebornServer.exe", "LCERebornUpdateHelper.exe")
     QT_PLUGIN_DIRS = ("generic", "imageformats", "networkinformation", "platforms", "styles", "tls")
     ALLOWED_NAME = re.compile(r"\.(exe|dll|png|ico|txt|js|json|mp3)$", re.I)
 REDIST_URL = "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"

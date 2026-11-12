@@ -451,7 +451,7 @@ void MainWindow::DownloadLauncherUpdate()
         saved = saved && file->read(2) == QByteArray("MZ", 2);
         const QString installerPath = file->fileName();
         file->close();
-        file->deleteLater();
+        delete file; // Release the download handle before asking Windows to execute the file.
         if (!saved)
         {
             if (mUpdateButton) mUpdateButton->setEnabled(true);
@@ -461,19 +461,33 @@ void MainWindow::DownloadLauncherUpdate()
             return;
         }
 #ifdef Q_OS_WIN
-        SHELLEXECUTEINFOW executeInfo = {};
-        executeInfo.cbSize = sizeof(executeInfo);
-        executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI | SEE_MASK_NOASYNC;
-        executeInfo.lpVerb = L"open";
-        const std::wstring nativeInstallerPath = installerPath.toStdWString();
-        executeInfo.lpFile = nativeInstallerPath.c_str();
-        executeInfo.nShow = SW_SHOWNORMAL;
-        const bool started = ShellExecuteExW(&executeInfo) != FALSE;
-        const DWORD launchError = started ? ERROR_SUCCESS : GetLastError();
-        if (executeInfo.hProcess)
-            CloseHandle(executeInfo.hProcess);
-        if (!started)
-        {
+        // Windows may briefly hold a freshly downloaded executable for scanning.
+        // Wait for that sharing lock to clear before reporting a launch failure.
+        auto* launchTimer = new QTimer(this);
+        connect(launchTimer, &QTimer::timeout, this, [this, launchTimer, installerPath, attempts = 0]() mutable {
+            ++attempts;
+            SHELLEXECUTEINFOW executeInfo = {};
+            executeInfo.cbSize = sizeof(executeInfo);
+            executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_FLAG_NO_UI | SEE_MASK_NOASYNC;
+            executeInfo.lpVerb = L"open";
+            const std::wstring nativeInstallerPath = installerPath.toStdWString();
+            executeInfo.lpFile = nativeInstallerPath.c_str();
+            executeInfo.nShow = SW_SHOWNORMAL;
+            const bool started = ShellExecuteExW(&executeInfo) != FALSE;
+            const DWORD launchError = started ? ERROR_SUCCESS : GetLastError();
+            if (executeInfo.hProcess)
+                CloseHandle(executeInfo.hProcess);
+            if (started)
+            {
+                launchTimer->stop();
+                launchTimer->deleteLater();
+                close();
+                return;
+            }
+            if ((launchError == ERROR_SHARING_VIOLATION || launchError == ERROR_LOCK_VIOLATION) && attempts < 20)
+                return;
+            launchTimer->stop();
+            launchTimer->deleteLater();
             wchar_t* systemMessage = nullptr;
             FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM
                                | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -488,10 +502,12 @@ void MainWindow::DownloadLauncherUpdate()
             SetStatus("Could not start the installer", GameColours::kWarning);
             QMessageBox::warning(
                 this, "Update LCEReborn Live",
-                QString("The installer downloaded, but Windows could not start it.\n\n%1\n\nThe file was kept here:\n%2")
-                    .arg(reason, QDir::toNativeSeparators(installerPath)));
-            return;
-        }
+                QString("The installer downloaded, but Windows could not start it.\n\n%1 (code %2)\n\nThe file was kept here:\n%3")
+                    .arg(reason).arg(launchError).arg(QDir::toNativeSeparators(installerPath)));
+        });
+        SetStatus("Waiting for Windows to release the installer…", GameColours::kWarning);
+        launchTimer->start(500);
+        return;
 #else
         if (!QProcess::startDetached(installerPath, {}))
         {
@@ -503,7 +519,9 @@ void MainWindow::DownloadLauncherUpdate()
             return;
         }
 #endif
+#ifndef Q_OS_WIN
         close();
+#endif
     });
 #else
     QMessageBox::information(this, "Update LCEReborn Live", "In-launcher updates are currently available for Windows releases.");

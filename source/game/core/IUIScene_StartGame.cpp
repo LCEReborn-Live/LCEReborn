@@ -92,6 +92,8 @@ IUIScene_StartGame::IUIScene_StartGame(int sceneType, void* data, UILayer* layer
     m_touchBoxRebuild = false;
     m_isCreative = false;
     m_actionPending = false;
+    m_matchmakingSearchPending = false;
+    m_matchmakingSearchPlayerMask = 0;
     m_signInPending = false;
     m_gameTypeId = GameType::SURVIVAL->getId();
     m_pendingSlot = -1;
@@ -467,6 +469,8 @@ void IUIScene_StartGame::RequestPrivMessageBox()
 
 void IUIScene_StartGame::FindAndJoinGame(unsigned int playerMask)
 {
+    if (m_matchmakingSearchPending)
+        return;
     EMiniGameId miniGameId = m_launchData.mMiniGameId;
     if (m_launchData.mMiniGameId != eMiniGameId_Any)
     {
@@ -481,6 +485,13 @@ void IUIScene_StartGame::FindAndJoinGame(unsigned int playerMask)
                                                                          count, values, ids);
     delete values;
     delete ids;
+    if (result == 1 && !m_matchmakingSearchPlayerMask)
+    {
+        m_matchmakingSearchPending = true;
+        m_matchmakingSearchPlayerMask = playerMask ? playerMask : 1;
+        addTimer(2, 3000);
+        return;
+    }
     gApp.SetLiveLinkRequired(false);
     switch (result)
     {
@@ -515,9 +526,15 @@ void IUIScene_StartGame::FindAndJoinGame(unsigned int playerMask)
         break;
     }
     case 1:
-        gConsoleUIController.NavigateBack(m_playerId, false, EUIScene_None, EUILayer_Count);
+    {
+        int parameters[1] = { IDS_CONFIRM_OK };
+        gConsoleUIController.RequestAlertMessage(IDS_MG_FIND_MATCH, IDS_NO_GAMES_FOUND, parameters, 1,
+                                                 gProfile->GetPrimaryPad(), NULL, NULL, NULL, true);
+        m_actionPending = false;
+        m_matchmakingSearchPlayerMask = 0;
         Minecraft::GetInstance()->SetJoiningFromFriendsTabOrInvite(false);
         break;
+    }
     case 0:
         telemetryManagerInstance->PrepareMiniGameHostOptions(m_playerId, &m_launchData,
                                                              eTelemetryJoinMethod_Matchmaking);
@@ -868,6 +885,12 @@ void IUIScene_StartGame::handleTouchBoxRebuild()
 
 void IUIScene_StartGame::handleTimerComplete(int timerId)
 {
+    if (timerId == 2 && m_matchmakingSearchPending)
+    {
+        m_matchmakingSearchPending = false;
+        FindAndJoinGame(m_matchmakingSearchPlayerMask);
+        return;
+    }
     if (m_touchBoxRebuild)
     {
         GetMainPanel()->UpdateControl();

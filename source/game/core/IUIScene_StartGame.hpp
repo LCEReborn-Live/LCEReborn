@@ -82,6 +82,8 @@ protected:
     UIControl_CheckBox m_onlineGameCheckBox;
     LaunchMoreOptionsMenuInitData m_launchData;
     bool m_actionPending;
+    bool m_matchmakingSearchPending;
+    unsigned int m_matchmakingSearchPlayerMask;
     LevelGenerationOptions* m_levelGenerationOptions;
     std::vector<TEXTUREPACKSORTSTRUCT> m_texturePacks;
     std::wstring m_worldName;

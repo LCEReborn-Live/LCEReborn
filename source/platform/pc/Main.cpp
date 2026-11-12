@@ -236,7 +236,6 @@ int main(int argc, char** argv)
         PIXBeginNamedEvent(timingColour, "Frame present");
         gRenderer->Present();
         PIXEndNamedEvent();
-        PcWindowPaceFrame();
         gRenderer->Set_matrixDirty();
         gConsoleUIController.CheckMenuDisplayed();
         PIXBeginNamedEvent(timingColour, "Profile load check");

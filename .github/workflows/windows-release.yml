@@ -131,16 +131,21 @@ jobs:
           $assets = @(Get-ChildItem build -Filter 'LCEReborn-Live-Portable-*.zip' | ForEach-Object FullName)
           $assets += @(Get-ChildItem build/release -Filter 'LCEReborn-Live-Installer-*.exe' | ForEach-Object FullName)
           $notesFile = "docs/releases/$($env:RELEASE_TAG).md"
+          $releaseTitle = "LCEReborn Live $env:RELEASE_TAG"
+          if (Test-Path $notesFile) {
+            $heading = Get-Content -LiteralPath $notesFile -TotalCount 1
+            if ($heading -match '^#\s+(.+)$') { $releaseTitle = $Matches[1].Trim() }
+          }
           gh release view $env:RELEASE_TAG --repo $env:RELEASE_REPOSITORY --json id *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --clobber
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if (Test-Path $notesFile) {
-              gh release edit $env:RELEASE_TAG --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --notes-file $notesFile
+              gh release edit $env:RELEASE_TAG --repo $env:RELEASE_REPOSITORY --title $releaseTitle --notes-file $notesFile
             }
           } elseif (Test-Path $notesFile) {
-            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --notes-file $notesFile
+            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title $releaseTitle --notes-file $notesFile
           } else {
-            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title "LCEReborn Live $env:RELEASE_TAG" --generate-notes
+            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title $releaseTitle --generate-notes
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

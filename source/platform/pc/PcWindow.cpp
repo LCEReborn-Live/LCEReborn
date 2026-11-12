@@ -24,10 +24,8 @@ SDL_GLContext sContext = NULL;
 bool sShown = false;
 bool sFullscreen = false;
 bool sVSync = true;
-Uint64 sNextFrame = 0;
 PcDropHandler sDropHandler = NULL;
 void* sDropContext = NULL;
-const Uint64 kFramePeriod = SDL_NS_PER_SECOND / 60;
 
 std::string WindowTitle()
 {
@@ -274,19 +272,6 @@ void PcPumpEvents()
 
         PcInputHandleEvent(event);
     }
-}
-
-void PcWindowPaceFrame()
-{
-    Uint64 now = SDL_GetTicksNS();
-    if (sNextFrame == 0 || now >= sNextFrame + kFramePeriod)
-    {
-        sNextFrame = now + kFramePeriod;
-        return;
-    }
-    if (now < sNextFrame)
-        SDL_DelayPrecise(sNextFrame - now);
-    sNextFrame += kFramePeriod;
 }
 
 bool PcWindowIsFullscreen()

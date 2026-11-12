@@ -12,7 +12,6 @@ void PcWindowSwap();
 void PcWindowGetDrawableSize(int* width, int* height);
 void* PcWindowGetProcAddress(const char* name);
 void PcPumpEvents();
-void PcWindowPaceFrame();
 bool PcWindowIsFullscreen();
 void PcWindowSetFullscreen(bool fullscreen);
 bool PcWindowIsVSync();

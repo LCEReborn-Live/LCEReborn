@@ -5,6 +5,9 @@
 #include <cstring>
 
 #include <opus.h>
+extern "C" {
+#include <rnnoise.h>
+}
 #include <SDL3/SDL.h>
 
 #include "platform/pc/Log.hpp"
@@ -14,6 +17,7 @@ namespace
 const Logger sLog("Voice");
 const int SAMPLE_RATE = 48000;
 const int FRAME_SAMPLES = 960; // 20 ms at 48 kHz.
+const int DENOISE_FRAME_SAMPLES = 480; // RNNoise processes 10 ms at 48 kHz.
 const int MAX_OPUS_PACKET = 1024;
 const int PLAYBACK_CHANNELS = 2;
 const float VAD_THRESHOLD = 430.0f;
@@ -31,6 +35,7 @@ PcVoiceChat::PcVoiceChat()
     : m_captureStream(NULL),
       m_playbackStream(NULL),
       m_encoder(NULL),
+      m_denoiser(NULL),
       m_audioInitialized(false),
       m_enabled(false),
       m_talking(false),
@@ -90,12 +95,17 @@ bool PcVoiceChat::Open()
     opus_encoder_ctl(m_encoder, OPUS_SET_DTX(1));
     opus_encoder_ctl(m_encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
 
+    m_denoiser = rnnoise_create();
+    if (m_denoiser == NULL)
+        LOG_WARN(sLog, "Noise suppression unavailable; microphone audio will still work");
+
     m_capture.clear();
     m_capture.reserve(FRAME_SAMPLES * 4);
     m_playback.resize(4096 * PLAYBACK_CHANNELS);
     SDL_ResumeAudioStreamDevice(m_captureStream);
     SDL_ResumeAudioStreamDevice(m_playbackStream);
-    LOG_INFO(sLog, "Voice chat ready: open microphone, voice activity detection enabled");
+    LOG_INFO(sLog, "Voice chat ready: open microphone, noise suppression %s",
+             m_denoiser != NULL ? "enabled" : "unavailable");
     return true;
 }
 
@@ -117,6 +127,11 @@ void PcVoiceChat::Close()
     {
         opus_encoder_destroy(m_encoder);
         m_encoder = NULL;
+    }
+    if (m_denoiser != NULL)
+    {
+        rnnoise_destroy(m_denoiser);
+        m_denoiser = NULL;
     }
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -201,6 +216,22 @@ void PcVoiceChat::ProcessCapture(const SendCallback& send)
 
 void PcVoiceChat::EncodeFrame(const short* samples, const SendCallback& send)
 {
+    std::array<short, FRAME_SAMPLES> cleaned;
+    if (m_denoiser != NULL)
+    {
+        std::array<float, DENOISE_FRAME_SAMPLES> input;
+        std::array<float, DENOISE_FRAME_SAMPLES> output;
+        for (int frame = 0; frame < 2; ++frame)
+        {
+            for (int i = 0; i < DENOISE_FRAME_SAMPLES; ++i)
+                input[i] = static_cast<float>(samples[frame * DENOISE_FRAME_SAMPLES + i]);
+            rnnoise_process_frame(m_denoiser, output.data(), input.data());
+            for (int i = 0; i < DENOISE_FRAME_SAMPLES; ++i)
+                cleaned[frame * DENOISE_FRAME_SAMPLES + i] = static_cast<short>(std::max(-32768.0f,
+                    std::min(32767.0f, std::round(output[i]))));
+        }
+        samples = cleaned.data();
+    }
     double energy = 0.0;
     for (int i = 0; i < FRAME_SAMPLES; ++i)
         energy += static_cast<double>(samples[i]) * samples[i];

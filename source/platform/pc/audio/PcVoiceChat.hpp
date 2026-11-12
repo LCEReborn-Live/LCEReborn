@@ -9,6 +9,7 @@
 struct SDL_AudioStream;
 struct OpusEncoder;
 struct OpusDecoder;
+struct DenoiseState;
 
 class PcVoiceChat
 {
@@ -48,6 +49,7 @@ private:
     SDL_AudioStream* m_captureStream;
     SDL_AudioStream* m_playbackStream;
     OpusEncoder* m_encoder;
+    DenoiseState* m_denoiser;
     bool m_audioInitialized;
     bool m_enabled;
     bool m_talking;

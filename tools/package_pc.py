@@ -314,6 +314,7 @@ def game_components(build):
     rapidxml = os.path.join(TOOLS, "build", "third_party", "rapidxml", "rapidxml.hpp")
     bink = os.path.join(ROOT, "source", "platform", "pc", "audio", "BinkAudioDecoder.cpp")
     opus_source = os.path.join(build, "_deps", "opus-src")
+    rnnoise_source = os.path.join(build, "_deps", "rnnoise-src")
     boost_license = os.path.join(LICENSE_TEXTS, "BSL-1.0.txt")
     rapidxml_header = read(rapidxml)
     truetype_header = read(stb_truetype)
@@ -333,6 +334,13 @@ def game_components(build):
             "source": "https://github.com/xiph/opus",
             "license": ["BSD-3-Clause"],
             "notice": read(os.path.join(opus_source, "COPYING")).strip(),
+        },
+        {
+            "name": "RNNoise",
+            "version": "0.1",
+            "source": "https://github.com/xiph/rnnoise",
+            "license": ["BSD-3-Clause"],
+            "notice": read(os.path.join(rnnoise_source, "COPYING")).strip(),
         },
         {
             "name": "zlib",

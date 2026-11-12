@@ -82,6 +82,29 @@ FetchContent_Declare(opus
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(opus)
 
+# RNNoise v0.1 includes its default model in the source archive, so release builds
+# do not download model weights at runtime or depend on an external audio service.
+FetchContent_Declare(rnnoise
+  GIT_REPOSITORY https://github.com/xiph/rnnoise.git
+  GIT_TAG cdf196b1e9de2f8ff1003328ebf9a4316477429d)
+FetchContent_MakeAvailable(rnnoise)
+add_library(lce_rnnoise STATIC
+  "${rnnoise_SOURCE_DIR}/src/denoise.c"
+  "${rnnoise_SOURCE_DIR}/src/rnn.c"
+  "${rnnoise_SOURCE_DIR}/src/rnn_data.c"
+  "${rnnoise_SOURCE_DIR}/src/pitch.c"
+  "${rnnoise_SOURCE_DIR}/src/kiss_fft.c"
+  "${rnnoise_SOURCE_DIR}/src/celt_lpc.c")
+target_include_directories(lce_rnnoise PUBLIC "${rnnoise_SOURCE_DIR}/include" PRIVATE "${rnnoise_SOURCE_DIR}/src")
+# RNNoise v0.1 embeds a copy of Opus FFT with the same exported C names.
+target_compile_definitions(lce_rnnoise PRIVATE
+  opus_fft_impl=rnnoise_fft_impl
+  opus_fft_c=rnnoise_fft_c
+  opus_ifft_c=rnnoise_ifft_c)
+if(MSVC)
+  target_compile_definitions(lce_rnnoise PRIVATE _USE_MATH_DEFINES _CRT_SECURE_NO_WARNINGS)
+endif()
+
 # The game core, in the C++ dialect it was written in.
 file(GLOB_RECURSE LCE_GAME_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/game/*.cpp")
 # Units under game/ that the PC build does not compile: the Miles sound engine and the game's glue to it (PC audio
@@ -153,7 +176,7 @@ endif()
 # Audio: the game's sound bank and Bink Audio, played through SDL.
 file(GLOB_RECURSE LCE_PC_AUDIO_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/platform/pc/audio/*.cpp")
 add_library(lce_audio OBJECT ${LCE_PC_AUDIO_SOURCES})
-target_link_libraries(lce_audio PRIVATE lce_common SDL3::SDL3-static opus)
+target_link_libraries(lce_audio PRIVATE lce_common SDL3::SDL3-static opus lce_rnnoise)
 set_target_properties(lce_audio PROPERTIES CXX_STANDARD 17)
 
 # zlib and libpng, the releases the game was built against (libpng with the game's own png.h and pngwrite.c).
@@ -178,7 +201,7 @@ endif()
 function(lce_add_program target main)
   add_executable(${target} "${LCE_SOURCE}/platform/pc/${main}" $<TARGET_OBJECTS:lce_game>
                  $<TARGET_OBJECTS:lce_platform> $<TARGET_OBJECTS:lce_audio>)
-  target_link_libraries(${target} PRIVATE lce_common lce_png lce_zlib SDL3::SDL3-static opus)
+  target_link_libraries(${target} PRIVATE lce_common lce_png lce_zlib SDL3::SDL3-static opus lce_rnnoise)
   set_target_properties(${target} PROPERTIES CXX_STANDARD 17)
   target_compile_definitions(${target} PRIVATE LCE_DISCORD_APP_ID="${LCE_DISCORD_APP_ID}")
   if(WIN32)

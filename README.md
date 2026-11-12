@@ -25,7 +25,7 @@
 - A launcher news feed for both LCEReborn Live and original LCEReborn releases.
 - Update notifications and in-launcher installer downloads for installed Windows copies.
 - A focused mini-game Join tab for Battle, Tumble, and Glide matchmaking.
-- Wii U-style open-mic Game Chat in online play, with automatic voice activity detection and no push-to-talk key.
+- Wii U-style open-mic Game Chat in online play, with local microphone noise suppression, automatic voice activity detection and no push-to-talk key.
 - Keyboard, mouse, and controller support; single-player and split-screen play.
 
 ### Installation
@@ -70,7 +70,7 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 - Лента новостей с релизами LCEReborn Live и оригинального LCEReborn.
 - Уведомления об обновлениях и загрузка установщика из лаунчера для установленной версии Windows.
 - Вкладка Join с поиском игр Battle, Tumble и Glide.
-- Голосовой Game Chat в стиле Wii U: открытый микрофон в сетевой игре с автоматическим определением речи, без кнопки PTT.
+- Голосовой Game Chat в стиле Wii U: открытый микрофон в сетевой игре с шумоподавлением и автоматическим определением речи, без кнопки PTT.
 - Клавиатура, мышь и геймпады; одиночная игра и разделённый экран.
 
 ### Установка

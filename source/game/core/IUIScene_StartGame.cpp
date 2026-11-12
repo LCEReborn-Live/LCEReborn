@@ -46,6 +46,7 @@
 #include "platform/CStorage.hpp"
 #include "game/ui/UIScene_FullscreenProgress.hpp"
 #include "game/world/LevelData.hpp"
+#include "vendor/_ConnectionProgressParams.hpp"
 #include "vendor/_LoadingInputParams.hpp"
 #include "vendor/_NetworkGameInitData.hpp"
 
@@ -489,6 +490,12 @@ void IUIScene_StartGame::FindAndJoinGame(unsigned int playerMask)
     {
         m_matchmakingSearchPending = true;
         m_matchmakingSearchPlayerMask = playerMask ? playerMask : 1;
+        _ConnectionProgressParams* progress = new _ConnectionProgressParams();
+        progress->m_playerId = m_playerId;
+        progress->m_stringId = IDS_MG_FIND_MATCH;
+        progress->m_miniGameId = miniGameId;
+        gConsoleUIController.NavigateToScene(m_playerId, EUIScene_ConnectingProgress, progress, EUILayer_Scene,
+                                             EUIGroup_PlayerDefault);
         addTimer(2, 3000);
         return;
     }
@@ -888,6 +895,8 @@ void IUIScene_StartGame::handleTimerComplete(int timerId)
     if (timerId == 2 && m_matchmakingSearchPending)
     {
         m_matchmakingSearchPending = false;
+        if (gConsoleUIController.IsSceneInStack(m_playerId, EUIScene_ConnectingProgress))
+            gConsoleUIController.NavigateBack(m_playerId, false, EUIScene_None, EUILayer_Count);
         FindAndJoinGame(m_matchmakingSearchPlayerMask);
         return;
     }

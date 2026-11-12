@@ -2,6 +2,7 @@
 #include "game/core/EntityType.hpp"
 #include "game/core/GameRules.hpp"
 #include <algorithm>
+#include <cstdlib>
 #include "game/core/System.hpp"
 #include "game/core/Socket.hpp"
 #include "game/item/Inventory.hpp"
@@ -142,6 +143,10 @@ ServerGamePacketListenerImpl::ServerGamePacketListenerImpl(MinecraftServer* serv
       mTickCount(0),
       mKeepAliveId(0),
       mKeepAliveTime(0),
+      mVoiceLastRefill(0),
+      mVoiceLastWarning(0),
+      mVoicePacketTokens(0),
+      mVoiceByteTokens(0),
       mKeepAlivePending(0),
       mChatSpamTickCount(0),
       mDropSpamTickCount(0),
@@ -1178,6 +1183,52 @@ void ServerGamePacketListenerImpl::handleVoice(boost::shared_ptr<ServerboundVoic
     INetworkPlayer* sender = getNetworkPlayer();
     if (sender == NULL)
         return;
+
+#if LCE_PLATFORM_PC
+    // A separate budget per connection prevents one microphone from filling the
+    // outgoing queues of every player in the room. Keep packet framing unchanged.
+    static const unsigned int packetsPerSecond = []() {
+        const char* value = std::getenv("LCE_VOICE_MAX_PACKETS_PER_SECOND");
+        if (!value || !*value) return 75U;
+        char* end = NULL;
+        const unsigned long parsed = std::strtoul(value, &end, 10);
+        return *end == 0 && parsed >= 1 && parsed <= 1000 ? static_cast<unsigned int>(parsed) : 75U;
+    }();
+    static const unsigned int bytesPerSecond = []() {
+        const char* value = std::getenv("LCE_VOICE_MAX_BYTES_PER_SECOND");
+        if (!value || !*value) return 16384U;
+        char* end = NULL;
+        const unsigned long parsed = std::strtoul(value, &end, 10);
+        return *end == 0 && parsed >= 1024 && parsed <= 1048576 ? static_cast<unsigned int>(parsed) : 16384U;
+    }();
+    const uint64_t now = getMilliseconds();
+    const double packetBurst = packetsPerSecond * 1.25;
+    const double byteBurst = bytesPerSecond * 1.25;
+    if (mVoiceLastRefill == 0)
+    {
+        mVoicePacketTokens = packetBurst;
+        mVoiceByteTokens = byteBurst;
+    }
+    else if (now > mVoiceLastRefill)
+    {
+        const double elapsed = static_cast<double>(std::min<uint64_t>(now - mVoiceLastRefill, 1000));
+        mVoicePacketTokens = std::min(packetBurst, mVoicePacketTokens + elapsed * packetsPerSecond / 1000.0);
+        mVoiceByteTokens = std::min(byteBurst, mVoiceByteTokens + elapsed * bytesPerSecond / 1000.0);
+    }
+    mVoiceLastRefill = now;
+    const double packetBytes = static_cast<double>(packet->Audio().size() + 8);
+    if (mVoicePacketTokens < 1.0 || mVoiceByteTokens < packetBytes)
+    {
+        if (mVoiceLastWarning == 0 || now - mVoiceLastWarning >= 10000)
+        {
+            warn(L"Voice chat packet limit exceeded; dropping excess audio");
+            mVoiceLastWarning = now;
+        }
+        return;
+    }
+    mVoicePacketTokens -= 1.0;
+    mVoiceByteTokens -= packetBytes;
+#endif
 
     const bool hasVoice = packet->HasVoice();
     const bool talking = hasVoice && packet->IsTalking() && !packet->Audio().empty()

@@ -185,6 +185,10 @@ private:
     int mTickCount;
     int mKeepAliveId;
     uint64_t mKeepAliveTime;
+    uint64_t mVoiceLastRefill;
+    uint64_t mVoiceLastWarning;
+    double mVoicePacketTokens;
+    double mVoiceByteTokens;
     int mKeepAlivePending;
     int mChatSpamTickCount;
     int mDropSpamTickCount;

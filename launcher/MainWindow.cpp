@@ -525,6 +525,7 @@ void MainWindow::LiveAccount()
         mFriends = {}; mIncomingFriends = {}; mSentFriends = {};
         RenderLiveFriends();
         mSeenInvites.clear();
+        mSeenFriendRequests.clear();
         if (mInvitePopup) mInvitePopup->close();
         mLiveButton->setText("Live Sign In");
         RefreshProfiles();
@@ -822,7 +823,30 @@ void MainWindow::RefreshLiveFriends()
             if (session != mLiveToken) return;
             if (status != 200) { mFriendsMessage->setText("Could not refresh friends. Check your connection."); return; }
             if (index == 0) mFriends = data.value("friends").toArray();
-            else if (index == 1) mIncomingFriends = data.value("incoming").toArray();
+            else if (index == 1)
+            {
+                mIncomingFriends = data.value("incoming").toArray();
+                QSet<qint64> pendingIds;
+                for (const QJsonValue& value : mIncomingFriends)
+                {
+                    const qint64 id = value.toObject().value("id").toVariant().toLongLong();
+                    if (id > 0) pendingIds.insert(id);
+                }
+                mSeenFriendRequests.intersect(pendingIds);
+                if (!mInvitePopup)
+                {
+                    for (const QJsonValue& value : mIncomingFriends)
+                    {
+                        const QJsonObject entry = value.toObject();
+                        const qint64 id = entry.value("id").toVariant().toLongLong();
+                        const QString username = entry.value("username").toString();
+                        if (id <= 0 || username.isEmpty() || mSeenFriendRequests.contains(id)) continue;
+                        mSeenFriendRequests.insert(id);
+                        ShowLiveInvite(id, username, QString(), true);
+                        break;
+                    }
+                }
+            }
             else mSentFriends = data.value("sent").toArray();
             RenderLiveFriends();
         });
@@ -1013,7 +1037,7 @@ void MainWindow::PollLiveInvites()
     });
 }
 
-void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world)
+void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world, bool friendRequest)
 {
     QFrame* toast = new QFrame(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     toast->setAttribute(Qt::WA_DeleteOnClose);
@@ -1038,9 +1062,11 @@ void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QStr
     LoadLiveFriendFace(ownerId, avatar);
     auto* message = new QVBoxLayout;
     message->setSpacing(4);
-    QLabel* title = new QLabel("Game invitation", toast);
+    QLabel* title = new QLabel(friendRequest ? "Friend request" : "Game invitation", toast);
     title->setStyleSheet("font-weight:bold; font-size:16px; color:#f2e5c4; border:0;");
-    QLabel* detail = new QLabel(QString("%1 invited you to %2").arg(owner, world.isEmpty() ? "their world" : world), toast);
+    QLabel* detail = new QLabel(friendRequest ? QString("%1 wants to be your friend").arg(owner)
+                                             : QString("%1 invited you to %2").arg(owner, world.isEmpty() ? "their world" : world), toast);
+    detail->setTextFormat(Qt::PlainText);
     detail->setWordWrap(true);
     message->addWidget(title);
     message->addWidget(detail);
@@ -1056,23 +1082,63 @@ void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QStr
     actions->addWidget(accept); actions->addWidget(decline);
     layout->addLayout(header);
     layout->addLayout(actions);
-    connect(accept, &GameButton::clicked, this, [this, toast, title, detail, accept, decline, owner] {
-        const bool running = mRunner->IsRunning();
-        AcceptLiveInvite(owner);
-        if (!running) { toast->close(); return; }
-        title->setText("Connecting");
-        detail->setText("If you are in a world, return to the main menu to join.");
-        accept->hide(); decline->hide();
-        QTimer::singleShot(5000, toast, &QWidget::close);
-    });
-    connect(decline, &GameButton::clicked, this, [this, toast, ownerId] {
-        toast->close();
-        QNetworkRequest request{QUrl(QString("https://api.kerneldev.qzz.io/v1/game-invites/%1").arg(ownerId))};
-        request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
-        request.setTransferTimeout(10000);
-        QNetworkReply* reply = mLiveNetwork->deleteResource(request);
-        connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
-    });
+    if (friendRequest)
+    {
+        const QString session = mLiveToken;
+        auto answer = [this, session, ownerId, toast, detail, accept, decline](bool allow) {
+            if (session != mLiveToken || session.isEmpty()) { toast->close(); return; }
+            accept->setEnabled(false);
+            decline->setEnabled(false);
+            const QString path = QString("/friends/requests/%1").arg(ownerId) + (allow ? "/accept" : "");
+            QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1" + path)};
+            request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
+            request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+            request.setTransferTimeout(10000);
+            QNetworkReply* reply = allow ? mLiveNetwork->post(request, QByteArray("{}"))
+                                        : mLiveNetwork->deleteResource(request);
+            QPointer<QWidget> safeToast = toast;
+            QPointer<QLabel> safeDetail = detail;
+            QPointer<GameButton> safeAccept = accept, safeDecline = decline;
+            connect(reply, &QNetworkReply::finished, this, [this, reply, session, safeToast, safeDetail, safeAccept, safeDecline] {
+                const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                reply->deleteLater();
+                if (session != mLiveToken) return;
+                if ((status >= 200 && status < 300) || status == 404)
+                {
+                    if (safeToast) safeToast->close();
+                    RefreshLiveFriends();
+                }
+                else
+                {
+                    if (safeDetail) safeDetail->setText("Could not update the request. Please try again.");
+                    if (safeAccept) safeAccept->setEnabled(true);
+                    if (safeDecline) safeDecline->setEnabled(true);
+                }
+            });
+        };
+        connect(accept, &GameButton::clicked, this, [answer] { answer(true); });
+        connect(decline, &GameButton::clicked, this, [answer] { answer(false); });
+    }
+    else
+    {
+        connect(accept, &GameButton::clicked, this, [this, toast, title, detail, accept, decline, owner] {
+            const bool running = mRunner->IsRunning();
+            AcceptLiveInvite(owner);
+            if (!running) { toast->close(); return; }
+            title->setText("Connecting");
+            detail->setText("If you are in a world, return to the main menu to join.");
+            accept->hide(); decline->hide();
+            QTimer::singleShot(5000, toast, &QWidget::close);
+        });
+        connect(decline, &GameButton::clicked, this, [this, toast, ownerId] {
+            toast->close();
+            QNetworkRequest request{QUrl(QString("https://api.kerneldev.qzz.io/v1/game-invites/%1").arg(ownerId))};
+            request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
+            request.setTransferTimeout(10000);
+            QNetworkReply* reply = mLiveNetwork->deleteResource(request);
+            connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
+        });
+    }
     mInvitePopup = toast;
     toast->adjustSize();
     QPoint destination = toast->pos();

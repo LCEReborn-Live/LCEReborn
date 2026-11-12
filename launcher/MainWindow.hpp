@@ -52,7 +52,7 @@ private:
     void LiveAccount();
     void RestoreLiveSession();
     void PollLiveInvites();
-    void ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world);
+    void ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world, bool friendRequest = false);
     void AcceptLiveInvite(const QString& owner);
     void WaitForLiveJoin(const QString& owner, int attempt = 0);
     QWidget* CreateLiveFriendsPage();
@@ -85,6 +85,7 @@ private:
     std::function<void()> mCosmeticsReadyCallback;
     QString mLiveDirectory;
     QSet<QString> mSeenInvites;
+    QSet<qint64> mSeenFriendRequests;
     QPointer<QWidget> mInvitePopup;
     bool mInvitePollPending = false;
     QWidget* mFriendsList = nullptr;

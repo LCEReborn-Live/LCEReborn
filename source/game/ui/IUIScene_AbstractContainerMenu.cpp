@@ -1,9 +1,13 @@
 #include "game/ui/IUIScene_AbstractContainerMenu.hpp"
 #include "game/core/StringIds.hpp"
-#include "game/core/System.hpp"
 
 #include <algorithm>
 #include <cmath>
+
+#if LCE_PLATFORM_PC
+#include <chrono>
+#include "platform/pc/PcCursorMotion.hpp"
+#endif
 
 #include "game/client/render/Renderer.hpp"
 #include "game/core/CConsoleMinecraftApp.hpp"
@@ -333,9 +337,10 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
 {
     float frameScale = 1.0f;
 #if LCE_PLATFORM_PC
-    const long long now = System::processTimeInNanoSecs();
+    const long long now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              std::chrono::steady_clock::now().time_since_epoch()).count();
     if (m_lastPointerUpdate != 0)
-        frameScale = std::max(0.0f, std::min(3.0f, static_cast<float>(now - m_lastPointerUpdate) * 60.0e-9f));
+        frameScale = PcCursorMotion::FrameScale(now - m_lastPointerUpdate);
     m_lastPointerUpdate = now;
 #endif
     Minecraft* minecraft = Minecraft::GetInstance();
@@ -383,6 +388,13 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
         else if (m_tapState < ETapState_NoMove && tapState != m_tapState && tapState != ETapState_None)
             m_tapState = ETapState_Cancelled;
 
+#if LCE_PLATFORM_PC
+        const float viewportSpeed = (!gRenderer->IsHiDef() || gApp.GetLocalPlayerCount() > 1) ? 0.6f : 1.0f;
+        PcCursorMotion::Advance(inputX, inputY, frameScale, viewportSpeed,
+                               m_consecutiveInputTicks, pointerX, pointerY);
+        if (m_consecutiveInputTicks >= 15.0f)
+            m_tapState = ETapState_Cancelled;
+#else
         float moveX = inputX * inputX * xDirection * 13.0f * frameScale;
         float moveY = inputY * inputY * yDirection * 13.0f * frameScale;
         float speed = 1.0f;
@@ -404,6 +416,7 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
 
         pointerX = moveX * speed + pointerX;
         pointerY = pointerY - moveY * speed;
+#endif
 #if LCE_PLATFORM_PC
         m_mousePointerActive = false;
 #endif
@@ -1055,6 +1068,7 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
 
     newPointerPos.x -= m_pointerImageOffset.x;
     newPointerPos.y -= m_pointerImageOffset.y;
+#if !LCE_PLATFORM_PC
     if (xDirection != 0.0f)
     {
         if (xDirection == 1.0f)
@@ -1073,6 +1087,9 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
     newPointerPos.x += (float)((int)newPointerPos.x % 2);
     newPointerPos.y = floorf(newPointerPos.y);
     newPointerPos.y += (float)((int)newPointerPos.y % 2);
+#endif
+    // PC rendering rounds the displayed cursor in UIScene_AbstractContainerMenu::tick.
+    // Do not round its stored position: subpixel movement must survive the next frame.
     m_pointerPos = newPointerPos;
     adjustPointerForSafeZone();
 

@@ -69,6 +69,15 @@ jobs:
 
       - name: Set up MSVC build environment
         uses: ilammy/msvc-dev-cmd@v1
+      - name: Check controller cursor timing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path build/cursor-tests -Force | Out-Null
+          cl /nologo /EHsc /std:c++17 /I source tools/tests/pc_cursor_motion_test.cpp /Fo:build/cursor-tests/cursor.obj /Fe:build/cursor-tests/cursor.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./build/cursor-tests/cursor.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile Windows client
         shell: pwsh
         run: |

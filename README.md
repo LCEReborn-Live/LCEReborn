@@ -53,6 +53,10 @@ Client build instructions are in [`docs/pc-platform.md`](docs/pc-platform.md). R
 
 LCEReborn is a community reconstruction project and is not affiliated with or endorsed by Mojang Studios, Microsoft, 4J Studios, or Nintendo. Minecraft is a trademark of Mojang Studios and Microsoft; Wii U is a trademark of Nintendo.
 
+## Special thanks
+
+Special thanks to the team and contributors behind **[LCEReborn](https://github.com/LCEReborn/LCEReborn)**. LCEReborn Live is a fork of their project, and their work on the PC port is the foundation for our client and Live integration.
+
 ## Credits and license
 
 LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party components retain their respective licenses. Game files and assets are not included in this repository or installer.
@@ -93,6 +97,10 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 ### Сборка из исходников
 
 Инструкции по сборке клиента находятся в [`docs/pc-platform.md`](docs/pc-platform.md), а сведения о сборке релизов — в [`docs/live-release.md`](docs/live-release.md).
+
+### Отдельная благодарность
+
+Спасибо команде и участникам **[LCEReborn](https://github.com/LCEReborn/LCEReborn)**. LCEReborn Live — форк этого проекта: их работа над PC-портом стала основой нашего клиента и интеграции Live.
 
 ### Благодарности и лицензия
 

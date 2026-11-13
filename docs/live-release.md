@@ -18,3 +18,9 @@ must import their own base game and Update 688 dumps through the launcher.
 
 The client keeps its Live API endpoint in the launcher source. The workflow does
 not replace it or require API credentials to compile the client.
+
+The API endpoint is `https://api.lcereborn.xyz`; browser sign-in opens
+`https://lcereborn.xyz/authorize`. The same saved account tokens remain valid.
+Existing releases using `api.kerneldev.qzz.io` continue to work through the
+legacy server alias. Relay addresses come from the API rather than being
+hardcoded in the client.

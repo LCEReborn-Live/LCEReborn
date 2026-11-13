@@ -514,7 +514,7 @@ void MainWindow::LiveAccount()
 {
     if (!mLiveToken.isEmpty())
     {
-        QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/sessions/current")};
+        QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/sessions/current")};
         request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
         QNetworkReply* reply = mLiveNetwork->deleteResource(request);
         connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
@@ -532,7 +532,7 @@ void MainWindow::LiveAccount()
         return;
     }
 
-    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/device/start")};
+    QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/device/start")};
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setTransferTimeout(10000);
     mLiveButton->setEnabled(false);
@@ -549,7 +549,7 @@ void MainWindow::LiveAccount()
             return;
         }
         reply->deleteLater();
-        QUrl url("https://api.kerneldev.qzz.io/authorize");
+        QUrl url("https://lcereborn.xyz/authorize");
         url.setQuery("v=2");
         url.setFragment(userCode);
         if (!QDesktopServices::openUrl(url))
@@ -567,7 +567,7 @@ void MainWindow::LiveAccount()
         connect(timer, &QTimer::timeout, this, [this, timer, notice, deviceCode] {
             if (timer->property("waiting").toBool()) return;
             timer->setProperty("waiting", true);
-            QNetworkRequest poll{QUrl("https://api.kerneldev.qzz.io/v1/device/token")};
+            QNetworkRequest poll{QUrl("https://api.lcereborn.xyz/v1/device/token")};
             poll.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
             poll.setTransferTimeout(10000);
             QJsonObject body;
@@ -613,7 +613,7 @@ void MainWindow::RestoreLiveSession()
     const QString token = LoadLiveToken();
     if (token.isEmpty()) return;
     mLiveButton->setEnabled(false);
-    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/me")};
+    QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/me")};
     request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
     request.setTransferTimeout(10000);
     QNetworkReply* reply = mLiveNetwork->get(request);
@@ -658,7 +658,7 @@ void MainWindow::RefreshLiveCosmetics(std::function<void()> completion)
         }
     };
 
-    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/me/cosmetics")};
+    QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/me/cosmetics")};
     request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
     request.setTransferTimeout(10000);
     QNetworkReply* metadataReply = mLiveNetwork->get(request);
@@ -704,7 +704,7 @@ void MainWindow::RefreshLiveCosmetics(std::function<void()> completion)
                 oneFinished();
                 return;
             }
-            QNetworkRequest assetRequest{QUrl(QString("https://api.kerneldev.qzz.io/v1/users/%1/%2").arg(userId).arg(kind))};
+            QNetworkRequest assetRequest{QUrl(QString("https://api.lcereborn.xyz/v1/users/%1/%2").arg(userId).arg(kind))};
             assetRequest.setTransferTimeout(10000);
             QNetworkReply* assetReply = mLiveNetwork->get(assetRequest);
             connect(assetReply, &QNetworkReply::finished, this, [this, assetReply, session, path, skinAsset, oneFinished] {
@@ -796,7 +796,7 @@ void MainWindow::SendLivePresence()
             }
         }
     }
-    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/presence")};
+    QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/presence")};
     request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setTransferTimeout(10000);
@@ -812,7 +812,7 @@ void MainWindow::RefreshLiveFriends()
     const QStringList paths = {"/friends", "/friends/requests", "/friends/requests/sent"};
     for (int index = 0; index < paths.size(); ++index)
     {
-        QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1" + paths[index])};
+        QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1" + paths[index])};
         request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
         request.setTransferTimeout(10000);
         QNetworkReply* reply = mLiveNetwork->get(request);
@@ -857,7 +857,7 @@ void MainWindow::LiveFriendAction(const QByteArray& method, const QString& path,
 {
     if (mLiveToken.isEmpty()) { mFriendsMessage->setText("Sign in to LCE Live to manage friends."); return; }
     const QString session = mLiveToken;
-    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1" + path)};
+    QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1" + path)};
     request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setTransferTimeout(10000);
@@ -971,7 +971,7 @@ void MainWindow::LoadLiveFriendFace(qint64 userId, QLabel* target)
     if (mFriendFacesPending.contains(userId)) return;
 
     mFriendFacesPending.insert(userId);
-    QNetworkRequest request{QUrl(QString("https://api.kerneldev.qzz.io/v1/users/%1/skin").arg(userId))};
+    QNetworkRequest request{QUrl(QString("https://api.lcereborn.xyz/v1/users/%1/skin").arg(userId))};
     request.setTransferTimeout(8000);
     QNetworkReply* reply = mLiveNetwork->get(request);
     QPointer<QLabel> safeTarget(target);
@@ -1013,7 +1013,7 @@ void MainWindow::PollLiveInvites()
     if (mLiveToken.isEmpty() || mInvitePollPending || mInvitePopup) return;
     mInvitePollPending = true;
     const QString session = mLiveToken;
-    QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/game-invites")};
+    QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/game-invites")};
     request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
     request.setTransferTimeout(10000);
     QNetworkReply* reply = mLiveNetwork->get(request);
@@ -1090,7 +1090,7 @@ void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QStr
             accept->setEnabled(false);
             decline->setEnabled(false);
             const QString path = QString("/friends/requests/%1").arg(ownerId) + (allow ? "/accept" : "");
-            QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1" + path)};
+            QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1" + path)};
             request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
             request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
             request.setTransferTimeout(10000);
@@ -1132,7 +1132,7 @@ void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QStr
         });
         connect(decline, &GameButton::clicked, this, [this, toast, ownerId] {
             toast->close();
-            QNetworkRequest request{QUrl(QString("https://api.kerneldev.qzz.io/v1/game-invites/%1").arg(ownerId))};
+            QNetworkRequest request{QUrl(QString("https://api.lcereborn.xyz/v1/game-invites/%1").arg(ownerId))};
             request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
             request.setTransferTimeout(10000);
             QNetworkReply* reply = mLiveNetwork->deleteResource(request);
@@ -1381,7 +1381,7 @@ void MainWindow::StartGame()
             QMessageBox::warning(this, "Live", "Could not start Live networking.");
             return;
         }
-        const QJsonObject init{{"apiUrl", "https://api.kerneldev.qzz.io"}, {"token", mLiveToken},
+        const QJsonObject init{{"apiUrl", "https://api.lcereborn.xyz"}, {"token", mLiveToken},
                                {"username", mLiveName}, {"directory", liveDirectory}};
         bridge->write(QJsonDocument(init).toJson(QJsonDocument::Compact) + '\n');
         QTimer* inviteTimer = new QTimer(bridge);
@@ -1392,7 +1392,7 @@ void MainWindow::StartGame()
             QFile::remove(inviteFile);
             if (mLiveToken.isEmpty()) return;
             inviteTimer->setProperty("busy", true);
-            QNetworkRequest request{QUrl("https://api.kerneldev.qzz.io/v1/friends")};
+            QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/friends")};
             request.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
             request.setTransferTimeout(10000);
             QNetworkReply* reply = mLiveNetwork->get(request);
@@ -1417,7 +1417,7 @@ void MainWindow::StartGame()
                 if (!safeTimer) return;
                 safeTimer->setProperty("busy", false);
                 if (!accepted || name.isEmpty()) return;
-                QNetworkRequest invite{QUrl("https://api.kerneldev.qzz.io/v1/servers/mine/invites")};
+                QNetworkRequest invite{QUrl("https://api.lcereborn.xyz/v1/servers/mine/invites")};
                 invite.setRawHeader("Authorization", QByteArray("Bearer ") + mLiveToken.toUtf8());
                 invite.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
                 invite.setTransferTimeout(10000);

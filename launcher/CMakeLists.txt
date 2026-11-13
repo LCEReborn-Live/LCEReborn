@@ -45,9 +45,15 @@ qt_add_executable(LCERebornLauncher WIN32 MACOSX_BUNDLE
 
 set_source_files_properties("${CMAKE_SOURCE_DIR}/resources/launcher/icon.png" PROPERTIES QT_RESOURCE_ALIAS icon.png)
 set_source_files_properties("${CMAKE_SOURCE_DIR}/resources/pc/icon.png" PROPERTIES QT_RESOURCE_ALIAS mark.png)
+foreach(mode battle tumble glide)
+  set_source_files_properties("${CMAKE_SOURCE_DIR}/resources/pc/minigames/${mode}.png" PROPERTIES QT_RESOURCE_ALIAS "${mode}.png")
+endforeach()
 qt_add_resources(LCERebornLauncher launcher_resources
   PREFIX /launcher
-  FILES "${CMAKE_SOURCE_DIR}/resources/launcher/icon.png" "${CMAKE_SOURCE_DIR}/resources/pc/icon.png")
+  FILES "${CMAKE_SOURCE_DIR}/resources/launcher/icon.png" "${CMAKE_SOURCE_DIR}/resources/pc/icon.png"
+        "${CMAKE_SOURCE_DIR}/resources/pc/minigames/battle.png"
+        "${CMAKE_SOURCE_DIR}/resources/pc/minigames/tumble.png"
+        "${CMAKE_SOURCE_DIR}/resources/pc/minigames/glide.png")
 
 add_custom_target(lce_launcher_build_info
   COMMAND "${CMAKE_COMMAND}" -DSOURCE_DIR="${CMAKE_SOURCE_DIR}" -DOUTPUT="${CMAKE_CURRENT_BINARY_DIR}/BuildInfo.hpp"
@@ -56,6 +62,15 @@ add_custom_target(lce_launcher_build_info
 add_dependencies(LCERebornLauncher lce_launcher_build_info)
 target_include_directories(LCERebornLauncher PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_SOURCE_DIR}/source")
 target_link_libraries(LCERebornLauncher PRIVATE Qt6::Widgets Qt6::Network)
+option(LCE_BUILD_LIVE_JOIN_TESTS "Build standalone Live join URL and local IPC checks" OFF)
+if(LCE_BUILD_LIVE_JOIN_TESTS)
+  add_executable(LCERebornLiveJoinUrlTest "${CMAKE_SOURCE_DIR}/tools/tests/live_join_test.cpp")
+  target_link_libraries(LCERebornLiveJoinUrlTest PRIVATE Qt6::Core)
+  add_executable(LCERebornLiveJoinIpcTest "${CMAKE_SOURCE_DIR}/tools/tests/live_join_ipc_test.cpp")
+  target_link_libraries(LCERebornLiveJoinIpcTest PRIVATE Qt6::Core Qt6::Network)
+  set_target_properties(LCERebornLiveJoinUrlTest LCERebornLiveJoinIpcTest PROPERTIES
+    CXX_STANDARD 17 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()
 set_target_properties(LCERebornLauncher PROPERTIES
   CXX_STANDARD 17
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")

@@ -19,6 +19,8 @@
 
 - Browser-based Live sign-in with a persistent launcher session.
 - Friends, launcher and in-game presence, invitations, and a list of joinable worlds.
+- Join an available friend's online world from the website or launcher; browser links open the existing launcher and start the game when needed.
+- Original Battle, Tumble and Glide icons alongside friends' activity in the launcher and on the website.
 - Live matchmaking for Battle, Tumble, Glide, and Build games with compatible open sessions.
 - Direct connections with NAT traversal when possible, with relay fallback.
 - Live account skins and capes in game.
@@ -71,6 +73,8 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 
 - Вход в Live через браузер с сохранением сессии в лаунчере.
 - Друзья, статусы «в лаунчере» и «в игре», приглашения и список доступных миров.
+- Подключение к доступному онлайн-миру друга с сайта или из лаунчера: браузерная ссылка открывает лаунчер и при необходимости запускает игру.
+- Оригинальные иконки Battle, Tumble и Glide рядом с активностью друзей на сайте и в лаунчере.
 - Подключение напрямую с обходом NAT, когда это возможно, и через relay в остальных случаях.
 - Скины и плащи Live-аккаунта в игре.
 - Оригинальное меню таблиц рекордов LCE с глобальными результатами, результатами друзей и личным рекордом.

@@ -35,3 +35,20 @@ Name: "{autodesktop}\LCEReborn Live"; Filename: "{app}\LCERebornLauncher.exe"; T
 
 [Run]
 Filename: "{app}\LCERebornLauncher.exe"; Description: "Launch LCEReborn Live"; Flags: postinstall nowait skipifsilent
+
+[Registry]
+Root: HKCU; Subkey: "Software\Classes\lcereborn"; ValueType: string; ValueName: ""; ValueData: "URL:LCEReborn Live"
+Root: HKCU; Subkey: "Software\Classes\lcereborn"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCU; Subkey: "Software\Classes\lcereborn\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\LCERebornLauncher.exe"",0"
+Root: HKCU; Subkey: "Software\Classes\lcereborn\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\LCERebornLauncher.exe"" --live-join ""%1"""
+
+[Code]
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  CurrentCommand: String;
+begin
+  if CurUninstallStep = usPostUninstall then
+    if RegQueryStringValue(HKCU, 'Software\Classes\lcereborn\shell\open\command', '', CurrentCommand) then
+      if CompareText(CurrentCommand, ExpandConstant('"{app}\LCERebornLauncher.exe" --live-join "%1"')) = 0 then
+        RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\lcereborn');
+end;

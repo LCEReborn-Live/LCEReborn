@@ -59,6 +59,7 @@
 #include "GameArt.hpp"
 #include "GameRunner.hpp"
 #include "LauncherPaths.hpp"
+#include "LiveJoin.hpp"
 #include "NewsTab.hpp"
 #include "ProfileDialog.hpp"
 #include "ProfilePopup.hpp"
@@ -522,7 +523,8 @@ void MainWindow::LiveAccount()
         SaveLiveToken(QString());
         mLiveName.clear();
         mLiveUserId = 0; mLiveSkinCachePath.clear(); mLiveCapeCachePath.clear();
-        mFriends = {}; mIncomingFriends = {}; mSentFriends = {};
+        mFriends = {}; mIncomingFriends = {}; mSentFriends = {}; mLiveWorlds = {};
+        mPendingLiveJoinId = 0; mPendingLiveJoinOwner.clear(); ++mLiveJoinGeneration;
         RenderLiveFriends();
         mSeenInvites.clear();
         mSeenFriendRequests.clear();
@@ -601,6 +603,7 @@ void MainWindow::LiveAccount()
                 RefreshLiveFriends();
                 RefreshLiveCosmetics();
                 PollLiveInvites();
+                ContinueLiveJoin();
             });
         });
         notice->show();
@@ -612,6 +615,7 @@ void MainWindow::RestoreLiveSession()
 {
     const QString token = LoadLiveToken();
     if (token.isEmpty()) return;
+    mLiveSessionRestoring = true;
     mLiveButton->setEnabled(false);
     QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/me")};
     request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
@@ -623,13 +627,15 @@ void MainWindow::RestoreLiveSession()
         const QString name = account.value("username").toString();
         reply->deleteLater();
         mLiveButton->setEnabled(true);
-        if (status == 401) { SaveLiveToken(QString()); return; }
+        mLiveSessionRestoring = false;
+        if (status == 401) { SaveLiveToken(QString()); ContinueLiveJoin(); return; }
         if (status != 200 || name.isEmpty()) { mLog->AddLauncherMessage(LogLevel::Warn, "Could not restore Live session. Check your connection."); return; }
         mLiveName = name;
         mLiveUserId = account.value("id").toVariant().toLongLong();
         mLiveToken = token;
         mLiveButton->setText("Live Sign Out");
         RefreshProfiles(); SendLivePresence(); RefreshLiveFriends(); RefreshLiveCosmetics(); PollLiveInvites();
+        ContinueLiveJoin();
     });
 }
 
@@ -751,6 +757,16 @@ QWidget* MainWindow::CreateLiveFriendsPage()
     send->setFixedSize(135, 40); refresh->setFixedSize(135, 40);
     add->addWidget(mFriendName, 1); add->addWidget(send); add->addWidget(refresh);
     layout->addLayout(add);
+    GameButton* browserJoins = new GameButton("Enable browser joins", page);
+    browserJoins->SetPixelSize(14);
+    browserJoins->setToolTip("Allow lcereborn.xyz to open this launcher. Useful for portable copies.");
+    connect(browserJoins, &GameButton::clicked, this, [this] {
+        const bool ok = LiveJoin::RegisterBrowserHandler();
+        QMessageBox::information(this, "LCE Live", ok
+            ? "Browser joins enabled for this launcher. Keep this portable folder in the same location."
+            : "Could not register browser joins. On Windows, try installing the Live client.");
+    });
+    layout->addWidget(browserJoins, 0, Qt::AlignLeft);
     mFriendsMessage = new QLabel(page);
     mFriendsMessage->setWordWrap(true);
     mFriendsMessage->setFont(GameFont(14));
@@ -809,7 +825,7 @@ void MainWindow::RefreshLiveFriends()
 {
     if (mLiveToken.isEmpty()) { RenderLiveFriends(); return; }
     const QString session = mLiveToken;
-    const QStringList paths = {"/friends", "/friends/requests", "/friends/requests/sent"};
+    const QStringList paths = {"/friends", "/friends/requests", "/friends/requests/sent", "/servers"};
     for (int index = 0; index < paths.size(); ++index)
     {
         QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1" + paths[index])};
@@ -821,7 +837,10 @@ void MainWindow::RefreshLiveFriends()
             const QJsonObject data = QJsonDocument::fromJson(reply->readAll()).object();
             reply->deleteLater();
             if (session != mLiveToken) return;
-            if (status != 200) { mFriendsMessage->setText("Could not refresh friends. Check your connection."); return; }
+            if (status != 200) {
+                if (index == 3) { mLiveWorlds = {}; RenderLiveFriends(); }
+                mFriendsMessage->setText("Could not refresh friends. Check your connection."); return;
+            }
             if (index == 0) mFriends = data.value("friends").toArray();
             else if (index == 1)
             {
@@ -847,7 +866,8 @@ void MainWindow::RefreshLiveFriends()
                     }
                 }
             }
-            else mSentFriends = data.value("sent").toArray();
+            else if (index == 2) mSentFriends = data.value("sent").toArray();
+            else mLiveWorlds = data.value("servers").toArray();
             RenderLiveFriends();
         });
     }
@@ -916,19 +936,24 @@ void MainWindow::RenderLiveFriends()
             row->setStyleSheet("background:rgba(20,18,18,220); border-bottom:1px solid rgba(255,255,255,35);");
             QHBoxLayout* line = new QHBoxLayout(row); line->setContentsMargins(8, 5, 8, 5); line->setSpacing(10);
             QString name = entry.value("username").toString();
+            QString presence;
+            QString activityIcon;
             if (type == 0)
             {
-                QString presence = "Offline";
+                presence = "Offline";
                 if (entry.value("online").toBool())
                 {
                     const QString status = entry.value("presence").toString();
                     const QString activity = entry.value("activity").toString();
                     const QMap<QString, QString> games{{"battle", "Battle"}, {"tumble", "Tumble"}, {"glide", "Glide"}, {"build", "Build"}};
                     if (status == "game" || status == "minigame") presence = "Online | In Game";
+                    else if (status == "website") presence = "Online | On Website";
                     else presence = "Online | In Launcher";
-                    if (status == "minigame" && games.contains(activity)) presence += " | " + games.value(activity);
+                    if (status == "minigame" && games.contains(activity)) {
+                        presence += " | " + games.value(activity);
+                        if (QStringList{"battle", "tumble", "glide"}.contains(activity)) activityIcon = ":/launcher/" + activity + ".png";
+                    }
                 }
-                name += "  |  " + presence;
             }
             QLabel* face = new QLabel(name.left(1).toUpper(), row);
             face->setAlignment(Qt::AlignCenter);
@@ -937,14 +962,48 @@ void MainWindow::RenderLiveFriends()
             face->setStyleSheet("color:#ffffff; background:#55504d; border:2px solid #a83232;");
             LoadLiveFriendFace(id, face);
             line->addWidget(face);
+            QVBoxLayout* words = new QVBoxLayout;
+            words->setSpacing(3);
             QLabel* player = new QLabel(name, row); player->setFont(GameFont(15)); player->setStyleSheet("color:#ffffff; background:transparent; border:0;");
-            line->addWidget(player, 1);
+            player->setTextFormat(Qt::PlainText);
+            words->addWidget(player);
+            if (!presence.isEmpty()) {
+                QHBoxLayout* statusLine = new QHBoxLayout;
+                statusLine->setSpacing(6);
+                if (!activityIcon.isEmpty()) {
+                    QLabel* icon = new QLabel(row);
+                    icon->setFixedSize(24, 24);
+                    icon->setPixmap(QPixmap(activityIcon).scaled(24, 24, Qt::KeepAspectRatio, Qt::FastTransformation));
+                    icon->setStyleSheet("background:transparent; border:0;");
+                    statusLine->addWidget(icon);
+                }
+                QLabel* status = new QLabel(presence, row);
+                status->setFont(GameFont(12)); status->setWordWrap(true);
+                status->setStyleSheet("color:#d8ded1; background:transparent; border:0;");
+                statusLine->addWidget(status, 1);
+                words->addLayout(statusLine);
+            }
+            line->addLayout(words, 1);
             auto button = [this, line, row, id](const QString& text, const QByteArray& method, const QString& path) {
-                GameButton* action = new GameButton(text, row); action->SetPixelSize(14); action->SetReadableFont(false); action->setFixedSize(125, 36);
+                GameButton* action = new GameButton(text, row); action->SetPixelSize(14); action->SetReadableFont(false); action->setFixedSize(95, 36);
                 line->addWidget(action);
                 connect(action, &GameButton::clicked, this, [this, id, method, path] { LiveFriendAction(method, path.arg(id)); });
             };
-            if (type == 0) button("Remove", "DELETE", "/friends/%1");
+            if (type == 0) {
+                bool joinable = false;
+                for (const auto& world : mLiveWorlds) {
+                    const auto listing = world.toObject();
+                    if (listing.value("owner_id").toVariant().toLongLong() == id
+                        && (listing.value("direct").isObject() || listing.value("relay").isObject())) joinable = true;
+                }
+                if (joinable && entry.value("online").toBool()) {
+                    GameButton* join = new GameButton("Join", row);
+                    join->SetPixelSize(14); join->setFixedSize(85, 36);
+                    line->addWidget(join);
+                    connect(join, &GameButton::clicked, this, [this, id] { JoinLiveWorld(id); });
+                }
+                button("Remove", "DELETE", "/friends/%1");
+            }
             else if (type == 1) {
                 button("Accept", "POST", "/friends/requests/%1/accept");
                 button("Decline", "DELETE", "/friends/requests/%1");
@@ -1159,15 +1218,89 @@ void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QStr
     animation->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
-void MainWindow::AcceptLiveInvite(const QString& owner)
+void MainWindow::JoinLiveWorld(qint64 ownerId)
 {
-    if (!mRunner->IsRunning()) Play();
-    if (!mRunner->IsRunning() || mLiveDirectory.isEmpty()) return;
-    WaitForLiveJoin(owner);
+    if (ownerId <= 0 || ownerId > 9007199254740991LL) return;
+    showNormal(); raise(); activateWindow();
+    ShowPage(FriendsPage);
+    ++mLiveJoinGeneration;
+    mPendingLiveJoinOwner.clear();
+    mPendingLiveJoinId = ownerId;
+    ContinueLiveJoin();
 }
 
-void MainWindow::WaitForLiveJoin(const QString& owner, int attempt)
+void MainWindow::ContinueLiveJoin()
 {
+    if (!mPendingLiveJoinId || mLiveSessionRestoring || mLiveJoinRequestPending) return;
+    if (mLiveToken.isEmpty()) {
+        mFriendsMessage->setText("Sign in to Live to join this world. The join request will resume after sign-in.");
+        if (mLiveButton->isEnabled()) LiveAccount();
+        return;
+    }
+    const qint64 ownerId = mPendingLiveJoinId;
+    if (ownerId == mLiveUserId) {
+        mPendingLiveJoinId = 0;
+        mFriendsMessage->setText("This is your own world.");
+        return;
+    }
+    mLiveJoinRequestPending = true;
+    const QString session = mLiveToken;
+    QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/servers")};
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + session.toUtf8());
+    request.setTransferTimeout(10000);
+    QNetworkReply* reply = mLiveNetwork->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, session, ownerId] {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QJsonArray worlds = QJsonDocument::fromJson(reply->readAll()).object().value("servers").toArray();
+        reply->deleteLater();
+        mLiveJoinRequestPending = false;
+        if (session != mLiveToken || ownerId != mPendingLiveJoinId) { ContinueLiveJoin(); return; }
+        if (status == 401) {
+            mLiveToken.clear(); mLiveName.clear(); mLiveUserId = 0;
+            SaveLiveToken(QString());
+            mLiveButton->setText("Live Sign In");
+            ContinueLiveJoin();
+            return;
+        }
+        if (status != 200) {
+            mPendingLiveJoinId = 0;
+            QMessageBox::warning(this, "LCE Live", "Could not check access to this world. Check your connection and Live sign-in.");
+            return;
+        }
+        for (const auto& value : worlds) {
+            const QJsonObject world = value.toObject();
+            if (world.value("owner_id").toVariant().toLongLong() == ownerId
+                && !world.value("owner").toString().isEmpty()
+                && (world.value("direct").isObject() || world.value("relay").isObject())) {
+                mPendingLiveJoinId = 0;
+                AcceptLiveInvite(world.value("owner").toString());
+                return;
+            }
+        }
+        mPendingLiveJoinId = 0;
+        QMessageBox::information(this, "LCE Live", "This world is no longer available, or this account does not have permission to join it.");
+    });
+}
+
+void MainWindow::AcceptLiveInvite(const QString& owner)
+{
+    if (mLiveToken.isEmpty()) return;
+    if (!mRunner->IsRunning()) {
+        const QString problem = GameRunner::CheckGameReady();
+        if (!problem.isEmpty()) { QMessageBox::information(this, "LCE Live", problem); return; }
+        if (!mStore.Selected()) { QMessageBox::information(this, "LCE Live", "Choose a game profile before joining."); return; }
+    }
+    mPendingLiveJoinOwner = owner;
+    if (mRunner->IsRunning()) {
+        mFriendsMessage->setText("Joining " + owner + ". If you are in a world, return to the game's main menu.");
+        WaitForLiveJoin(owner);
+    } else Play();
+}
+
+void MainWindow::WaitForLiveJoin(const QString& owner, int attempt, quint64 generation)
+{
+    if (generation == 0) generation = ++mLiveJoinGeneration;
+    if (generation != mLiveJoinGeneration || mLiveToken.isEmpty()) return;
     if (!mRunner->IsRunning() || mLiveDirectory.isEmpty()) return;
     QFile file(mLiveDirectory + "/directory.json");
     if (file.open(QIODevice::ReadOnly))
@@ -1179,13 +1312,19 @@ void MainWindow::WaitForLiveJoin(const QString& owner, int attempt)
             const int port = server.value("port").toInt();
             if (server.value("owner").toString().compare(owner, Qt::CaseInsensitive) != 0 || port < 1 || port > 65535) continue;
             QSaveFile command(mLiveDirectory + "/join.txt");
-            if (command.open(QIODevice::WriteOnly) && command.write(QByteArray::number(port)) > 0 && command.commit())
+            if (command.open(QIODevice::WriteOnly) && command.write(QByteArray::number(port)) > 0 && command.commit()) {
+                mPendingLiveJoinOwner.clear();
+                mLog->AddLauncherMessage(LogLevel::Info, "Live join queued for " + owner + ". Return to the main menu if a world is open.");
                 return;
+            }
             break;
         }
     }
-    if (attempt < 20) QTimer::singleShot(1000, this, [this, owner, attempt] { WaitForLiveJoin(owner, attempt + 1); });
-    else QMessageBox::warning(this, "LCE Live", QString("%1's world is unavailable. Try opening the Join list.").arg(owner));
+    if (attempt < 60) QTimer::singleShot(1000, this, [this, owner, attempt, generation] { WaitForLiveJoin(owner, attempt + 1, generation); });
+    else {
+        mPendingLiveJoinOwner.clear();
+        QMessageBox::warning(this, "LCE Live", QString("%1's world is unavailable. Try opening the Join list.").arg(owner));
+    }
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event)
@@ -1261,10 +1400,15 @@ void MainWindow::RefreshStatus()
 
 void MainWindow::Play()
 {
+    if (mGameLaunchPending || mRunner->IsRunning()) return;
     if (mLiveToken.isEmpty()) { StartGame(); return; }
+    mGameLaunchPending = true;
     mPlay->setEnabled(false);
-    RefreshLiveCosmetics([this] {
+    const QString session = mLiveToken;
+    RefreshLiveCosmetics([this, session] {
+        mGameLaunchPending = false;
         mPlay->setEnabled(true);
+        if (session != mLiveToken) { mPendingLiveJoinOwner.clear(); return; }
         StartGame();
     });
 }
@@ -1457,6 +1601,7 @@ void MainWindow::StartGame()
 
 void MainWindow::OnGameStarted()
 {
+    if (!mPendingLiveJoinOwner.isEmpty()) WaitForLiveJoin(mPendingLiveJoinOwner);
     RefreshStatus();
     const Profile* profile = mStore.Selected();
     if (profile != nullptr && (profile->afterLaunch == AfterLaunch::Hide || profile->afterLaunch == AfterLaunch::Close))
@@ -1469,6 +1614,8 @@ void MainWindow::OnGameStarted()
 
 void MainWindow::OnGameFinished(int exitCode, bool crashed)
 {
+    ++mLiveJoinGeneration;
+    mPendingLiveJoinOwner.clear();
     if (mLiveBridge) mLiveBridge->closeWriteChannel();
     if (crashed || exitCode != 0)
         mLog->AddLauncherMessage(LogLevel::Error, crashed ? QString("The game crashed.")

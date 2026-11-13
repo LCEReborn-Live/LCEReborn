@@ -35,6 +35,7 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(ProfileStore& store, QWidget* parent = nullptr);
+    void JoinLiveWorld(qint64 ownerId);
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -54,7 +55,8 @@ private:
     void PollLiveInvites();
     void ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world, bool friendRequest = false);
     void AcceptLiveInvite(const QString& owner);
-    void WaitForLiveJoin(const QString& owner, int attempt = 0);
+    void WaitForLiveJoin(const QString& owner, int attempt = 0, quint64 generation = 0);
+    void ContinueLiveJoin();
     QWidget* CreateLiveFriendsPage();
     void RefreshLiveFriends();
     void RenderLiveFriends();
@@ -92,6 +94,13 @@ private:
     QLineEdit* mFriendName = nullptr;
     QLabel* mFriendsMessage = nullptr;
     QJsonArray mFriends, mIncomingFriends, mSentFriends;
+    QJsonArray mLiveWorlds;
+    qint64 mPendingLiveJoinId = 0;
+    QString mPendingLiveJoinOwner;
+    bool mLiveSessionRestoring = false;
+    bool mLiveJoinRequestPending = false;
+    bool mGameLaunchPending = false;
+    quint64 mLiveJoinGeneration = 0;
     QSet<qint64> mFriendFacesPending;
     QHash<qint64, QPixmap> mFriendFaceCache;
     QHash<qint64, qint64> mFriendFaceFetchedAt;

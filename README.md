@@ -1,5 +1,7 @@
 <div align="center">
 
+![LCEReborn Live banner](docs/assets/lcereborn-live-banner.png)
+
 # LCEReborn Live
 
 **Minecraft: Wii U Edition, rebuilt for PC and connected with friends.**

@@ -29,6 +29,8 @@ ProfilesTab::ProfilesTab(ProfileStore& store, QWidget* parent)
     auto* editButton = new QPushButton("Edit", this);
     auto* openButton = new QPushButton("Open game folder", this);
     auto* reimportButton = new QPushButton("Re-import game files", this);
+    auto* browserJoins = new QPushButton("Enable browser joins", this);
+    browserJoins->setToolTip("Allow lcereborn.xyz to open this launcher for game invitations and world joins.");
     auto* buttons = new QHBoxLayout;
     buttons->setSpacing(8);
     buttons->addWidget(newButton);
@@ -37,6 +39,7 @@ ProfilesTab::ProfilesTab(ProfileStore& store, QWidget* parent)
     buttons->addStretch(1);
     buttons->addWidget(openButton);
     buttons->addWidget(reimportButton);
+    buttons->addWidget(browserJoins);
 
     auto* well = new GameWell(this);
     auto* wellLayout = new QVBoxLayout(well);
@@ -54,6 +57,7 @@ ProfilesTab::ProfilesTab(ProfileStore& store, QWidget* parent)
     connect(mDelete, &QPushButton::clicked, this, &ProfilesTab::DeleteProfile);
     connect(openButton, &QPushButton::clicked, this, &ProfilesTab::OpenGameFolder);
     connect(reimportButton, &QPushButton::clicked, this, &ProfilesTab::ReimportRequested);
+    connect(browserJoins, &QPushButton::clicked, this, &ProfilesTab::BrowserJoinsRequested);
     connect(mList, &QListWidget::itemDoubleClicked, this, &ProfilesTab::EditProfile);
     connect(mList, &QListWidget::itemSelectionChanged, this, [this] {
         if (!mReloading && !CurrentId().isEmpty())

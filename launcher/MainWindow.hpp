@@ -5,8 +5,6 @@
 #include <QPointer>
 #include <QHash>
 #include <QSet>
-#include <QJsonArray>
-#include <QJsonObject>
 #include <QPixmap>
 #include <functional>
 
@@ -18,7 +16,6 @@ class GameRunner;
 class NewsTab;
 class QNetworkAccessManager;
 class QProcess;
-class QLineEdit;
 class QLabel;
 class Panorama;
 class PlayButton;
@@ -54,14 +51,11 @@ private:
     void RestoreLiveSession();
     void PollLiveInvites();
     void ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world, bool friendRequest = false);
+    void PollLiveFriendRequests();
     void AcceptLiveInvite(const QString& owner);
     void WaitForLiveJoin(const QString& owner, int attempt = 0, quint64 generation = 0);
     void ContinueLiveJoin();
-    QWidget* CreateLiveFriendsPage();
-    void RefreshLiveFriends();
-    void RenderLiveFriends();
-    void LoadLiveFriendFace(qint64 userId, QLabel* target);
-    void LiveFriendAction(const QByteArray& method, const QString& path, const QJsonObject& body = QJsonObject());
+    void LoadLivePlayerFace(qint64 userId, QLabel* target);
     void SendLivePresence();
     void OnGameStarted();
     void OnGameFinished(int exitCode, bool crashed);
@@ -90,20 +84,16 @@ private:
     QSet<qint64> mSeenFriendRequests;
     QPointer<QWidget> mInvitePopup;
     bool mInvitePollPending = false;
-    QWidget* mFriendsList = nullptr;
-    QLineEdit* mFriendName = nullptr;
-    QLabel* mFriendsMessage = nullptr;
-    QJsonArray mFriends, mIncomingFriends, mSentFriends;
-    QJsonArray mLiveWorlds;
+    bool mFriendRequestsPollPending = false;
     qint64 mPendingLiveJoinId = 0;
     QString mPendingLiveJoinOwner;
     bool mLiveSessionRestoring = false;
     bool mLiveJoinRequestPending = false;
     bool mGameLaunchPending = false;
     quint64 mLiveJoinGeneration = 0;
-    QSet<qint64> mFriendFacesPending;
-    QHash<qint64, QPixmap> mFriendFaceCache;
-    QHash<qint64, qint64> mFriendFaceFetchedAt;
+    QSet<qint64> mPlayerFacesPending;
+    QHash<qint64, QPixmap> mPlayerFaceCache;
+    QHash<qint64, qint64> mPlayerFaceFetchedAt;
     QProcess* mLiveBridge = nullptr;
     Panorama* mPanorama;
     QStackedWidget* mRoot;

@@ -16,6 +16,7 @@ public:
 
 signals:
     void ReimportRequested();
+    void BrowserJoinsRequested();
 
 private:
     void Reload();

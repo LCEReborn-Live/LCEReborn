@@ -61,7 +61,7 @@ if LINUX:
                       "tls", "wayland-decoration-client", "wayland-graphics-integration-client",
                       "wayland-shell-integration", "xcbglintegrations")
     QT_PLATFORMS = ("libqxcb.so", "libqwayland.so")
-    ALLOWED_NAME = re.compile(r"(^[^.]+$|\.so(\.\d+)*$|\.(png|ico|txt|mp3)$)")
+    ALLOWED_NAME = re.compile(r"(^[^.]+$|\.so(\.\d+)*$|\.(png|ico|txt|mp3|js|json)$)")
 else:
     SYSTEM = "pc"
     PROGRAMS = ("LCEReborn.exe", "LCERebornLauncher.exe", "LCERebornServer.exe", "LCERebornUpdateHelper.exe")

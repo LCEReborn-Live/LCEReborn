@@ -52,6 +52,7 @@ public:
     virtual void HandleCharInput(unsigned int character);
     virtual uint32_t getType();
     void SetNavigation(const std::string& up, const std::string& down);
+    void CopyNavigationFrom(FJ_Base& source);
 
 protected:
     friend class FJ_BookAndQuillMenu;

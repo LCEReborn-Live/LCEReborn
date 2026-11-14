@@ -567,3 +567,12 @@ void FJ_Base::SetNavigation(const std::string& up, const std::string& down)
     m_navUpName = up;
     m_navDownName = down;
 }
+
+void FJ_Base::CopyNavigationFrom(FJ_Base& source)
+{
+    m_navUpName = source.m_navUpName;
+    m_navDownName = source.m_navDownName;
+    m_navLeftName = source.m_navLeftName;
+    m_navRightName = source.m_navRightName;
+    setTabIndex(source.getTabIndex());
+}

@@ -1,6 +1,8 @@
 #include "game/ui/UIScene_MainMenu.hpp"
 #include "game/core/StringIds.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "game/core/CConsoleMinecraftApp.hpp"
@@ -33,6 +35,8 @@
 #include "game/ui/UIPacksPage.hpp"
 #include "game/ui/UIScene_LiveFriends.hpp"
 #include "game/ui/FJ_Base.hpp"
+#include "game/ui/FJ_Factory.hpp"
+#include "game/ui/FJ_FuiNode.hpp"
 #if LCE_PLATFORM_PC
 #include "platform/pc/PcLiveBridge.hpp"
 #endif
@@ -59,6 +63,7 @@ static const EUIScene s_componentDRC = EUIScene_Panorama;
 static const EUIScene s_componentTV = EUIScene_Logo;
 static EUIScene s_nextScene = EUIScene_Count;
 static Random* s_splashRandom = new Random();
+static const char* const s_nativeMenuButtonSymbol = "fourj.Buttons.FJ_MenuButton_Normal";
 
 }
 
@@ -86,42 +91,7 @@ UIScene_MainMenu::UIScene_MainMenu(int sceneType, void*, UILayer* layer)
     m_buttons[7].init(UIString(L"LCE Live"), 7);
     handleReload();
     doHorizontalResizeCheck();
-#if LCE_PLATFORM_PC
-    if (PcLiveBridge::Enabled())
-    {
-        // Put Packs and LCE Live together, with Exit Game as the last row.
-        const float left = m_buttons[5].getXPos();
-        const float fullWidth = m_buttons[5].getWidth();
-        const float gap = 4.0f;
-        const float halfWidth = (fullWidth - gap) * 0.5f;
-        // Place the split row directly below Help & Options, using the actual
-        // FUI control bounds so the spacing remains correct at each UI scale.
-        const float rowGap = 5.0f;
-        const float rowY = m_buttons[4].getYPos() + m_buttons[4].getHeight() + rowGap;
-        const float rowHeight = m_buttons[5].getHeight();
-
-        FJ_FuiNode* packsNode = m_buttons[5].getFuiRenderNode()->getFuiNode();
-        FJ_FuiNode* liveNode = m_buttons[7].getFuiRenderNode()->getFuiNode();
-        if (packsNode != NULL && packsNode->asFJ_Base() != NULL)
-        {
-            packsNode->asFJ_Base()->ResizeObject(halfWidth, rowHeight);
-            packsNode->setX(left);
-            packsNode->setY(rowY);
-            m_buttons[5].UpdateControl();
-        }
-        if (liveNode != NULL && liveNode->asFJ_Base() != NULL)
-        {
-            liveNode->asFJ_Base()->ResizeObject(halfWidth, rowHeight);
-            liveNode->setX(left + halfWidth + gap);
-            liveNode->setY(rowY);
-            m_buttons[7].UpdateControl();
-        }
-        const float splitRowHeight = m_buttons[5].getHeight() > m_buttons[7].getHeight()
-                                         ? m_buttons[5].getHeight()
-                                         : m_buttons[7].getHeight();
-        m_buttons[6].getFuiRenderNode()->setY(rowY + splitRowHeight + rowGap);
-    }
-#endif
+    layoutLiveMenuButtons();
     m_splash = L"Default Text";
     std::wstring splashesFile(L"splashes.txt");
     if (gApp.hasArchiveFile(splashesFile, false))
@@ -189,8 +159,38 @@ unsigned int UIScene_MainMenu::mapElementsAndNames()
         m_controls.push_back(&m_buttons[6]);
     }
     {
-        m_buttons[7].setupControl(this, root, std::string("ButtonUpsell"));
-        m_controls.push_back(&m_buttons[7]);
+        bool createdNativeLiveButton = false;
+#if LCE_PLATFORM_PC
+        if (PcLiveBridge::Enabled() && root->getFuiNode() != NULL)
+        {
+            // ButtonUpsell is a different FUI class (FJ_UpsellButton_Normal),
+            // with different padding and wrapping behavior from the main-menu
+            // buttons. Replace that visual with the same stock 4J button class
+            // used by Packs while retaining its native ButtonUpsell name so the
+            // FUI's existing focus/navigation links continue to work.
+            FJ_FuiNode* liveButton = FJ_Factory::createObject(s_nativeMenuButtonSymbol, root, true, "ButtonUpsell");
+            FJ_FuiNode* menuRoot = root->getFuiNode();
+            FJ_FuiNode* upsellButton = menuRoot->getChildByName("ButtonUpsell");
+            if (liveButton != NULL)
+            {
+                FJ_Base* oldButtonBase = upsellButton != NULL ? upsellButton->asFJ_Base() : NULL;
+                FJ_Base* liveButtonBase = liveButton->asFJ_Base();
+                if (oldButtonBase != NULL && liveButtonBase != NULL)
+                    liveButtonBase->CopyNavigationFrom(*oldButtonBase);
+                if (upsellButton != NULL)
+                    menuRoot->removeChild(upsellButton, true);
+                menuRoot->addChild(liveButton);
+                m_buttons[7].setupControl(this, root, std::string("ButtonUpsell"));
+                m_controls.push_back(&m_buttons[7]);
+                createdNativeLiveButton = true;
+            }
+        }
+#endif
+        if (!createdNativeLiveButton)
+        {
+            m_buttons[7].setupControl(this, root, std::string("ButtonUpsell"));
+            m_controls.push_back(&m_buttons[7]);
+        }
     }
     {
         m_timer.setupControl(this, root, std::string("Timer"));
@@ -210,10 +210,54 @@ void UIScene_MainMenu::handleReload()
     if (PcLiveBridge::Enabled())
     {
         m_buttons[7].setLabel(UIString(L"LCE Live"), false, false);
+        layoutLiveMenuButtons();
         return;
     }
 #endif
     removeControl(&m_buttons[7], false);
+}
+
+void UIScene_MainMenu::layoutLiveMenuButtons()
+{
+#if LCE_PLATFORM_PC
+    if (!PcLiveBridge::Enabled() || m_buttons[5].getFuiRenderNode() == NULL
+        || m_buttons[6].getFuiRenderNode() == NULL || m_buttons[7].getFuiRenderNode() == NULL)
+        return;
+
+    FJ_FuiNode* packsNode = m_buttons[5].getFuiRenderNode()->getFuiNode();
+    FJ_FuiNode* liveNode = m_buttons[7].getFuiRenderNode()->getFuiNode();
+    if (packsNode == NULL || liveNode == NULL || packsNode->asFJ_Base() == NULL || liveNode->asFJ_Base() == NULL)
+        return;
+
+    // Keep the established two-button row. Snap its geometry to whole FUI
+    // pixels so the stock borders and texture pixels stay crisp at native scale.
+    const float left = std::floor(m_buttons[5].getXPos() + 0.5f);
+    const float fullWidth = std::floor(m_buttons[5].getWidth() + 0.5f);
+    const float gap = 4.0f;
+    const float combinedButtonWidth = std::max(2.0f, fullWidth - gap);
+    const float packsWidth = std::floor(combinedButtonWidth * 0.5f);
+    const float liveWidth = combinedButtonWidth - packsWidth;
+    const float rowGap = 5.0f;
+    const float rowY = std::floor(m_buttons[4].getYPos() + m_buttons[4].getHeight() + rowGap + 0.5f);
+    const float rowHeight = std::floor(m_buttons[5].getHeight() + 0.5f);
+
+    packsNode->asFJ_Base()->ResizeObject(packsWidth, rowHeight);
+    packsNode->setX(left);
+    packsNode->setY(rowY);
+    m_buttons[5].UpdateControl();
+
+    liveNode->asFJ_Base()->ResizeObject(liveWidth, rowHeight);
+    liveNode->setX(left + packsWidth + gap);
+    liveNode->setY(rowY);
+    m_buttons[7].UpdateControl();
+
+    const float splitRowHeight = std::max(m_buttons[5].getHeight(), m_buttons[7].getHeight());
+    fuiRenderNode* exitNode = m_buttons[6].getFuiRenderNode();
+    exitNode->setY(std::floor(rowY + splitRowHeight + rowGap + 0.5f));
+    m_buttons[6].UpdateControl();
+
+    gConsoleUIController.TouchBoxRebuild(this);
+#endif
 }
 
 void UIScene_MainMenu::updateTooltips()

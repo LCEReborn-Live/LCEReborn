@@ -52,6 +52,8 @@ public:
     virtual unsigned long long getDefaultGtcButtons();
 
 private:
+    void layoutLiveMenuButtons();
+
     UIControl_Button m_buttons[8];
     UIControl m_timer;
     bool m_loading;

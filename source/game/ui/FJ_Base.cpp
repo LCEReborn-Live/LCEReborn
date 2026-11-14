@@ -535,6 +535,25 @@ void FJ_Base::SetNewObjectHeight(int height)
     }
 }
 
+void FJ_Base::ResizeObject(float width, float height)
+{
+    if (width <= 0.0f || height <= 0.0f)
+        return;
+
+    SetTextOnly(std::wstring(L" "));
+    setWidth(width);
+    setHeight(height);
+    m_preScaleWidth = static_cast<int>(width);
+    m_newWidth = static_cast<int>(width);
+    fuiRect rect = getRect(this);
+    m_objectWidth = getWidth() + rect.xMin * 2.0f;
+    m_objectHeight = getHeight() + rect.yMin * 2.0f;
+    m_labelTooWide = false;
+    m_labelOverflowResolved = false;
+    m_ellipsisWidthOverride = 0;
+    SetLabel(m_label);
+}
+
 void FJ_Base::HandleCharInput(unsigned int)
 {
 }

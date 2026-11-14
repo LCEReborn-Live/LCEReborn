@@ -176,8 +176,7 @@ void FJ_LoadCreateJoinMenu::handlePress(FJ_Event* event)
     FJ_Button* button = event->m_pTarget->asFJ_Button();
     if (button != NULL)
     {
-        static_cast<UIScene_LoadCreateJoinMenu*>(m_pCallbackScene)
-            ->handlePress(button->FJ_Base::getObjListParent()->asFJ_List()->getId(), button->getId());
+        m_pCallbackScene->handlePress(button->FJ_Base::getObjListParent()->asFJ_List()->getId(), button->getId());
         button->setButtonPressed(false);
     }
 }

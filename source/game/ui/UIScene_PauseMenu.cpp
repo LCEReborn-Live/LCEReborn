@@ -45,6 +45,7 @@
 #include "platform/C4JThreadImpl.hpp"
 #include "platform/Runtime.hpp"
 #include "game/ui/UIScene_OnlineSettingsMenu.hpp"
+#include "game/ui/UIScene_LiveFriends.hpp"
 
 extern ConsoleUIController gConsoleUIController;
 
@@ -335,7 +336,8 @@ void UIScene_PauseMenu::handlePress(int, int childId)
                                                          : UIScene_OnlineSettingsMenu::eMode_LanWorld);
         return;
     case 10:
-        CGameNetworkManager::sInstance.SendInviteGUI(m_playerId);
+        gConsoleUIController.NavigateToScene(m_playerId, EUIScene_LiveFriends,
+            reinterpret_cast<void*>(static_cast<uintptr_t>(1)), EUILayer_Scene, EUIGroup_PlayerDefault);
         return;
     case 3:
         break;

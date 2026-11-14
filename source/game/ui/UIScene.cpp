@@ -672,7 +672,7 @@ void UIScene::gainFocus()
             bool hadFocus = m_hasGainedFocus;
             if (!hadFocus)
             {
-                if (m_movie->getRootNode()->getFuiNode()->isFJ_Document())
+                if (m_movie != NULL && m_movie->getRootNode()->getFuiNode()->isFJ_Document())
                     static_cast<FJ_Document*>(m_movie->getRootNode()->getFuiNode())->SetFocus(-1);
                 hadFocus = m_hasGainedFocus;
             }

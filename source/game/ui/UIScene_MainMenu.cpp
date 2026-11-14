@@ -31,8 +31,14 @@
 #include "game/client/render/Renderer.hpp"
 #include "game/ui/UILayer.hpp"
 #include "game/ui/UIPacksPage.hpp"
+#include "game/ui/UIScene_LiveFriends.hpp"
+#include "game/ui/FJ_Base.hpp"
+#if LCE_PLATFORM_PC
+#include "platform/pc/PcLiveBridge.hpp"
+#endif
 #include "game/ui/ScreenSizeCalculator.hpp"
 #include "game/ui/fuiFile.hpp"
+#include "game/ui/fuiRenderNode.hpp"
 #include "game/ui/fuiRect.hpp"
 #include "game/ui/UIString.hpp"
 #include "game/util/Random.hpp"
@@ -77,8 +83,45 @@ UIScene_MainMenu::UIScene_MainMenu(int sceneType, void*, UILayer* layer)
     m_buttons[4].init(UIString(IDS_HELP_AND_OPTIONS), 4);
     m_buttons[5].init(UIString(L"Packs"), 5);
     m_buttons[6].init(UIString(IDS_EXIT_GAME), 6);
+    m_buttons[7].init(UIString(L"LCE Live"), 7);
     handleReload();
     doHorizontalResizeCheck();
+#if LCE_PLATFORM_PC
+    if (PcLiveBridge::Enabled())
+    {
+        // Put Packs and LCE Live together, with Exit Game as the last row.
+        const float left = m_buttons[5].getXPos();
+        const float fullWidth = m_buttons[5].getWidth();
+        const float gap = 4.0f;
+        const float halfWidth = (fullWidth - gap) * 0.5f;
+        // Place the split row directly below Help & Options, using the actual
+        // FUI control bounds so the spacing remains correct at each UI scale.
+        const float rowGap = 5.0f;
+        const float rowY = m_buttons[4].getYPos() + m_buttons[4].getHeight() + rowGap;
+        const float rowHeight = m_buttons[5].getHeight();
+
+        FJ_FuiNode* packsNode = m_buttons[5].getFuiRenderNode()->getFuiNode();
+        FJ_FuiNode* liveNode = m_buttons[7].getFuiRenderNode()->getFuiNode();
+        if (packsNode != NULL && packsNode->asFJ_Base() != NULL)
+        {
+            packsNode->asFJ_Base()->ResizeObject(halfWidth, rowHeight);
+            packsNode->setX(left);
+            packsNode->setY(rowY);
+            m_buttons[5].UpdateControl();
+        }
+        if (liveNode != NULL && liveNode->asFJ_Base() != NULL)
+        {
+            liveNode->asFJ_Base()->ResizeObject(halfWidth, rowHeight);
+            liveNode->setX(left + halfWidth + gap);
+            liveNode->setY(rowY);
+            m_buttons[7].UpdateControl();
+        }
+        const float splitRowHeight = m_buttons[5].getHeight() > m_buttons[7].getHeight()
+                                         ? m_buttons[5].getHeight()
+                                         : m_buttons[7].getHeight();
+        m_buttons[6].getFuiRenderNode()->setY(rowY + splitRowHeight + rowGap);
+    }
+#endif
     m_splash = L"Default Text";
     std::wstring splashesFile(L"splashes.txt");
     if (gApp.hasArchiveFile(splashesFile, false))
@@ -163,6 +206,13 @@ void UIScene_MainMenu::proceedToScene(int, EUIScene scene)
 
 void UIScene_MainMenu::handleReload()
 {
+#if LCE_PLATFORM_PC
+    if (PcLiveBridge::Enabled())
+    {
+        m_buttons[7].setLabel(UIString(L"LCE Live"), false, false);
+        return;
+    }
+#endif
     removeControl(&m_buttons[7], false);
 }
 
@@ -636,6 +686,18 @@ void UIScene_MainMenu::handlePress(int controlId, int)
                                                  this, NULL, true);
     }
         return;
+    case 7:
+    {
+#if LCE_PLATFORM_PC
+        if (PcLiveBridge::Enabled())
+        {
+            gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+            gConsoleUIController.NavigateToScene(pad, EUIScene_LiveFriends, NULL, EUILayer_Scene,
+                                                 EUIGroup_PlayerDefault);
+        }
+#endif
+        return;
+    }
     }
 
     if (signInReturnedFunc != NULL)
@@ -697,7 +759,11 @@ void UIScene_MainMenu::handleGainFocus(bool hadFocus)
     m_buttons[4].setVisible(true);
     m_buttons[5].setVisible(true);
     m_buttons[6].setVisible(true);
-    m_buttons[7].setVisible(true);
+#if LCE_PLATFORM_PC
+    m_buttons[7].setVisible(PcLiveBridge::Enabled());
+#else
+    m_buttons[7].setVisible(false);
+#endif
 
     int splashIndex = static_cast<int>(m_splashes.size());
     splashIndex = s_splashRandom->nextInt(splashIndex - 4) + 4;

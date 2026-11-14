@@ -21,6 +21,9 @@ public:
         std::wstring description;
         std::wstring gamerPic;
         std::wstring achievementIcon;
+        bool social = false;
+        int player = -1;
+        int achievement = -1;
     };
 
     UIComponent_PressStartToPlay(int type, void* data, UILayer* layer);
@@ -56,6 +59,12 @@ public:
     virtual bool hidesLowerScenes();
 
 private:
+    void PollLiveSocial();
+    long long m_nextLivePoll = 0;
+    unsigned long long m_lastLiveNotification = 0;
+    bool m_socialToastShowing = false;
+    std::string m_lastAchievementSnapshot;
+    std::vector<Toast> m_socialToasts;
     bool m_showSaveIcon;
     bool m_showAutosaveTimer;
     bool m_showPressStart[4];

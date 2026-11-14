@@ -66,14 +66,15 @@ unsigned int FJ_PressStartToPlay::getType()
 }
 
 void FJ_PressStartToPlay::ShowAchievementToast(const std::wstring& title, const std::wstring& description,
-                                               const std::wstring& gamerPic, const std::wstring& achievementIcon)
+                                               const std::wstring& gamerPic, const std::wstring& achievementIcon, bool social)
 {
     if (m_achievementToast != 0)
     {
         m_achievementToast->getChildByName("Achievement_PressButton")->asFJ_Label()->setUseHtmlText(true);
         m_achievementToast->getChildByName("Achievement_Unlocked")->asFJ_Label()->SetLabel(title);
         m_achievementToast->getChildByName("Achievement_PressButton")->asFJ_Label()->SetLabel(description);
-        m_achievementToast->getChildByName("GamerPic")->asFJ_BitmapIcon()->SetTextureName(gamerPic);
+        if (!social) m_achievementToast->getChildByName("GamerPic")->asFJ_BitmapIcon()->SetTextureName(gamerPic);
+        m_achievementToast->getChildByName("GamerPic")->setVisible(!social);
         m_achievementToast->getChildByName("AchievementIcon")
             ->asFJ_ListButtonAchievement()
             ->SetTextureName(achievementIcon);

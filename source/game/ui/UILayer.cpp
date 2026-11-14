@@ -81,6 +81,7 @@
 #include "game/ui/UIScene_Timer.hpp"
 #include "game/ui/UIScene_TradingMenu.hpp"
 #include "game/ui/UIScene_CustomMenu.hpp"
+#include "game/ui/UIScene_LiveFriends.hpp"
 #include "game/ui/UIScene_DebugOverlayMenu.hpp"
 #include "game/ui/UIScene_OnlineSettingsMenu.hpp"
 #include "game/ui/UIScene_EditServerMenu.hpp"
@@ -454,6 +455,9 @@ bool UILayer::NavigateToScene(int player, EUIScene scene, void* data)
         break;
     case EUIScene_CustomMenu:
         created = new UIScene_CustomMenu(player, data, this);
+        break;
+    case EUIScene_LiveFriends:
+        created = new UIScene_LiveFriends(player, data, this);
         break;
     case EUIScene_EditServerMenu:
         created = new UIScene_EditServerMenu(player, data, this);

@@ -48,6 +48,7 @@ public:
     virtual void GetLabelTooWide(fuiRenderNodeEditText* textField);
     virtual void SetNewObjectWidth(int width);
     virtual void SetNewObjectHeight(int height);
+    void ResizeObject(float width, float height);
     virtual void HandleCharInput(unsigned int character);
     virtual uint32_t getType();
     void SetNavigation(const std::string& up, const std::string& down);

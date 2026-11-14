@@ -81,7 +81,7 @@ void PlayLiveInviteSound(QObject* context)
     const unsigned int generation = ++gLiveInviteSoundGeneration;
     mciSendStringW(L"close LCEInviteSound", nullptr, 0, nullptr);
     const QString soundPath = QDir::toNativeSeparators(
-        QDir(QCoreApplication::applicationDirPath()).filePath("resources/ps4-trophy.mp3"));
+        QDir(QCoreApplication::applicationDirPath()).filePath("resources/xbox-360-achievement-sound.mp3"));
     const QString open = QString("open \"%1\" type mpegvideo alias LCEInviteSound").arg(soundPath);
     if (mciSendStringW(reinterpret_cast<LPCWSTR>(open.utf16()), nullptr, 0, nullptr) == 0
         && mciSendStringW(L"play LCEInviteSound", nullptr, 0, nullptr) == 0)
@@ -326,11 +326,11 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     connect(liveInvites, &QTimer::timeout, this, &MainWindow::PollLiveInvites);
     liveInvites->start();
     QTimer* friendsRefresh = new QTimer(this);
-    friendsRefresh->setInterval(15000);
+    friendsRefresh->setInterval(2000);
     connect(friendsRefresh, &QTimer::timeout, this, &MainWindow::RefreshLiveFriends);
     friendsRefresh->start();
     QTimer* presence = new QTimer(this);
-    presence->setInterval(15000);
+    presence->setInterval(3000);
     connect(presence, &QTimer::timeout, this, &MainWindow::SendLivePresence);
     presence->start();
     QTimer* cosmetics = new QTimer(this);
@@ -863,7 +863,7 @@ void MainWindow::RefreshLiveFriends()
                     if (id > 0) pendingIds.insert(id);
                 }
                 mSeenFriendRequests.intersect(pendingIds);
-                if (!mInvitePopup)
+                if (!mRunner->IsRunning() && !mInvitePopup)
                 {
                     for (const QJsonValue& value : mIncomingFriends)
                     {
@@ -872,6 +872,7 @@ void MainWindow::RefreshLiveFriends()
                         const QString username = entry.value("username").toString();
                         if (id <= 0 || username.isEmpty() || mSeenFriendRequests.contains(id)) continue;
                         mSeenFriendRequests.insert(id);
+                    if (mRunner->IsRunning()) continue;
                         ShowLiveInvite(id, username, QString(), true);
                         break;
                     }
@@ -1080,7 +1081,7 @@ void MainWindow::LoadLiveFriendFace(qint64 userId, QLabel* target)
 
 void MainWindow::PollLiveInvites()
 {
-    if (mLiveToken.isEmpty() || mInvitePollPending || mInvitePopup) return;
+    if (mRunner->IsRunning() || mLiveToken.isEmpty() || mInvitePollPending || mInvitePopup) return;
     mInvitePollPending = true;
     const QString session = mLiveToken;
     QNetworkRequest request{QUrl("https://api.lcereborn.xyz/v1/game-invites")};
@@ -1519,6 +1520,9 @@ void MainWindow::StartGame()
         }
         liveDirectory = directory->path();
         mLiveDirectory = liveDirectory;
+        QFile::copy(QDir(QCoreApplication::applicationDirPath()).filePath(
+                        "resources/xbox-360-achievement-sound.mp3"),
+                    QDir(liveDirectory).filePath("xbox-360-achievement-sound.mp3"));
         QProcess* bridge = new QProcess(this);
         mLiveBridge = bridge;
         connect(bridge, &QProcess::readyReadStandardError, this, [this, bridge] {

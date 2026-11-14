@@ -93,6 +93,7 @@ enum EUIScene
     EUIScene_ShaderMenu = 0x55,
     EUIScene_OnlineSettingsMenu = 0x56,
     EUIScene_None = 0x57,
+    EUIScene_LiveFriends = 0x58,
     EUIScene_Count
 };
 

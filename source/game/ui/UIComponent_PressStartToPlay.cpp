@@ -2,7 +2,18 @@
 #include "game/core/StringIds.hpp"
 
 #include <cwchar>
+#include <cstdio>
+#include <cstdlib>
+#include <sstream>
+#include "game/core/System.hpp"
+#include "game/client/audio/SoundEvents.hpp"
+#include "platform/pc/PcLiveBridge.hpp"
+#include "game/ui/UILiveAvatar.hpp"
 #include <string>
+#if LCE_PLATFORM_PC && defined(_WIN32)
+extern "C" unsigned int __stdcall mciSendStringW(const wchar_t*, wchar_t*, unsigned int, void*);
+#pragma comment(lib, "winmm.lib")
+#endif
 
 #include "game/core/CMinecraftApp.hpp"
 #include "game/core/CConsoleMinecraftApp.hpp"
@@ -22,6 +33,20 @@
 
 namespace
 {
+#if LCE_PLATFORM_PC && defined(_WIN32)
+void PlayLiveToastSound()
+{
+    const wchar_t* liveDir = _wgetenv(L"LCE_LIVE_DIR");
+    if (!liveDir || !*liveDir) return;
+    std::wstring path(liveDir);
+    if (path.back() != L'\\' && path.back() != L'/') path += L'\\';
+    path += L"xbox-360-achievement-sound.mp3";
+    mciSendStringW(L"close LCEGameToastSound", NULL, 0, NULL);
+    const std::wstring open = L"open \"" + path + L"\" type mpegvideo alias LCEGameToastSound";
+    if (mciSendStringW(open.c_str(), NULL, 0, NULL) == 0)
+        mciSendStringW(L"play LCEGameToastSound", NULL, 0, NULL);
+}
+#endif
 struct AvatarRequest
 {
     AvatarRequest(UIComponent_PressStartToPlay* scene, int player, int achievement)
@@ -66,7 +91,7 @@ UIComponent_PressStartToPlay::~UIComponent_PressStartToPlay()
 
 bool UIComponent_PressStartToPlay::GetAchievementToastShowing(int player)
 {
-    return (m_achievementToastShowing || m_holdToShowAchievements) && player == m_player;
+    return ((!m_socialToastShowing && m_achievementToastShowing) || m_holdToShowAchievements) && player == m_player;
 }
 
 bool UIComponent_PressStartToPlay::GetHoldToShowAchievementsActive(bool includeCancelled)
@@ -182,10 +207,18 @@ void UIComponent_PressStartToPlay::registerTexture(int achievement)
 
 void UIComponent_PressStartToPlay::ShowAchievementToast(const Toast& toast)
 {
+#if LCE_PLATFORM_PC && defined(_WIN32)
+    PlayLiveToastSound();
+#endif
     addTimer(1, 4000);
     m_achievementToastShowing = true;
+    m_socialToastShowing = toast.social;
+    if (!toast.social) {
+        if (toast.player >= 0) m_player = toast.player;
+        if (toast.achievement >= 0) m_achievement = toast.achievement;
+    }
     static_cast<FJ_PressStartToPlay*>(m_movie->getRootNode()->getFuiNode())
-        ->ShowAchievementToast(toast.title, toast.description, toast.gamerPic, toast.achievementIcon);
+        ->ShowAchievementToast(toast.title, toast.description, toast.gamerPic, toast.achievementIcon, toast.social);
 }
 
 int UIComponent_PressStartToPlay::AvatarReturned(void* context, unsigned char* data, unsigned int size)
@@ -209,6 +242,8 @@ int UIComponent_PressStartToPlay::AvatarReturned(void* context, unsigned char* d
         std::wstring description = gApp.FormatHTMLString(
             player, replaceAll(text, L"{*CONTROLLER_VK_X*}", L"{*CONTROLLER_VK_Y*}"), -1);
         Toast toast = {title, description, texture, info->icon};
+        toast.player = player;
+        toast.achievement = achievement;
         if (!scene->m_achievementToastShowing)
             scene->ShowAchievementToast(toast);
         else
@@ -285,6 +320,7 @@ void UIComponent_PressStartToPlay::handleReload()
 void UIComponent_PressStartToPlay::HideAchievementToast()
 {
     m_achievementToastShowing = false;
+    m_socialToastShowing = false;
     static_cast<FJ_PressStartToPlay*>(m_movie->getRootNode()->getFuiNode())->HideAchievementToast();
     if (!m_achievementToasts.empty())
     {
@@ -356,6 +392,9 @@ void UIComponent_PressStartToPlay::ShowBetaWatermark()
 void UIComponent_PressStartToPlay::tick()
 {
     UIScene::tick();
+#if LCE_PLATFORM_PC
+    if (hasMovie() && !gConsoleUIController.IsExpectingOrReloadingSkin()) PollLiveSocial();
+#endif
     Minecraft* minecraft = Minecraft::GetInstance();
     if (!gConsoleUIController.IsExpectingOrReloadingSkin() && hasMovie())
     {
@@ -383,4 +422,74 @@ bool UIComponent_PressStartToPlay::hasFocus(int sceneType)
 bool UIComponent_PressStartToPlay::hidesLowerScenes()
 {
     return false;
+}
+
+void UIComponent_PressStartToPlay::PollLiveSocial()
+{
+    if (!PcLiveBridge::Enabled()) return;
+    const long long now = System::processTimeInMilliSecs();
+    if (now >= m_nextLivePoll)
+    {
+        m_nextLivePoll = now + 1000;
+        FILE* events = PcLiveBridge::Open(L"social-events.tsv", L"rb");
+        if (events)
+        {
+            char line[512];
+            for (int row = 0; row < 32 && std::fgets(line, sizeof(line), events); ++row)
+            {
+                std::istringstream input(line);
+                std::string sequence, kind, id, username, revision;
+                if (!std::getline(input, sequence, '\t') || !std::getline(input, kind, '\t')
+                    || !std::getline(input, id, '\t') || !std::getline(input, username, '\t')
+                    || !std::getline(input, revision)) continue;
+                const unsigned long long serial = std::strtoull(sequence.c_str(), NULL, 10);
+                if (serial <= m_lastLiveNotification) continue;
+                m_lastLiveNotification = serial;
+                if ((kind != "R" && kind != "I") || username.empty() || username.size() > 20
+                    || username.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_") != std::string::npos
+                    || m_socialToasts.size() >= 8) continue;
+                revision.erase(revision.find_last_not_of("\r\n") + 1);
+                const std::wstring avatar = RegisterLiveFaceIcon(*this, static_cast<unsigned int>(std::strtoul(id.c_str(), NULL, 10)), revision);
+                Toast toast;
+                toast.social = true;
+                toast.title = kind == "I" ? L"Game invitation" : L"Friend request";
+                toast.description = std::wstring(username.begin(), username.end())
+                    + (kind == "I" ? L" invited you to play" : L" wants to add you");
+                toast.achievementIcon = avatar;
+                if (avatar.empty()) { registerTexture(1); toast.achievementIcon = UIScene_AchievementsMenu::GetInfo(1)->icon; }
+                m_socialToasts.push_back(toast);
+            }
+            std::fclose(events);
+        }
+        // Only the launcher's primary profile belongs to this Live account.
+        // Never upload split-screen guest progress to the signed-in owner.
+        std::string achievements;
+        for (int index = 0; index < UIScene_AchievementsMenu::DISPLAY_COUNT; ++index)
+        {
+            const int id = UIScene_AchievementsMenu::sDisplayList[index];
+            if (gProfile->IsAwardsFlagSet(0, id))
+            {
+                if (!achievements.empty()) achievements += ',';
+                achievements += std::to_string(id);
+            }
+        }
+        achievements += '\n';
+        if (achievements != m_lastAchievementSnapshot)
+        {
+            FILE* file = PcLiveBridge::Open(L"achievements.tmp", L"wb");
+            if (file)
+            {
+                const bool written = std::fwrite(achievements.data(), 1, achievements.size(), file) == achievements.size();
+                std::fclose(file);
+                if (written && PcLiveBridge::Rename(L"achievements.tmp", L"achievements.txt")) m_lastAchievementSnapshot = achievements;
+            }
+        }
+    }
+    // Existing achievement notifications always drain first. Social messages
+    // use the same native animation without enabling the achievement shortcut.
+    if (!m_achievementToastShowing && !m_holdToShowAchievements && m_achievementToasts.empty() && !m_socialToasts.empty())
+    {
+        ShowAchievementToast(m_socialToasts.front());
+        m_socialToasts.erase(m_socialToasts.begin());
+    }
 }

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
 import { GameBridge } from './game-bridge.js';
+import { SocialBridge } from './social-bridge.js';
 
 // One instance per launched game. The launcher sends credentials over stdin.
 console.log = () => {};
@@ -9,6 +10,7 @@ const input = readline.createInterface({ input: process.stdin, crlfDelay: Infini
 let bridge, directory, username, running = false, stopped = false, lastWorld = '';
 let timer, leaderboardTimer, leaderboardBusy = false, leaderboardSubmissionBusy = false;
 let leaderboardRetryAt = 0;
+let socialTimer, socialActionTimer, social;
 
 const leaderboardBoards = ['traveling', 'mining', 'farming', 'kills'];
 
@@ -120,6 +122,7 @@ async function tick() {
       }
     }
     const servers = await bridge.refresh();
+    await social?.updateWorlds(servers);
     const lines = servers.filter(s => s.owner.toLowerCase() !== username.toLowerCase())
       .map(s => {
         const match = s.matchmaking?.enabled ? s.matchmaking : {};
@@ -149,6 +152,16 @@ input.once('line', line => {
     bridge = new GameBridge({ apiUrl: init.apiUrl, token: init.token });
     void tick();
     timer = setInterval(() => void tick(), 2000);
+    social = new SocialBridge({ bridge, directory });
+    void social.refresh();
+    socialTimer = setInterval(() => {
+      void social.refresh();
+      void social.syncAchievements();
+    }, 2000);
+    socialActionTimer = setInterval(() => {
+      void social.processAction().catch(error => console.error('Live social action:', error.message));
+      void social.refreshProfile().catch(error => console.error('Live social profile:', error.message));
+    }, 200);
     leaderboardTimer = setInterval(() => {
       void processLeaderboardRequest();
       void processLeaderboardSubmissions();
@@ -159,9 +172,12 @@ input.on('close', () => {
   stopped = true;
   clearInterval(timer);
   clearInterval(leaderboardTimer);
+  clearInterval(socialTimer);
+  clearInterval(socialActionTimer);
   void (async () => {
     while (running) await new Promise(resolve => setTimeout(resolve, 50));
     while (leaderboardBusy || leaderboardSubmissionBusy) await new Promise(resolve => setTimeout(resolve, 50));
+    await social?.close();
     await bridge?.close();
   })();
 });

@@ -321,6 +321,7 @@ void UIScene_CustomMenu::handleInput(int playerId, int action, bool repeat, bool
     gConsoleUIController.AnimateKeyPress(playerId, action, repeat, pressed, released);
     if (pressed && m_page != NULL
         && (action == EControllerActions_MenuX || action == EControllerActions_MenuY
+            || action == EControllerActions_MenuLeft || action == EControllerActions_MenuRight
             || action == EControllerActions_MenuLeftScroll || action == EControllerActions_MenuRightScroll)
         && m_page->OnAction(*this, action))
     {

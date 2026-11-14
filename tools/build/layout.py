@@ -28,7 +28,10 @@ PNG_PRIVATE_HEADERS = ("pngconf.h", "pngdebug.h", "pnginfo.h", "pngpriv.h", "png
 
 def link_or_copy(source, target):
     try:
-        os.symlink(source, target, target_is_directory=True)
+        # Keep the layout relocatable: Linux builds mount the repository at a
+        # different path inside Docker, so absolute host paths become broken.
+        relative_source = os.path.relpath(source, os.path.dirname(target))
+        os.symlink(relative_source, target, target_is_directory=True)
     except (OSError, NotImplementedError):
         shutil.copytree(source, target)
 

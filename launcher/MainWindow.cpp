@@ -381,15 +381,17 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
 void MainWindow::DownloadLauncherUpdate()
 {
 #ifdef Q_OS_LINUX
-    const QString target = !mUpdateInstallerUrl.isEmpty() ? mUpdateInstallerUrl : mUpdateReleaseUrl;
+    const bool appImage = LauncherPaths::RunsFromAppImage();
+    const QString target = appImage && !mUpdateInstallerUrl.isEmpty() ? mUpdateInstallerUrl : mUpdateReleaseUrl;
     const QUrl url(target);
     if (!url.isValid() || url.scheme() != "https" || (url.host() != "github.com" && url.host() != "objects.githubusercontent.com"))
     {
         QMessageBox::warning(this, "Update LCEReborn Live", "The release download URL is invalid.");
         return;
     }
-    QMessageBox::information(this, "Update LCEReborn Live",
-                             "The Linux update will open in your browser. Download the new AppImage, then replace the current one.");
+    QMessageBox::information(this, "Update LCEReborn Live", appImage
+        ? "The Linux update will open in your browser. Download the new AppImage, then replace the current one."
+        : "The release page will open in your browser. Download the new portable archive, then replace the current folder.");
     QDesktopServices::openUrl(url);
 #elif defined(Q_OS_WIN)
     if (mUpdateName.isEmpty())

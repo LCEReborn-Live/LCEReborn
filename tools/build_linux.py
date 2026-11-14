@@ -55,6 +55,21 @@ def ensure_image():
     return tag
 
 
+def prepare_node_runtime():
+    node = shutil.which("node") or shutil.which("nodejs")
+    if node is None:
+        raise BuildError("Node.js 22 is required to prepare the Live runtime; install Node.js 22 and retry")
+    version = subprocess.run([node, "--version"], capture_output=True, text=True)
+    if version.returncode != 0 or not version.stdout.strip().startswith("v22."):
+        raise BuildError("Node.js 22 is required to prepare the Live runtime (found %s)"
+                         % version.stdout.strip())
+    destination = os.path.join(ROOT, "build", "live-runtime")
+    command = [sys.executable, os.path.join(TOOLS, "build", "node_runtime.py"), "--version",
+               version.stdout.strip(), "--platform", "linux-x64", "--output", destination]
+    if subprocess.run(command).returncode != 0:
+        raise BuildError("preparing the checksum-verified Node.js runtime failed")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build and package the Linux PC version in Docker.")
     parser.add_argument("--clean", action="store_true", help="discard the cached build first")
@@ -71,6 +86,8 @@ def main():
             raise BuildError("Third-party sources are missing. Run:\n"
                              "  python tools/build/deps.py build/deps\n"
                              "  python tools/build/layout.py build/deps build/third_party")
+        if not args.no_package:
+            prepare_node_runtime()
         image = ensure_image()
         if args.clean:
             subprocess.run(["docker", "volume", "rm", "-f", BUILD_VOLUME], stdout=subprocess.DEVNULL)
@@ -80,6 +97,7 @@ def main():
                  "cmake -S /src -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release",
                  "cmake --build /build"]
         if not args.no_package:
+            steps.append("mkdir -p /build/live-runtime && cp /src/build/live-runtime/* /build/live-runtime/")
             steps.append("python3 /src/tools/package_pc.py --build /build" + (" --allow-dirty" if args.allow_dirty
                                                                               else ""))
         command = ["docker", "run", "--rm", "-v", ROOT + ":/src", "-v", QT_VOLUME + ":/src/build/qt",

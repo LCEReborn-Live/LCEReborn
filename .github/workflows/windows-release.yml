@@ -1,4 +1,4 @@
-name: Windows build and release
+name: Windows and Linux build and release
 
 on:
   push:
@@ -48,24 +48,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (& node --version).Trim()
-          $base = "https://nodejs.org/dist/$version"
-          $folder = Join-Path $env:RUNNER_TEMP 'node-runtime'
-          New-Item -ItemType Directory -Path $folder -Force | Out-Null
-          $archiveName = "node-$version-win-x64.zip"
-          Invoke-WebRequest "$base/$archiveName" -OutFile (Join-Path $folder $archiveName)
-          Invoke-WebRequest "$base/SHASUMS256.txt" -OutFile (Join-Path $folder 'SHASUMS256.txt')
-          $line = Select-String -Path (Join-Path $folder 'SHASUMS256.txt') -Pattern " $archiveName$" | Select-Object -First 1
-          if (-not $line) { throw "No checksum found for $archiveName" }
-          $expected = ($line.Line -split '\s+')[0].ToLowerInvariant()
-          $actual = (Get-FileHash (Join-Path $folder $archiveName) -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $expected) { throw 'Node.js archive checksum did not match' }
-          $unpack = Join-Path $folder 'unpacked'
-          Expand-Archive (Join-Path $folder $archiveName) -DestinationPath $unpack
-          $nodeFolder = Get-ChildItem -LiteralPath $unpack -Directory | Select-Object -First 1
-          $destination = Join-Path $env:GITHUB_WORKSPACE 'build/pc/live-runtime'
-          New-Item -ItemType Directory -Path $destination -Force | Out-Null
-          Copy-Item (Join-Path $nodeFolder.FullName 'node.exe') (Join-Path $destination 'node.exe')
-          Copy-Item (Join-Path $nodeFolder.FullName 'LICENSE') (Join-Path $destination 'Node-LICENSE.txt')
+          python tools/build/node_runtime.py --version $version --platform win-x64 --output build/pc/live-runtime
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Set up MSVC build environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -128,33 +112,99 @@ jobs:
             build/release/LCEReborn-Live-Installer-*.exe
           if-no-files-found: error
 
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and package Linux client
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/build/deps.py build/deps
+          python tools/build/layout.py build/deps build/third_party
+          python tools/build_linux.py
+          version="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then version="0.1.0"; fi
+          mv build/LCEReborn-linux-*.AppImage "build/LCEReborn-Live-Linux-$version.AppImage"
+          mv build/LCEReborn-linux-*.tar.gz "build/LCEReborn-Live-Linux-Portable-$version.tar.gz"
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: LCEReborn-Live-Linux
+          path: |
+            build/LCEReborn-Live-Linux-*.AppImage
+            build/LCEReborn-Live-Linux-Portable-*.tar.gz
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release notes
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: LCEReborn-Live-Windows
+          path: build/release-assets
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: LCEReborn-Live-Linux
+          path: build/release-assets
+
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_REPOSITORY: ${{ github.repository }}
+        shell: bash
         run: |
-          $ErrorActionPreference = 'Stop'
-          $assets = @(Get-ChildItem build -Filter 'LCEReborn-Live-Portable-*.zip' | ForEach-Object FullName)
-          $assets += @(Get-ChildItem build/release -Filter 'LCEReborn-Live-Installer-*.exe' | ForEach-Object FullName)
-          $notesFile = "docs/releases/$($env:RELEASE_TAG).md"
-          $releaseTitle = "LCEReborn Live $env:RELEASE_TAG"
-          if (Test-Path $notesFile) {
-            $heading = Get-Content -LiteralPath $notesFile -TotalCount 1
-            if ($heading -match '^#\s+(.+)$') { $releaseTitle = $Matches[1].Trim() }
-          }
-          gh release view $env:RELEASE_TAG --repo $env:RELEASE_REPOSITORY --json id *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --clobber
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            if (Test-Path $notesFile) {
-              gh release edit $env:RELEASE_TAG --repo $env:RELEASE_REPOSITORY --title $releaseTitle --notes-file $notesFile
-            }
-          } elseif (Test-Path $notesFile) {
-            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title $releaseTitle --notes-file $notesFile
-          } else {
-            gh release create $env:RELEASE_TAG @assets --repo $env:RELEASE_REPOSITORY --title $releaseTitle --generate-notes
-          }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(build/release-assets/*)
+          if (( ${#assets[@]} == 0 )); then echo "No release assets were downloaded" >&2; exit 1; fi
+          notes="docs/releases/$RELEASE_TAG.md"
+          title="LCEReborn Live $RELEASE_TAG"
+          if [[ -f "$notes" ]]; then
+            heading="$(head -n 1 "$notes")"
+            if [[ "$heading" =~ ^#[[:space:]]+(.+)$ ]]; then title="${BASH_REMATCH[1]}"; fi
+          fi
+          if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$RELEASE_REPOSITORY" --clobber
+            if [[ -f "$notes" ]]; then
+              gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY" --title "$title" --notes-file "$notes"
+            fi
+          elif [[ -f "$notes" ]]; then
+            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$RELEASE_REPOSITORY" --title "$title" --notes-file "$notes"
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$RELEASE_REPOSITORY" --title "$title" --generate-notes
+          fi

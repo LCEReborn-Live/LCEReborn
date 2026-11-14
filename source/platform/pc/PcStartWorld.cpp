@@ -28,6 +28,7 @@
 #include "platform/pc/Log.hpp"
 #include "platform/pc/PcApplication.hpp"
 #include "platform/pc/PcLaunchOptions.hpp"
+#include "platform/pc/PcLiveBridge.hpp"
 #include "platform/pc/PcPaths.hpp"
 #include "vendor/DiskSaveBuffer.hpp"
 #include "vendor/_LoadingInputParams.hpp"
@@ -56,25 +57,17 @@ std::string sLiveInvite;
 
 std::string ReadLiveInvite()
 {
-#ifdef _WIN32
-    const wchar_t* directory = _wgetenv(L"LCE_LIVE_DIR");
-    if (!directory || !*directory) return std::string();
-    const std::wstring path = std::wstring(directory) + L"\\join.txt";
-    FILE* file = NULL;
-    _wfopen_s(&file, path.c_str(), L"rb");
+    FILE* file = PcLiveBridge::Open(L"join.txt", L"rb");
     if (!file) return std::string();
     char text[16] = {};
     const bool read = fgets(text, sizeof(text), file) != NULL;
     fclose(file);
-    _wremove(path.c_str());
+    PcLiveBridge::Remove(L"join.txt");
     if (!read) return std::string();
     char* end = NULL;
     long port = strtol(text, &end, 10);
     if (*end != '\0' || port < 1 || port > 65535) return std::string();
     return std::string("127.0.0.1:") + text;
-#else
-    return std::string();
-#endif
 }
 
 double NowSeconds()

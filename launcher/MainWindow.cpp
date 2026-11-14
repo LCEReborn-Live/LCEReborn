@@ -380,7 +380,18 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
 
 void MainWindow::DownloadLauncherUpdate()
 {
-#ifdef Q_OS_WIN
+#ifdef Q_OS_LINUX
+    const QString target = !mUpdateInstallerUrl.isEmpty() ? mUpdateInstallerUrl : mUpdateReleaseUrl;
+    const QUrl url(target);
+    if (!url.isValid() || url.scheme() != "https" || (url.host() != "github.com" && url.host() != "objects.githubusercontent.com"))
+    {
+        QMessageBox::warning(this, "Update LCEReborn Live", "The release download URL is invalid.");
+        return;
+    }
+    QMessageBox::information(this, "Update LCEReborn Live",
+                             "The Linux update will open in your browser. Download the new AppImage, then replace the current one.");
+    QDesktopServices::openUrl(url);
+#elif defined(Q_OS_WIN)
     if (mUpdateName.isEmpty())
         return;
     const QString installedPath = QDir::cleanPath(LauncherPaths::InstallDir());
@@ -500,8 +511,6 @@ void MainWindow::DownloadLauncherUpdate()
         close();
 #endif
     });
-#else
-    QMessageBox::information(this, "Update LCEReborn Live", "In-launcher updates are currently available for Windows releases.");
 #endif
 }
 
@@ -763,8 +772,8 @@ QWidget* MainWindow::CreateLiveFriendsPage()
     connect(browserJoins, &GameButton::clicked, this, [this] {
         const bool ok = LiveJoin::RegisterBrowserHandler();
         QMessageBox::information(this, "LCE Live", ok
-            ? "Browser joins enabled for this launcher. Keep this portable folder in the same location."
-            : "Could not register browser joins. On Windows, try installing the Live client.");
+            ? "Browser joins enabled for this launcher. If you move the portable copy, enable browser joins again."
+            : "Could not register browser joins. Check that a desktop environment and its URL handler tools are available.");
     });
     layout->addWidget(browserJoins, 0, Qt::AlignLeft);
     mFriendsMessage = new QLabel(page);
@@ -1485,8 +1494,14 @@ void MainWindow::StartGame()
             return;
         }
         const QString livePath = QCoreApplication::applicationDirPath() + "/live";
-        QString node = livePath + "/node.exe";
+        QString node = livePath + "/node";
+#ifdef Q_OS_WIN
+        node += ".exe";
+#endif
         if (!QFileInfo::exists(node)) node = QStandardPaths::findExecutable("node");
+#if defined(Q_OS_LINUX) || defined(Q_OS_MACOS)
+        if (node.isEmpty()) node = QStandardPaths::findExecutable("nodejs");
+#endif
         const QString script = livePath + "/game-session.js";
         if (node.isEmpty() || !QFileInfo::exists(script))
         {

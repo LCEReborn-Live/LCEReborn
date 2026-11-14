@@ -212,17 +212,19 @@ def program_files(build):
         for name in sorted(names):
             path = os.path.join(folder, name)
             files.append((path, "resources/" + os.path.relpath(path, resources).replace(os.sep, "/")))
-    if not LINUX:
-        live = os.path.join(ROOT, "live")
-        for folder, _, names in os.walk(live):
-            for name in sorted(names):
-                if os.path.splitext(name)[1].lower() not in (".js", ".json"):
-                    continue
-                path = os.path.join(folder, name)
-                files.append((path, "live/" + os.path.relpath(path, live).replace(os.sep, "/")))
-        runtime = os.path.join(build, "live-runtime", "node.exe")
-        if os.path.isfile(runtime):
-            files.append((runtime, "live/node.exe"))
+    live = os.path.join(ROOT, "live")
+    for folder, _, names in os.walk(live):
+        for name in sorted(names):
+            if os.path.splitext(name)[1].lower() not in (".js", ".json"):
+                continue
+            path = os.path.join(folder, name)
+            files.append((path, "live/" + os.path.relpath(path, live).replace(os.sep, "/")))
+    runtime_name = "node" if LINUX else "node.exe"
+    runtime = os.path.join(build, "live-runtime", runtime_name)
+    if not os.path.isfile(runtime):
+        raise PackageError("%s is missing. Prepare the bundled Node.js runtime before packaging the Live client."
+                           % os.path.relpath(runtime, ROOT))
+    files.append((runtime, "live/" + runtime_name))
     return files, [(arcname, sbom_name) for _, arcname, sbom_name in qt_files]
 
 
@@ -606,7 +608,7 @@ def write_tar(path, entries, date):
                 content = content.replace("\r\n", "\n").encode("utf-8")
             info = tarfile.TarInfo(TOP + "/" + arcname)
             info.size = len(content)
-            info.mode = 0o755 if arcname in PROGRAMS else 0o644
+            info.mode = 0o755 if arcname in PROGRAMS or arcname == "live/node" else 0o644
             info.mtime = stamp
             archive.addfile(info, io.BytesIO(content))
 
@@ -642,7 +644,7 @@ def write_appimage(path, entries, date, tools):
                 content = content.replace("\r\n", "\n").encode("utf-8")
             with open(target, "wb") as handle:
                 handle.write(content)
-            os.chmod(target, 0o755 if arcname in PROGRAMS + ("AppRun",) else 0o644)
+            os.chmod(target, 0o755 if arcname in PROGRAMS + ("AppRun",) or arcname == "live/node" else 0o644)
         environment = dict(os.environ, ARCH="x86_64", SOURCE_DATE_EPOCH=str(int(date.timestamp())))
         result = subprocess.run([tool, "--no-appstream", "--runtime-file", runtime, app_dir, path], env=environment,
                                 capture_output=True, text=True)
@@ -660,7 +662,8 @@ def package(build, allow_dirty, appimage=True):
     qt = qt_notices(build, qt_files)
     game = game_components(build)
     launcher = launcher_components(qt_files)
-    glibc = glibc_requirement([path for path, arcname in files if arcname in PROGRAMS or ".so" in arcname]) \
+    glibc = glibc_requirement([path for path, arcname in files
+                               if arcname in PROGRAMS or ".so" in arcname or arcname == "live/node"]) \
         if LINUX else None
 
     entries = []
@@ -669,10 +672,9 @@ def package(build, allow_dirty, appimage=True):
             entries.append((arcname, handle.read()))
     entries.append(("README.txt", readme_text(source, glibc)))
     entries.append(("LICENSE.txt", read(os.path.join(ROOT, "LICENSE"))))
-    if not LINUX:
-        node_license = os.path.join(build, "live-runtime", "Node-LICENSE.txt")
-        if os.path.isfile(node_license):
-            entries.append(("third_party/Node-LICENSE.txt", read(node_license)))
+    node_license = os.path.join(build, "live-runtime", "Node-LICENSE.txt")
+    if os.path.isfile(node_license):
+        entries.append(("third_party/Node-LICENSE.txt", read(node_license)))
     common = list(entries)
     entries.append(("third_party/NOTICES.txt", notices_text(source, game, qt, launcher)))
     entries.extend(license_files(game, qt, launcher))

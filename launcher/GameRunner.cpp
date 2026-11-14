@@ -85,8 +85,13 @@ bool GameRunner::Start(const Profile& profile, QString* error, const QString& li
         return false;
     mOutput = LogParser(LogLevel::Info);
     mErrors = LogParser(LogLevel::Warn);
-    const QString executable = liveDirectory.isEmpty() ? LauncherPaths::GameExecutable()
-        : QCoreApplication::applicationDirPath() + "/LCEReborn-Live.exe";
+    QString executable = LauncherPaths::GameExecutable();
+    if (!liveDirectory.isEmpty())
+    {
+#ifdef Q_OS_WIN
+        executable = QDir(QCoreApplication::applicationDirPath()).filePath("LCEReborn-Live.exe");
+#endif
+    }
     if (!QFileInfo(executable).isFile())
     {
         *error = QString("The Live game executable is missing: %1").arg(QDir::toNativeSeparators(executable));

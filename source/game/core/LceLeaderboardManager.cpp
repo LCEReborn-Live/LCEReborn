@@ -20,6 +20,9 @@
 #include "game/network/LeaderboardReadListener.hpp"
 #include "game/network/ServerboundCustomPayloadPacket.hpp"
 #include "platform/CProfile.hpp"
+#if LCE_PLATFORM_PC
+#include "platform/pc/PcLiveBridge.hpp"
+#endif
 
 LeaderboardManager* g_pLeaderboardManager = new LceLeaderboardManager();
 
@@ -28,44 +31,33 @@ namespace
 const long long kServerTimeoutMs = 5000;
 const long long kLiveTimeoutMs = 15000;
 
-#ifdef _WIN32
+#if LCE_PLATFORM_PC
 int LiveBoardIndex(LeaderboardManager::EStatsType type)
 {
     const int board = static_cast<int>(type);
     return board >= 0 && board < 4 ? board : -1;
 }
 
-std::wstring LiveDirectory()
+bool WriteLiveFile(const wchar_t* name, const std::string& contents)
 {
-    const wchar_t* directory = _wgetenv(L"LCE_LIVE_DIR");
-    return directory == NULL ? std::wstring() : std::wstring(directory);
-}
-
-std::wstring LivePath(const wchar_t* name)
-{
-    const std::wstring directory = LiveDirectory();
-    return directory.empty() ? std::wstring() : directory + L"\\" + name;
-}
-
-bool WriteLiveFile(const std::wstring& path, const std::string& contents)
-{
-    if (path.empty())
+    if (name == NULL || !PcLiveBridge::Enabled())
         return false;
-    const std::wstring temporary = path + L".tmp";
-    FILE* file = NULL;
-    if (_wfopen_s(&file, temporary.c_str(), L"wb") != 0 || file == NULL)
+    std::wstring temporary(name);
+    temporary += L".tmp";
+    FILE* file = PcLiveBridge::Open(temporary.c_str(), L"wb");
+    if (file == NULL)
         return false;
     const bool written = std::fwrite(contents.data(), 1, contents.size(), file) == contents.size();
     const bool closed = std::fclose(file) == 0;
     if (!written || !closed)
     {
-        _wremove(temporary.c_str());
+        PcLiveBridge::Remove(temporary.c_str());
         return false;
     }
-    _wremove(path.c_str());
-    if (_wrename(temporary.c_str(), path.c_str()) != 0)
+    PcLiveBridge::Remove(name);
+    if (!PcLiveBridge::Rename(temporary.c_str(), name))
     {
-        _wremove(temporary.c_str());
+        PcLiveBridge::Remove(temporary.c_str());
         return false;
     }
     return true;
@@ -114,7 +106,7 @@ void LceLeaderboardManager::Tick()
 {
     if (m_pending == ePending_Live)
     {
-#ifdef _WIN32
+#if LCE_PLATFORM_PC
         if (ReadLiveResponse())
             return;
 #endif
@@ -152,8 +144,8 @@ void LceLeaderboardManager::DeleteSession()
 
 bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores)
 {
-#ifdef _WIN32
-    if (LiveDirectory().empty() || scores == NULL || count == 0)
+#if LCE_PLATFORM_PC
+    if (!PcLiveBridge::Enabled() || scores == NULL || count == 0)
         return true;
     std::ostringstream contents;
     bool any = false;
@@ -174,7 +166,7 @@ bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores
         const std::wstring name = L"leaderboard-submit-" +
             std::to_wstring(static_cast<unsigned long long>(System::processTimeInMilliSecs())) + L"-" +
             std::to_wstring(++submitId) + L".tsv";
-        WriteLiveFile(LivePath(name.c_str()), contents.str());
+        WriteLiveFile(name.c_str(), contents.str());
     }
 #else
     (void)count;
@@ -243,8 +235,8 @@ bool LceLeaderboardManager::ReadStats_Friends(LeaderboardReadListener* pReadList
                                               unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
-#ifdef _WIN32
-    if (!LiveDirectory().empty())
+#if LCE_PLATFORM_PC
+    if (PcLiveBridge::Enabled())
     {
         m_fallbackToLocal = true;
         RequestFromLive("friends", uiStartRank, uiNumRows);
@@ -264,8 +256,8 @@ bool LceLeaderboardManager::ReadStats_MyScore(LeaderboardReadListener* pReadList
                                               EStatsType eStatsType, PlayerUID, unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
-#ifdef _WIN32
-    if (!LiveDirectory().empty())
+#if LCE_PLATFORM_PC
+    if (PcLiveBridge::Enabled())
     {
         m_fallbackToLocal = true;
         RequestFromLive("mine", 1, uiNumRows);
@@ -280,8 +272,8 @@ bool LceLeaderboardManager::ReadStats_TopRank(LeaderboardReadListener* pReadList
                                               EStatsType eStatsType, unsigned int uiStartRank, unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
-#ifdef _WIN32
-    if (!LiveDirectory().empty())
+#if LCE_PLATFORM_PC
+    if (PcLiveBridge::Enabled())
     {
         RequestFromLive("overall", uiStartRank, uiNumRows);
         return true;
@@ -293,7 +285,7 @@ bool LceLeaderboardManager::ReadStats_TopRank(LeaderboardReadListener* pReadList
 
 void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int startRank, unsigned int count)
 {
-#ifdef _WIN32
+#if LCE_PLATFORM_PC
     const int board = LiveBoardIndex(static_cast<EStatsType>(m_board));
     if (board < 0 || filter == NULL || count == 0 || count > 50)
     {
@@ -305,8 +297,8 @@ void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int sta
         ++m_requestId;
     std::ostringstream request;
     request << m_requestId << '\t' << board << '\t' << filter << '\t' << startRank << '\t' << count << '\n';
-    _wremove(LivePath(L"leaderboard.response").c_str());
-    if (!WriteLiveFile(LivePath(L"leaderboard.request"), request.str()))
+    PcLiveBridge::Remove(L"leaderboard.response");
+    if (!WriteLiveFile(L"leaderboard.request", request.str()))
     {
         Finish(m_fallbackToLocal && AddLocalScore() ? eStatsReturn_Success : eStatsReturn_Failed);
         return;
@@ -323,17 +315,16 @@ void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int sta
 
 bool LceLeaderboardManager::ReadLiveResponse()
 {
-#ifdef _WIN32
-    const std::wstring responsePath = LivePath(L"leaderboard.response");
-    FILE* file = NULL;
-    if (responsePath.empty() || _wfopen_s(&file, responsePath.c_str(), L"rb") != 0 || file == NULL)
+#if LCE_PLATFORM_PC
+    FILE* file = PcLiveBridge::Open(L"leaderboard.response", L"rb");
+    if (file == NULL)
         return false;
     std::string contents;
     char buffer[1024];
     while (std::fgets(buffer, sizeof(buffer), file) != NULL)
         contents += buffer;
     std::fclose(file);
-    _wremove(responsePath.c_str());
+    PcLiveBridge::Remove(L"leaderboard.response");
     std::istringstream lines(contents);
     std::string line;
     if (!std::getline(lines, line))

@@ -24,6 +24,9 @@
 #include "net/NetMessages.hpp"
 #include "net/NetworkPlayerLan.hpp"
 #include "net/ServerList.hpp"
+#if LCE_PLATFORM_PC
+#include "platform/pc/PcLiveBridge.hpp"
+#endif
 
 namespace
 {
@@ -54,15 +57,11 @@ unsigned int g_liveReportedRevision = 0;
 
 FILE* LiveFile(const wchar_t* file, const wchar_t* mode)
 {
-#ifdef _WIN32
-    const wchar_t* directory = _wgetenv(L"LCE_LIVE_DIR");
-    if (directory == 0 || *directory == 0) return 0;
-    const std::wstring path = std::wstring(directory) + L"\\" + file;
-    FILE* result = 0;
-    _wfopen_s(&result, path.c_str(), mode);
-    return result;
+#if LCE_PLATFORM_PC
+    return PcLiveBridge::Open(file, mode);
 #else
-    (void)file; (void)mode;
+    (void)file;
+    (void)mode;
     return 0;
 #endif
 }

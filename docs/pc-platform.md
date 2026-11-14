@@ -83,4 +83,4 @@ cmake --build build/pc
 
 `python tools/build_linux.py` builds the Linux version in Docker from any system. `python tools/package_pc.py` packages a build for players, and `python tools/release_pc.py` publishes it as a GitHub release.
 
-For the LCEReborn Live Windows installer workflow and its release tags, see [live-release.md](live-release.md).
+The LCEReborn Live workflow also builds a Linux AppImage and portable archive with the Live bridge and bundled Node.js runtime. See [live-release.md](live-release.md) for browser joins and release tags.

@@ -26,14 +26,14 @@
 - Live account skins and capes in game.
 - The original LCE leaderboard menu with global, friends, and personal score filters.
 - A launcher news feed for both LCEReborn Live and original LCEReborn releases.
-- Update notifications and in-launcher installer downloads for installed Windows copies.
+- Update notifications on Windows and Linux; installed Windows copies can run the installer, while Linux opens the new AppImage for download.
 - A focused mini-game Join tab for Battle, Tumble, and Glide matchmaking.
 - Wii U-style open-mic Game Chat in online play, with local microphone noise suppression, automatic voice activity detection and no push-to-talk key.
 - Keyboard, mouse, and controller support; single-player and split-screen play.
 
 ### Installation
 
-1. Download the installer or portable archive from the [releases page](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
+1. Download the installer, portable archive, or Linux AppImage from the [releases page](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
 2. Start the launcher and import **your own dumps** of the base game and Update 688.
 3. Sign in to Live from the launcher, choose a profile, and select **Play**.
 
@@ -43,7 +43,7 @@ Game data, saves, and update files are not included in downloads. The launcher i
 
 Sign in to Live in the launcher, add friends by username, and open a world with online play enabled. Friends' available worlds appear in game automatically. Mini-game matchmaking searches visible Live sessions for a compatible open game. The client uses a direct connection when NAT traversal succeeds and falls back to the relay otherwise. Matchmaking currently searches open games; it does not keep players in a waiting queue.
 
-The launcher News page combines LCEReborn Live release notes with the original LCEReborn release feed. When a newer stable Live release is available, the launcher offers an update; installed Windows copies can download and start the installer from the launcher. Portable copies use the release page. In an online game, enabling **Game Chat** opens the default microphone and sends speech to the other players; silence is filtered automatically.
+The launcher News page combines LCEReborn Live release notes with the original LCEReborn release feed. When a newer stable Live release is available, the launcher offers an update; installed Windows copies can download and start the installer from the launcher, while Linux opens the AppImage download. Portable copies use the release page. In an online game, enabling **Game Chat** opens the default microphone and sends speech to the other players; silence is filtered automatically.
 
 The game host limits each player's voice stream to 75 packets and 16384 audio bytes per second, with a short burst allowance. Server operators can set `LCE_VOICE_MAX_PACKETS_PER_SECOND` and `LCE_VOICE_MAX_BYTES_PER_SECOND` before starting the game or dedicated server.
 

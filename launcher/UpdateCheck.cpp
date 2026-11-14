@@ -54,7 +54,11 @@ NewerRelease FindNewerRelease(const QJsonArray& releases, const QString& tag, co
     {
         const QJsonObject asset = assetValue.toObject();
         const QString name = asset.value("name").toString();
+#ifdef Q_OS_LINUX
+        if (name.startsWith("LCEReborn-Live-Linux-") && name.endsWith(".AppImage", Qt::CaseInsensitive))
+#else
         if (name.startsWith("LCEReborn-Live-Installer-") && name.endsWith(".exe", Qt::CaseInsensitive))
+#endif
         {
             newer.installerUrl = asset.value("browser_download_url").toString();
             break;

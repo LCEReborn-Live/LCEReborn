@@ -1,15 +1,18 @@
-# LCEReborn Live Windows releases
+# LCEReborn Live releases
 
-The `Windows build and release` workflow builds the game and launcher from the
-tagged source commit, packages the Live bridge and its Node.js runtime, then
-creates a per-user Windows installer and a portable ZIP. It also runs on pushes
-to `main` and `live-integration` and on pull requests to `main`; those runs
-publish downloadable build artifacts without creating a GitHub Release.
+The `Windows and Linux build and release` workflow builds both clients from the
+tagged source commit and packages the Live bridge with its checksum-verified
+Node.js runtime. Linux gets an AppImage and a portable `.tar.gz`; Windows gets a
+per-user installer and portable ZIP. Pushes to `main` and `live-integration`
+and pull requests to `main` build both platforms and publish workflow artifacts
+without creating a GitHub Release.
 
 To publish a release, merge the client changes, create and push a version tag
 such as `v0.1.0`, then wait for the workflow to finish. The GitHub Release gets
-`LCEReborn-Live-Installer-0.1.0.exe` and
-`LCEReborn-Live-Portable-0.1.0.zip`.
+`LCEReborn-Live-Installer-0.1.0.exe`,
+`LCEReborn-Live-Portable-0.1.0.zip`,
+`LCEReborn-Live-Linux-0.1.0.AppImage`, and
+`LCEReborn-Live-Linux-Portable-0.1.0.tar.gz`.
 
 The packages contain the executables, launcher resources, open-source runtime
 dependencies, and Live networking scripts. They do not contain game content,
@@ -28,10 +31,11 @@ hardcoded in the client.
 ## Browser joins
 
 The Windows installer registers `lcereborn://join/<owner-id>` for the current
-user. Portable users can select **Enable browser joins** in Friends to register
-their current launcher path. Moving that folder requires registering again.
-Uninstalling an installed copy removes the handler only when it still points to
-that installation.
+user. Linux users can select **Enable browser joins** in Friends to register a
+per-user desktop handler; an AppImage registers its stable AppImage path, while
+a portable archive registers the current launcher path. Moving a portable
+folder requires registering again. Windows portable users can use the same
+button.
 
 Join links contain only a positive account ID. The launcher checks the world
 directory using its own saved session, then the existing bridge obtains the
@@ -50,3 +54,9 @@ Configure with `-DLCE_BUILD_LIVE_JOIN_TESTS=ON` to build
 launcher copied into an isolated test folder with its Qt dependencies; do not
 point it at an in-use player installation. In headless runs set
 `QT_QPA_PLATFORM=offscreen` and include Qt's offscreen platform plugin.
+
+On Linux, the Live bridge reads and writes the same session files through the
+POSIX file bridge. The release packages include the Node.js 22 runtime and its
+license, so players do not need a separate Node installation. The Linux
+launcher opens AppImage updates in the browser; users of a portable archive
+download and replace it manually.

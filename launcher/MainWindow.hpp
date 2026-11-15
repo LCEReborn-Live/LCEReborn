@@ -22,6 +22,7 @@ class PlayButton;
 class ProfileStore;
 class QBoxLayout;
 class QStackedWidget;
+class QSystemTrayIcon;
 class SetupPage;
 class ShadowLabel;
 class TabbedPanel;
@@ -108,6 +109,8 @@ private:
     ShadowLabel* mStatus;
     bool mHiddenForGame = false;
     bool mCloseAfterGame = false;
+    QSystemTrayIcon* mTrayIcon = nullptr;
+    bool mQuitRequested = false;
 };
 
 #endif

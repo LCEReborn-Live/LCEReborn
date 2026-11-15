@@ -23,8 +23,11 @@ public:
     virtual unsigned int mapElementsAndNames();
     virtual int getSceneType();
     virtual void tick();
+    virtual bool handlesPointer();
     virtual void customDraw(const char* name, fuiRect* rect);
     virtual void handleInput(int playerId, int action, bool repeat, bool pressed, bool released, bool& handled);
+    virtual void handleTouchInput(unsigned int playerId, int touchX, int touchY, int touchBox, bool pressed,
+                                  bool repeat, bool released);
     virtual void handlePress(int controlId, int childId);
     virtual void handleFocusChange(int controlId, int childId);
     virtual void updateTooltips();
@@ -70,6 +73,7 @@ private:
     void ReleaseFaceTextures();
     std::wstring EntryLabel(const Entry& entry) const;
     void ActivateEntry(int selection);
+    bool HandleMouseInput();
 
     UIControl m_tabControls[eTab_Count];
     UIControl_LeftIconButtonList m_lists[eTab_Count];
@@ -91,6 +95,8 @@ private:
     char m_pendingOperation = 0;
     bool m_addFriendKeyboardPending = false;
     bool m_inviteMode = false;
+    float m_lastPointerX = -1.0f;
+    float m_lastPointerY = -1.0f;
     std::vector<unsigned int> m_inviteQueue;
     long long m_nextQueuedInviteAt = 0;
     unsigned int m_inFlightInviteId = 0;

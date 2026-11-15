@@ -24,6 +24,8 @@
 #include <QInputDialog>
 #include <QImage>
 #include <QMessageBox>
+#include <QMenu>
+#include <QSystemTrayIcon>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -312,6 +314,23 @@ MainWindow::MainWindow(ProfileStore& store, QWidget* parent)
     rootLayout->addWidget(mRoot);
     setCentralWidget(mPanorama);
 
+    if (QSystemTrayIcon::isSystemTrayAvailable())
+    {
+        mTrayIcon = new QSystemTrayIcon(QApplication::windowIcon(), this);
+        mTrayIcon->setToolTip("LCEReborn Live");
+        QMenu* trayMenu = new QMenu(this);
+        QAction* open = trayMenu->addAction("Open LCEReborn Live");
+        QAction* quit = trayMenu->addAction("Exit LCEReborn Live");
+        connect(open, &QAction::triggered, this, [this] { showNormal(); raise(); activateWindow(); });
+        connect(quit, &QAction::triggered, this, [this] { mQuitRequested = true; close(); mQuitRequested = false; });
+        connect(mTrayIcon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+            if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
+            { showNormal(); raise(); activateWindow(); }
+        });
+        mTrayIcon->setContextMenu(trayMenu);
+        mTrayIcon->show();
+    }
+
     connect(&mStore, &ProfileStore::Changed, this, &MainWindow::RefreshProfiles);
     connect(mProfileButton, &GameButton::clicked, this, &MainWindow::ShowProfileMenu);
     connect(mPlay, &PlayButton::clicked, this, &MainWindow::Play);
@@ -495,6 +514,7 @@ void MainWindow::DownloadLauncherUpdate()
             return;
         }
         helperDirectory.setAutoRemove(false);
+        mQuitRequested = true;
         QApplication::quit();
         return;
 #else
@@ -888,7 +908,7 @@ void MainWindow::PollLiveInvites()
 
 void MainWindow::ShowLiveInvite(qint64 ownerId, const QString& owner, const QString& world, bool friendRequest)
 {
-    QFrame* toast = new QFrame(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+    QFrame* toast = new QFrame(nullptr, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     toast->setAttribute(Qt::WA_DeleteOnClose);
     toast->setAttribute(Qt::WA_ShowWithoutActivating);
     toast->setAttribute(Qt::WA_TranslucentBackground);
@@ -1408,7 +1428,7 @@ void MainWindow::OnGameStarted()
     if (profile != nullptr && (profile->afterLaunch == AfterLaunch::Hide || profile->afterLaunch == AfterLaunch::Close))
     {
         mHiddenForGame = true;
-        mCloseAfterGame = profile->afterLaunch == AfterLaunch::Close;
+        mCloseAfterGame = profile->afterLaunch == AfterLaunch::Close && !mTrayIcon;
         hide();
     }
 }
@@ -1493,6 +1513,15 @@ void MainWindow::SaveProfiles()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    if (!mQuitRequested && mTrayIcon && mTrayIcon->isVisible())
+    {
+        QSettings settings(LauncherPaths::SettingsFile(), QSettings::IniFormat);
+        settings.setValue("window/geometry", saveGeometry());
+        settings.setValue("window/page", mPages->currentIndex());
+        hide();
+        event->ignore();
+        return;
+    }
     if (mRunner->IsRunning())
     {
         const auto answer = QMessageBox::question(

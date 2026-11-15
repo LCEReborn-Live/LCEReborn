@@ -506,10 +506,19 @@ void fuiRenderNodeTimeline::handleConstruction()
 
 int fuiRenderNodeTimeline::getFrame(const char* name)
 {
+    if (name == NULL || m_object == NULL || m_file == NULL || m_file->frameData == NULL)
+        return 0;
+
     fuiTimeline* timeline = static_cast<fuiTimeline*>(m_object);
-    fuiTimelineFrame* frame = m_file->frameData + timeline->timelineFrameIndex;
-    for (unsigned int i = 0; i < timeline->timelineFrameCount; ++i, ++frame)
-        if (std::strcmp(frame->name, name) == 0)
+    const unsigned int firstFrame = timeline->timelineFrameIndex;
+    const unsigned int frameCount = timeline->timelineFrameCount;
+    const unsigned int fileFrameCount = m_file->header.timelineFrameCount;
+    if (frameCount == 0 || firstFrame >= fileFrameCount || frameCount > fileFrameCount - firstFrame)
+        return 0;
+
+    fuiTimelineFrame* frame = m_file->frameData + firstFrame;
+    for (unsigned int i = 0; i < frameCount; ++i, ++frame)
+        if (std::memchr(frame->name, '\0', sizeof(frame->name)) != NULL && std::strcmp(frame->name, name) == 0)
             return static_cast<int>(i + 1);
     return 0;
 }

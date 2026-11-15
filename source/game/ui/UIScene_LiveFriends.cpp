@@ -30,6 +30,7 @@
 #include "game/ui/FJ_Base.hpp"
 #include "game/ui/FJ_FuiNode.hpp"
 #include "game/ui/FJ_LoadCreateJoinMenu.hpp"
+#include "game/ui/FJ_List.hpp"
 #include "game/ui/fuiFile.hpp"
 #include "game/ui/fuiRenderNode.hpp"
 #include "game/ui/fuiRenderNodeCodeGenRect.hpp"
@@ -37,6 +38,7 @@
 #include "game/ui/UILayer.hpp"
 #include "platform/pc/PcLiveBridge.hpp"
 #include "platform/CInput.hpp"
+#include "platform/C4JInput.hpp"
 
 extern ConsoleUIController gConsoleUIController;
 
@@ -100,6 +102,26 @@ void CenterNodeOnStageX(FJ_FuiNode* node, float stageWidth)
     }
     if (parentScaleX <= 0.0f) return;
     node->setX((stageWidth * 0.5f - parentX) / parentScaleX - node->getWidth() * 0.5f);
+}
+
+bool NodeBoundsOnStage(fuiRenderNode* node, fuiRect& bounds)
+{
+    if (node == NULL || !node->isVisible()) return false;
+    node->getParentSpaceBounds(&bounds);
+    for (fuiRenderNode* parent = node->getParent(); parent != NULL; parent = parent->getParent())
+    {
+        if (!parent->isVisible()) return false;
+        bounds.xMin = bounds.xMin * parent->getScaleX() + parent->getX();
+        bounds.xMax = bounds.xMax * parent->getScaleX() + parent->getX();
+        bounds.yMin = bounds.yMin * parent->getScaleY() + parent->getY();
+        bounds.yMax = bounds.yMax * parent->getScaleY() + parent->getY();
+    }
+    return true;
+}
+
+bool Contains(const fuiRect& bounds, float x, float y)
+{
+    return x >= bounds.xMin && x < bounds.xMax && y >= bounds.yMin && y < bounds.yMax;
 }
 
 std::string ReadLiveText(const wchar_t* name)
@@ -195,11 +217,101 @@ int UIScene_LiveFriends::getSceneType()
 void UIScene_LiveFriends::tick()
 {
     UIScene::tick();
+    if (m_hasFocus && HandleMouseInput()) return;
     const long long now = System::processTimeInMilliSecs();
     if (now < m_nextPoll) return;
     m_nextPoll = now + 500;
     if (ReadSocial()) PopulateLists();
     PollLive();
+}
+
+bool UIScene_LiveFriends::handlesPointer()
+{
+    return true;
+}
+
+bool UIScene_LiveFriends::HandleMouseInput()
+{
+#if LCE_PLATFORM_PC
+    float pointerX = 0.0f;
+    float pointerY = 0.0f;
+    if (!g_pInput->GetMenuPointer(m_playerId, &pointerX, &pointerY))
+        return false;
+
+    int offsetX = 0, offsetY = 0;
+    gConsoleUIController.GetViewportTouchOffset(m_layer->getViewport(), &offsetX, &offsetY);
+    const float x = pointerX * gConsoleUIController.getScreenWidth() / 1280.0f - offsetX;
+    const float y = pointerY * gConsoleUIController.getScreenHeight() / 720.0f - offsetY;
+    const bool moved = x != m_lastPointerX || y != m_lastPointerY;
+    m_lastPointerX = x;
+    m_lastPointerY = y;
+    const unsigned int clicks = g_pInput->ConsumeMenuClicks(m_playerId);
+    if ((clicks & C_4JInput::EPcMenuClick_Secondary) != 0)
+    {
+        navigateBack();
+        return true;
+    }
+    const bool clicked = (clicks & (C_4JInput::EPcMenuClick_Primary | C_4JInput::EPcMenuClick_Quick)) != 0;
+    if (clicked && !m_inviteMode)
+    {
+        const char* titles[eTab_Count] = {"LoadGameTabTitle", "NewGameTabTitle", "JoinGameTabTitle"};
+        FJ_FuiNode* root = m_movie->getRootNode()->getFuiNode();
+        fuiRect tabBounds[eTab_Count];
+        bool valid = true;
+        for (int tab = 0; tab < eTab_Count; ++tab)
+        {
+            fuiRenderNode* title = root->getRenderNodeChildByName(titles[tab]);
+            if (!NodeBoundsOnStage(title, tabBounds[tab])) { valid = false; break; }
+        }
+        if (valid)
+        {
+            const float first = (tabBounds[0].xMin + tabBounds[0].xMax) * 0.5f;
+            const float middle = (tabBounds[1].xMin + tabBounds[1].xMax) * 0.5f;
+            const float last = (tabBounds[2].xMin + tabBounds[2].xMax) * 0.5f;
+            const float top = std::min(tabBounds[0].yMin, std::min(tabBounds[1].yMin, tabBounds[2].yMin)) - 12.0f;
+            const float bottom = std::max(tabBounds[0].yMax, std::max(tabBounds[1].yMax, tabBounds[2].yMax)) + 12.0f;
+            if (y >= top && y < bottom && x >= first - (middle - first) * 0.5f
+                && x < last + (last - middle) * 0.5f)
+            {
+                SelectTab(x < (first + middle) * 0.5f ? eTab_Friends
+                          : x < (middle + last) * 0.5f ? eTab_Requests : eTab_Invites);
+                return false;
+            }
+        }
+    }
+
+    FJ_List* list = m_lists[m_tab].getFuiRenderNode()->getFuiNode()->asFJ_List();
+    if (list != NULL && (moved || clicked))
+    {
+        for (int index = 0; index < list->getINumButtons(); ++index)
+        {
+            FJ_FuiNode* item = list->ReturnItem(index);
+            fuiRect bounds;
+            if (item == NULL || !NodeBoundsOnStage(item->m_pRenderNode, bounds) || !Contains(bounds, x, y))
+                continue;
+            if (m_lists[m_tab].getCurrentSelection() != static_cast<unsigned int>(index))
+            {
+                list->HighlightItem(index, false);
+                m_lists[m_tab].updateChildFocus(index);
+            }
+            if (clicked)
+            {
+                ActivateEntry(index);
+                gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+            }
+            break;
+        }
+    }
+    int wheel = g_pInput->ConsumeMenuWheel(m_playerId);
+    while (wheel != 0)
+    {
+        const int action = wheel > 0 ? EControllerActions_MenuUp : EControllerActions_MenuDown;
+        sendInputToMovie(action, false, true, false);
+        sendInputToMovie(action, false, false, true);
+        wheel += wheel > 0 ? -1 : 1;
+    }
+#endif
+    return false;
 }
 
 int UIScene_LiveFriends::GetFaceTexture(const Entry& entry)
@@ -810,6 +922,13 @@ void UIScene_LiveFriends::handlePress(int controlId, int childId)
         SelectTab(static_cast<ETab>(controlId));
         ActivateEntry(childId);
     }
+}
+
+void UIScene_LiveFriends::handleTouchInput(unsigned int, int, int, int touchBox, bool pressed, bool, bool)
+{
+    if (!pressed || m_inviteMode || touchBox < 4 || touchBox >= 4 + eTab_Count)
+        return;
+    SelectTab(static_cast<ETab>(touchBox - 4));
 }
 
 void UIScene_LiveFriends::handleFocusChange(int controlId, int childId)

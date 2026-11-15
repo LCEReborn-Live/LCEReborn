@@ -63,7 +63,6 @@ static const EUIScene s_componentDRC = EUIScene_Panorama;
 static const EUIScene s_componentTV = EUIScene_Logo;
 static EUIScene s_nextScene = EUIScene_Count;
 static Random* s_splashRandom = new Random();
-static const char* const s_nativeMenuButtonSymbol = "fourj.Buttons.FJ_MenuButton_Normal";
 
 }
 
@@ -159,38 +158,8 @@ unsigned int UIScene_MainMenu::mapElementsAndNames()
         m_controls.push_back(&m_buttons[6]);
     }
     {
-        bool createdNativeLiveButton = false;
-#if LCE_PLATFORM_PC
-        if (PcLiveBridge::Enabled() && root->getFuiNode() != NULL)
-        {
-            // ButtonUpsell is a different FUI class (FJ_UpsellButton_Normal),
-            // with different padding and wrapping behavior from the main-menu
-            // buttons. Replace that visual with the same stock 4J button class
-            // used by Packs while retaining its native ButtonUpsell name so the
-            // FUI's existing focus/navigation links continue to work.
-            FJ_FuiNode* liveButton = FJ_Factory::createObject(s_nativeMenuButtonSymbol, root, true, "ButtonUpsell");
-            FJ_FuiNode* menuRoot = root->getFuiNode();
-            FJ_FuiNode* upsellButton = menuRoot->getChildByName("ButtonUpsell");
-            if (liveButton != NULL)
-            {
-                FJ_Base* oldButtonBase = upsellButton != NULL ? upsellButton->asFJ_Base() : NULL;
-                FJ_Base* liveButtonBase = liveButton->asFJ_Base();
-                if (oldButtonBase != NULL && liveButtonBase != NULL)
-                    liveButtonBase->CopyNavigationFrom(*oldButtonBase);
-                if (upsellButton != NULL)
-                    menuRoot->removeChild(upsellButton, true);
-                menuRoot->addChild(liveButton);
-                m_buttons[7].setupControl(this, root, std::string("ButtonUpsell"));
-                m_controls.push_back(&m_buttons[7]);
-                createdNativeLiveButton = true;
-            }
-        }
-#endif
-        if (!createdNativeLiveButton)
-        {
-            m_buttons[7].setupControl(this, root, std::string("ButtonUpsell"));
-            m_controls.push_back(&m_buttons[7]);
-        }
+        m_buttons[7].setupControl(this, root, std::string("ButtonUpsell"));
+        m_controls.push_back(&m_buttons[7]);
     }
     {
         m_timer.setupControl(this, root, std::string("Timer"));
@@ -231,8 +200,11 @@ void UIScene_MainMenu::layoutLiveMenuButtons()
 
     // Keep the established two-button row. Snap its geometry to whole FUI
     // pixels so the stock borders and texture pixels stay crisp at native scale.
-    const float left = std::floor(m_buttons[5].getXPos() + 0.5f);
-    const float fullWidth = std::floor(m_buttons[5].getWidth() + 0.5f);
+    // Packs used to be narrower than the regular rows, so its original width
+    // cannot be used as the width of the split row. Anchor the two buttons to
+    // the full-width Help & Options row instead.
+    const float left = std::floor(m_buttons[4].getXPos() + 0.5f);
+    const float fullWidth = std::floor(m_buttons[4].getWidth() + 0.5f);
     const float gap = 4.0f;
     const float combinedButtonWidth = std::max(2.0f, fullWidth - gap);
     const float packsWidth = std::floor(combinedButtonWidth * 0.5f);

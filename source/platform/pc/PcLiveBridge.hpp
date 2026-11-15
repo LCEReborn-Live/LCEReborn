@@ -7,6 +7,7 @@
 
 #ifdef _WIN32
 #include <stdio.h>
+extern "C" __declspec(dllimport) int __stdcall MoveFileExW(const wchar_t*, const wchar_t*, unsigned long);
 #endif
 
 // The launcher and game share a private per-session directory. Keep its small
@@ -120,7 +121,7 @@ inline bool Rename(const wchar_t* from, const wchar_t* to)
     }
     oldPath += from;
     newPath += to;
-    return _wrename(oldPath.c_str(), newPath.c_str()) == 0;
+    return MoveFileExW(oldPath.c_str(), newPath.c_str(), 0x1ul /* MOVEFILE_REPLACE_EXISTING */) != 0;
 #else
     std::string oldName;
     std::string newName;

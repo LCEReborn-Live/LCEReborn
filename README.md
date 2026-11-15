@@ -5,7 +5,7 @@
 
 **Minecraft: Wii U Edition, rebuilt for PC and connected with friends.**
 
-[English](#en) · [Русский](#ru) · [Downloads](https://github.com/LCEReborn-Live/LCEReborn/releases/latest)
+[English](#en) · [Русский](#ru) · [Website](https://lcereborn.xyz) · [Downloads](https://github.com/LCEReborn-Live/LCEReborn/releases/latest) · [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI)
 
 </div>
 
@@ -18,9 +18,11 @@
 ### Features
 
 - Browser-based Live sign-in with a persistent launcher session.
-- Friends, launcher and in-game presence, invitations, and a list of joinable worlds.
-- Join an available friend's online world from the website or launcher; browser links open the existing launcher and start the game when needed.
-- Original Battle, Tumble and Glide icons alongside friends' activity in the launcher and on the website.
+- In-game **LCE Live** menu for friends, friend requests, invitations, presence, and available worlds.
+- View friends' shared achievements in their in-game profiles. Existing achievements sync when their owner plays while signed in to Live.
+- Manage your account and friends on the [Live website](https://lcereborn.xyz); a link to an available friend's world opens the launcher.
+- Invitation and friend request notifications in game or in the launcher; the launcher can stay in the system tray for background notifications.
+- Battle, Tumble and Glide activity indicators for friends on the website.
 - Live matchmaking for Battle, Tumble, Glide, and Build games with compatible open sessions.
 - Direct connections with NAT traversal when possible, with relay fallback.
 - Live account skins and capes in game.
@@ -41,7 +43,7 @@ Game data, saves, and update files are not included in downloads. The launcher i
 
 ### Live networking
 
-Sign in to Live in the launcher, add friends by username, and open a world with online play enabled. Friends' available worlds appear in game automatically. Mini-game matchmaking searches visible Live sessions for a compatible open game. The client uses a direct connection when NAT traversal succeeds and falls back to the relay otherwise. Matchmaking currently searches open games; it does not keep players in a waiting queue.
+Sign in to Live in the launcher, add friends by username in the in-game LCE Live menu or on the website, and open a world with online play enabled. Friends' available worlds appear in game automatically. Mini-game matchmaking searches visible Live sessions for a compatible open game. The client uses a direct connection when NAT traversal succeeds and falls back to the relay otherwise. Matchmaking currently searches open games; it does not keep players in a waiting queue.
 
 The launcher News page combines LCEReborn Live release notes with the original LCEReborn release feed. When a newer stable Live release is available, the launcher offers an update; installed Windows copies can download and start the installer from the launcher, while Linux opens the AppImage download. Portable copies use the release page. In an online game, enabling **Game Chat** opens the default microphone and sends speech to the other players; silence is filtered automatically.
 
@@ -49,7 +51,7 @@ The game host limits each player's voice stream to 75 packets and 16384 audio by
 
 ### Build from source
 
-Client build instructions are in [`docs/pc-platform.md`](docs/pc-platform.md). Release build details are in [`docs/live-release.md`](docs/live-release.md).
+Client build instructions are in [`docs/pc-platform.md`](docs/pc-platform.md). Release build details are in [`docs/live-release.md`](docs/live-release.md). The separate server and website are maintained in [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI).
 
 ## Disclaimers
 
@@ -72,21 +74,23 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 ### Возможности
 
 - Вход в Live через браузер с сохранением сессии в лаунчере.
-- Друзья, статусы «в лаунчере» и «в игре», приглашения и список доступных миров.
-- Подключение к доступному онлайн-миру друга с сайта или из лаунчера: браузерная ссылка открывает лаунчер и при необходимости запускает игру.
-- Оригинальные иконки Battle, Tumble и Glide рядом с активностью друзей на сайте и в лаунчере.
+- Меню **LCE Live** в игре: друзья, заявки, приглашения, статусы и доступные миры.
+- Просмотр достижений друзей в их игровых профилях. Полученные ранее достижения синхронизируются, когда их владелец запускает игру с входом в Live.
+- Управление аккаунтом и друзьями на [сайте Live](https://lcereborn.xyz); ссылка на доступный мир друга открывает лаунчер.
+- Уведомления о приглашениях и заявках в игре или лаунчере; лаунчер может оставаться в системном трее и получать уведомления в фоне.
+- Индикаторы активности друзей в Battle, Tumble и Glide на сайте.
 - Подключение напрямую с обходом NAT, когда это возможно, и через relay в остальных случаях.
 - Скины и плащи Live-аккаунта в игре.
 - Оригинальное меню таблиц рекордов LCE с глобальными результатами, результатами друзей и личным рекордом.
 - Лента новостей с релизами LCEReborn Live и оригинального LCEReborn.
-- Уведомления об обновлениях и загрузка установщика из лаунчера для установленной версии Windows.
+- Уведомления об обновлениях для Windows и Linux; установленная версия Windows может скачать и запустить установщик.
 - Вкладка Join с поиском игр Battle, Tumble и Glide.
 - Голосовой Game Chat в стиле Wii U: открытый микрофон в сетевой игре с шумоподавлением и автоматическим определением речи, без кнопки PTT.
 - Клавиатура, мышь и геймпады; одиночная игра и разделённый экран.
 
 ### Установка
 
-1. Скачайте установщик или portable-архив со [страницы релизов](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
+1. Скачайте установщик, portable-архив или Linux AppImage со [страницы релизов](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
 2. Запустите лаунчер и импортируйте **собственные дампы** базовой игры и Update 688.
 3. Войдите в Live через кнопку в лаунчере, выберите профиль и нажмите **Play**.
 
@@ -94,13 +98,13 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 
 ### Сеть Live
 
-Войдите в Live в лаунчере, добавьте друзей по имени пользователя и откройте мир с включённой сетевой игрой. Доступные миры друзей появляются в игре автоматически. Прямое соединение используется, когда удаётся пройти NAT; иначе подключение идёт через relay.
+Войдите в Live в лаунчере, добавьте друзей по имени пользователя в игровом меню LCE Live или на сайте и откройте мир с включённой сетевой игрой. Доступные миры друзей появляются в игре автоматически. Поиск мини-игр ищет совместимые открытые сессии без очереди ожидания. Прямое соединение используется, когда удаётся пройти NAT; иначе подключение идёт через relay.
 
-Вкладка News объединяет заметки о релизах LCEReborn Live и ленту оригинального LCEReborn. Когда выходит новая стабильная версия Live, лаунчер предлагает обновление. Установленные версии Windows могут скачать и запустить установщик из лаунчера; для portable-версии открывается страница релиза. Включите **Game Chat** в настройках звука во время сетевой игры: микрофон будет открыт, тишина автоматически отфильтровывается.
+Вкладка News объединяет заметки о релизах LCEReborn Live и ленту оригинального LCEReborn. Когда выходит новая стабильная версия Live, лаунчер предлагает обновление. Установленные версии Windows могут скачать и запустить установщик из лаунчера; для portable-версии открывается страница релиза, а для Linux — загрузка AppImage. Включите **Game Chat** в настройках звука во время сетевой игры: микрофон будет открыт, тишина автоматически отфильтровывается.
 
 ### Сборка из исходников
 
-Инструкции по сборке клиента находятся в [`docs/pc-platform.md`](docs/pc-platform.md), а сведения о сборке релизов — в [`docs/live-release.md`](docs/live-release.md).
+Инструкции по сборке клиента находятся в [`docs/pc-platform.md`](docs/pc-platform.md), а сведения о сборке релизов — в [`docs/live-release.md`](docs/live-release.md). Сервер и сайт находятся в отдельном репозитории [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI).
 
 ### Отдельная благодарность
 

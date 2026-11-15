@@ -61,7 +61,7 @@ UIScene_LeaderboardsMenu::~UIScene_LeaderboardsMenu()
 
 std::wstring UIScene_LeaderboardsMenu::FilterText() const
 {
-    int filter = IDS_LCE_LEADERBOARD_MY_STATISTICS;
+    int filter = IDS_LEADERBOARD_FILTER_FRIENDS;
     if (m_readType == LeaderboardManager::eReadType_TopRank)
         filter = IDS_LEADERBOARD_FILTER_OVERALL;
     else if (m_readType == LeaderboardManager::eReadType_MyScore)

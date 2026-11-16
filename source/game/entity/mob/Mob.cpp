@@ -709,6 +709,10 @@ void Mob::aiStep()
 
 const EquipmentSlot* Mob::getEquipmentSlotForItem(not_null_ptr<ItemInstance> item)
 {
+#if LCE_PLATFORM_PC
+    if (!item->isEmpty() && Item::getId(item->getItem()) == 442)
+        return EquipmentSlot::OFFHAND;
+#endif
     if (Block::byItem(item->getItem()) != Blocks::carved_pumpkin && item->getItem() != Items::skull)
     {
         ArmorItem* armorItem = dynamic_cast<ArmorItem*>(item->getItem());

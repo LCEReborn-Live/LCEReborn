@@ -27,5 +27,6 @@ ShieldModel::ShieldModel(const ModelDefinition& modelDefinition)
 void ShieldModel::render(bool useDisplayList)
 {
     mPlate->render(0.0625f, useDisplayList, false);
+    mPlateFront->render(0.0625f, useDisplayList, false);
     mHandle->render(0.0625f, useDisplayList, false);
 }

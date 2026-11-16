@@ -27,7 +27,11 @@ SwordItem::SwordItem(const Item::Tier* tier)
 
 unsigned int SwordItem::GetUseTooltip(const ItemTooltipDataHolder& tooltipData)
 {
+#if LCE_PLATFORM_PC
+    return Item::GetUseTooltip(tooltipData);
+#else
     return IDS_TOOLTIPS_BLOCK;
+#endif
 }
 
 float SwordItem::getTierDamage()
@@ -85,20 +89,33 @@ bool SwordItem::isHandEquipped()
 
 int SwordItem::getUseAnimation(not_null_ptr<const ItemInstance> itemInstance) const
 {
+#if LCE_PLATFORM_PC
+    return UseAnim_none;
+#else
     return UseAnim_block;
+#endif
 }
 
 int SwordItem::getUseDuration(not_null_ptr<ItemInstance> itemInstance)
 {
+#if LCE_PLATFORM_PC
+    return 0;
+#else
     return 72000;
+#endif
 }
 
 InteractionResultHolder SwordItem::use(Level* level, boost::shared_ptr<Player> player,
                                        InteractionHand::EInteractionHand hand)
 {
+#if LCE_PLATFORM_PC
+    // Swords no longer block; PASS lets an offhand shield receive the use action.
+    return Item::use(level, player, hand);
+#else
     not_null_ptr<ItemInstance> itemInstance = player->getItemInHand(hand);
     player->startUsingItem(hand);
     return InteractionResultHolder(InteractionResult::eInteractionResult_Success, itemInstance);
+#endif
 }
 
 bool SwordItem::canDestroySpecial(const BlockState* state)

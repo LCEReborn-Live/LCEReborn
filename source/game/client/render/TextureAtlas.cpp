@@ -16,6 +16,11 @@
 #include "game/item/Item.hpp"
 #include "game/world/block/Block.hpp"
 #include "game/world/generation/GlideRingGenerator.hpp"
+#if LCE_PLATFORM_PC
+#include "game/client/render/TextureUtil.hpp"
+#include "game/core/BufferedImage.hpp"
+#include "platform/pc/PcPaths.hpp"
+#endif
 
 static std::wstring MISSING_ICON_NAME(L"missingno");
 
@@ -332,6 +337,9 @@ void TextureAtlas::loadUVs()
         addIcon(false, 15, 14, L"bucketPuffer");
         addIcon(false, 15, 15, L"bucketTropical");
         addIcon(false, 16, 0, L"leather_horse_armor_detail");
+#if LCE_PLATFORM_PC
+        addIcon(false, 16, 1, L"experimental_shield");
+#endif
         addIcon(false, 16, 7, L"kelp");
         addIcon(false, 16, 8, L"dried_kelp");
         addIcon(false, 16, 9, L"sea_pickle");
@@ -1022,6 +1030,28 @@ void TextureAtlas::stitch()
         height = image->getHeight();
         width = image->getWidth();
     }
+#if LCE_PLATFORM_PC
+    // Place the test icon in an unused cell of the item atlas without changing
+    // the user's texture pack. Scale to the selected atlas resolution.
+    if (mIconType == 1 && width >= 256 && height >= 272)
+    {
+        const std::string iconPath = PcResourceRoot() + "/experimental/shield_icon.png";
+        int iconWidth = 0, iconHeight = 0;
+        int* iconPixels = NULL;
+        if (TextureUtil::LoadTextureData(iconPath.c_str(), &iconWidth, &iconHeight, &iconPixels) == 0 &&
+            iconPixels != NULL && iconWidth > 0 && iconHeight > 0)
+        {
+            const int cellWidth = width / 16;
+            const int cellHeight = height / 17;
+            int* atlas = image->getData();
+            for (int y = 0; y < cellHeight; ++y)
+                for (int x = 0; x < cellWidth; ++x)
+                    atlas[(16 * cellHeight + y) * width + cellWidth + x] =
+                        iconPixels[(y * iconHeight / cellHeight) * iconWidth + (x * iconWidth / cellWidth)];
+        }
+        std::free(iconPixels);
+    }
+#endif
     if (mStitchedTexture != 0)
     {
         TextureManager::getInstance()->unregisterTexture(mName, mStitchedTexture);

@@ -78,6 +78,7 @@
 #include "game/item/SeedFoodItem.hpp"
 #include "game/item/SeedItem.hpp"
 #include "game/item/ShearsItem.hpp"
+#include "game/item/ShieldItem.hpp"
 #include "game/item/ShovelItem.hpp"
 #include "game/item/SignItem.hpp"
 #include "game/item/SimpleFoiledItem.hpp"
@@ -2560,6 +2561,11 @@ void Item::staticCtor()
                  (new LingeringPotionItem())
                      ->setIconName(L"lingering_potion")
                      ->setDescriptionId(IDS_ITEM_LINGERING_POTION, IDS_DESC_ITEM_LINGERING_POTION));
+
+#if LCE_PLATFORM_PC
+    // Local experiment: this ID and its gameplay are not yet network-compatible.
+    registerItem(442, L"shield", (new ShieldItem())->setIconName(L"experimental_shield"));
+#endif
 
     registerItem(443, L"elytra",
                  (new ElytraItem())->setIconName(L"elytra")->setDescriptionId(IDS_ITEM_ELYTRA, IDS_DESC_ITEM_ELYTRA));

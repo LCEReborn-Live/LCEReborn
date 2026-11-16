@@ -10,9 +10,18 @@
 #include "game/core/DLCPack.hpp"
 #include "game/core/Minecraft.hpp"
 #include "game/client/render/DLCTexturePack.hpp"
+#include "game/client/render/LegacyTexturePack.hpp"
 #include "game/client/render/MapRenderer.hpp"
 
 TexturePack* TexturePackRepository::defaultTexturePack = NULL;
+
+namespace
+{
+// This is the pack ID declared by the bundled 1.14 TexturePack.pck. It is
+// installed as the repository's default, not shown as a selectable DLC pack.
+const unsigned int kLiveBuiltInTexturePackSourceId = 2050;
+const unsigned int kLegacyTexturePackId = 0x00fffffe;
+}
 
 TexturePackRepository::TexturePackRepository(File file, Minecraft* minecraft)
 {
@@ -33,6 +42,7 @@ TexturePackRepository::TexturePackRepository(File file, Minecraft* minecraft)
     m_unknown0 = 0;
     m_unknown1 = NULL;
     m_previousSelected = NULL;
+    m_liveDefaultPackRegistered = false;
 }
 
 TexturePack* TexturePackRepository::getSelected()
@@ -142,9 +152,48 @@ TexturePack* TexturePackRepository::addTexturePackFromDLC(DLCPack* dlcPack, unsi
     unsigned int id = packId & 0x00ffffff;
     if (dlcPack != NULL)
     {
-        texturePack = new DLCTexturePack(id, dlcPack, defaultTexturePack);
-        m_allTexturePacks->push_back(texturePack);
-        m_texturePacksById[id] = texturePack;
+        if (!m_liveDefaultPackRegistered && id == kLiveBuiltInTexturePackSourceId)
+        {
+            // Preserve the former default as a normal, optional "Old Textures"
+            // pack. The DLC pack itself receives ID 0, so all ordinary code sees
+            // its contents as the built-in default rather than as a selected add-on.
+            TexturePack* previousDefault = defaultTexturePack;
+            TexturePack* legacyTexturePack = new LegacyTexturePack(kLegacyTexturePackId);
+            texturePack = new DLCTexturePack(0, dlcPack, legacyTexturePack);
+
+            // DLC metadata may create colour and material tables while the PCK
+            // data is mounted. Initialise their base tables before publishing
+            // this object as the repository-wide default.
+            texturePack->loadColourTable();
+            texturePack->loadMaterialTable();
+            texturePack->loadStructureManager();
+
+            for (std::vector<TexturePack*>::iterator it = m_allTexturePacks->begin(); it != m_allTexturePacks->end();
+                 ++it)
+            {
+                if (*it == previousDefault)
+                {
+                    *it = texturePack;
+                    break;
+                }
+            }
+            m_allTexturePacks->push_back(legacyTexturePack);
+            m_texturePacksById[0] = texturePack;
+            m_texturePacksById[kLegacyTexturePackId] = legacyTexturePack;
+            defaultTexturePack = texturePack;
+            if (m_selected == previousDefault)
+            {
+                m_previousSelected = previousDefault;
+                m_selected = texturePack;
+            }
+            m_liveDefaultPackRegistered = true;
+        }
+        else
+        {
+            texturePack = new DLCTexturePack(id, dlcPack, defaultTexturePack);
+            m_allTexturePacks->push_back(texturePack);
+            m_texturePacksById[id] = texturePack;
+        }
     }
     return texturePack;
 }

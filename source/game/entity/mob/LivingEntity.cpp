@@ -61,6 +61,7 @@
 #include "game/entity/mob/MobEffects.hpp"
 #include "game/entity/mob/SharedMonsterAttributes.hpp"
 #include "game/entity/mob/SynchedEntityData.hpp"
+#include "game/entity/projectile/Arrow.hpp"
 #include "game/item/ArmorItem.hpp"
 #include "game/item/ElytraItem.hpp"
 #include "game/item/EnchantmentHelper.hpp"
@@ -1317,11 +1318,50 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
     }
 
     bool blocked = false;
+    bool shieldBlockedCompletely = false;
 
     if (damage > 0.0f && isDamageSourceBlocked(source))
     {
-        damage = (damage + 1.0f) * 0.5f;
         blocked = true;
+
+#if LCE_PLATFORM_PC
+        if (eTYPE_DERIVED_FROM(EntityType::PLAYER, GetType()) && isBlocking())
+        {
+            shieldBlockedCompletely = true;
+            if (!mLevel->mIsClientSide)
+            {
+                hurtCurrentlyUsedShield(damage);
+                boost::shared_ptr<Entity> shieldAttacker = source->getEntity();
+                boost::shared_ptr<Entity> directAttacker = source->getDirectEntity();
+                if (shieldAttacker && shieldAttacker == directAttacker && !source->isProjectile()
+                    && !source->isExplosion()
+                    && eTYPE_DERIVED_FROM(EntityType::LIVING_ENTITY, shieldAttacker->GetType()))
+                {
+                    blockUsingShield(boost::static_pointer_cast<LivingEntity>(shieldAttacker));
+                }
+                else if (directAttacker && source->isProjectile()
+                         && eTYPE_DERIVED_FROM(EntityType::ARROW, directAttacker->GetType()))
+                {
+                    // Apply Punch at the confirmed block, before a broken shield
+                    // can invalidate a later isDamageSourceBlocked() query.
+                    boost::shared_ptr<Arrow> arrow = boost::static_pointer_cast<Arrow>(directAttacker);
+                    const int punch = arrow->getKnockback();
+                    const double horizontal = std::sqrt(arrow->mXd * arrow->mXd + arrow->mZd * arrow->mZd);
+                    if (punch > 0 && horizontal > 1.0e-6)
+                    {
+                        push(arrow->mXd * punch * 0.6 / horizontal, 0.1,
+                             arrow->mZd * punch * 0.6 / horizontal);
+                        markHurt(); // Send velocity to the controlling player as well.
+                    }
+                }
+            }
+            damage = 0.0f;
+        }
+        else
+#endif
+        {
+            damage = (damage + 1.0f) * 0.5f;
+        }
     }
 
     mAnimationSpeed = 1.5f;
@@ -1341,7 +1381,8 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
         }
 
         mLastHurt = damage;
-        mHurtDir = 0.0f;
+        if (!shieldBlockedCompletely)
+            mHurtDir = 0.0f;
         freshHurt = false;
     }
     else
@@ -1354,9 +1395,12 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
             actuallyHurt(source, damage);
         }
 
-        mHurtDuration = 10;
-        mHurtTime = 10;
-        mHurtDir = 0.0f;
+        if (!shieldBlockedCompletely)
+        {
+            mHurtDuration = 10;
+            mHurtTime = 10;
+            mHurtDir = 0.0f;
+        }
     }
 
     boost::shared_ptr<Entity> attacker = source->getEntity();
@@ -1391,7 +1435,7 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
         }
     }
 
-    if (source->isFireProjectile())
+    if (source->isFireProjectile() && !shieldBlockedCompletely)
     {
         setSecondsOnFire(5);
     }
@@ -1435,19 +1479,22 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
 
         if (attacker)
         {
-            double dx = attacker->mX - mX;
-            double dz = attacker->mZ - mZ;
-
-            while (dx * dx + dz * dz < 0.0001)
+            if (!shieldBlockedCompletely)
             {
-                dx = (Math::random() - Math::random()) * 0.01;
-                dz = (Math::random() - Math::random()) * 0.01;
-            }
+                double dx = attacker->mX - mX;
+                double dz = attacker->mZ - mZ;
 
-            mHurtDir = (float)(atan2(dz, dx) * 180.0 / 3.1415927410125732 - (double)mYRot);
-            knockback(attacker, 0.4f, dx, dz);
+                while (dx * dx + dz * dz < 0.0001)
+                {
+                    dx = (Math::random() - Math::random()) * 0.01;
+                    dz = (Math::random() - Math::random()) * 0.01;
+                }
+
+                mHurtDir = (float)(atan2(dz, dx) * 180.0 / 3.1415927410125732 - (double)mYRot);
+                knockback(attacker, 0.4f, dx, dz);
+            }
         }
-        else
+        else if (!shieldBlockedCompletely)
         {
             mHurtDir = (float)(int)(Math::random() * 2.0 * 180.0);
         }
@@ -1471,7 +1518,7 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
     }
     else
     {
-        const SoundEvent* hurtSound = getHurtSound(source);
+        const SoundEvent* hurtSound = shieldBlockedCompletely ? NULL : getHurtSound(source);
 
         if (freshHurt && hurtSound != NULL)
         {
@@ -1510,7 +1557,21 @@ const DamageSource* LivingEntity::getLastDamageSource()
 
 void LivingEntity::blockUsingShield(const boost::shared_ptr<LivingEntity>& attacker)
 {
-    attacker->knockback(shared_from_this(), 0.5f, mX - attacker->mX, mZ - attacker->mZ);
+    double dx = mX - attacker->mX;
+    double dz = mZ - attacker->mZ;
+    if (dx * dx + dz * dz < 1.0e-8)
+    {
+        // Point-blank attacks must not divide by zero in knockback().
+        dx = -Mth::sin(attacker->mYRot * Mth::DEG_TO_RAD);
+        dz = Mth::cos(attacker->mYRot * Mth::DEG_TO_RAD);
+    }
+    attacker->knockback(shared_from_this(), 0.5f, dx, dz);
+    if (!mLevel->mIsClientSide)
+    {
+        // mHasImpulse alone does not send player velocity to its own client.
+        // This schedules a motion packet, without damage or a hurt animation.
+        attacker->markHurt();
+    }
 }
 
 void LivingEntity::playHurtSound(const DamageSource* source)
@@ -2046,6 +2107,15 @@ void LivingEntity::handleEntityEvent(unsigned char event, int data)
                   (float)(mLevel->mRandom->nextFloat() * 0.4000000059604645 + 0.800000011920929));
         return;
     }
+
+#if LCE_PLATFORM_PC
+    if (event == EntityEvent::ATTACK_BLOCKED)
+    {
+        playSound(SoundEvents::SHIELD_BLOCK, 1.0f,
+                  (float)(mLevel->mRandom->nextFloat() * 0.4000000059604645 + 0.800000011920929));
+        return;
+    }
+#endif
 
     if (event != EntityEvent::HURT && event != EntityEvent::ATTACK_BLOCKED && event != EntityEvent::THORNED
         && event != EntityEvent::DROWNED && event != EntityEvent::BURNED)
@@ -4028,8 +4098,17 @@ void LivingEntity::updatingUsingItem()
 
     not_null_ptr<ItemInstance> itemInHand = getItemInHand(getUsedItemHand());
 
-    if (itemInHand == mUseItem)
+    const bool sameShieldStack = !itemInHand->isEmpty() && !mUseItem->isEmpty()
+                                 && Item::getId(itemInHand->getItem()) == 442
+                                 && Item::getId(mUseItem->getItem()) == 442;
+    if (itemInHand == mUseItem || sameShieldStack)
     {
+        // Equipment updates replace the client-side ItemInstance when shield
+        // durability changes. Keep the active use bound to that updated stack
+        // so a blocked hit does not briefly drop the block pose.
+        if (sameShieldStack)
+            mUseItem = itemInHand;
+
         int remaining = getUseItemRemainingTicks();
 
         if (remaining < 26 && (remaining & 3) == 0)

@@ -1009,11 +1009,13 @@ void ItemInHandRenderer::tick()
             CalculateNewHandHeights(true);
         }
     }
-    if (mMainHandHeight < 0.1f)
+    // Keep equal stacks attached to the current inventory instance without
+    // restarting the equip animation after a server inventory update.
+    if (mMainHandHeight < 0.1f || ItemInstance::matches(mMainHandItem, mainHandItem, true))
     {
         mMainHandItem = mainHandItem;
     }
-    if (mOffHandHeight < 0.1f)
+    if (mOffHandHeight < 0.1f || ItemInstance::matches(mOffHandItem, offHandItem, true))
     {
         mOffHandItem = offHandItem;
     }

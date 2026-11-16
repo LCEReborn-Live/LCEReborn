@@ -312,6 +312,12 @@ Recipes::Recipes()
                     Items::flint, L'#', Items::stick, L'T');
     mTippedArrowRecipe->addRecipes(this);
     mWeaponRecipies->addRecipes(this);
+#if LCE_PLATFORM_PC
+    // One wildcard recipe accepts all six wood types, including mixed planks.
+    // The tools group displays the same 3x3 recipe in console-style crafting.
+    addShapedRecipe(new ItemInstance(Item::byId(442), 1), L"sssctcig", L"#I#", L"###", L" # ",
+                    L'#', Blocks::planks, L'I', Items::ironIngot, L'T');
+#endif
     addShapedRecipe(new ItemInstance(Items::bucket, 1), L"sscig", L"# #", L" # ", L'#', Items::ironIngot, L'T');
     addShapedRecipe(new ItemInstance(Items::bowl, 4), L"ssctg", L"# #", L" # ", L'#', Blocks::planks, L'T');
     addShapedRecipe(new ItemInstance(Items::glassBottle, 3), L"ssctg", L"# #", L" # ", L'#', Blocks::glass, L'T');

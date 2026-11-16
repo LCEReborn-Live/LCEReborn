@@ -17,6 +17,9 @@ class ShieldItem : public Item
 {
 public:
     ShieldItem();
+    static void updateCrouchBlocking(Player* player);
+    static bool isCrouchBlocking(Player* player);
+    virtual unsigned int GetUseTooltip(const ItemTooltipDataHolder& tooltipData);
 
     virtual void appendHoverText(not_null_ptr<ItemInstance> itemInstance, boost::shared_ptr<Player> player,
                                  std::vector<HtmlString>* lines, bool advanced);

@@ -54,6 +54,7 @@
 #include "game/core/EquipmentSlot.hpp"
 #include "game/core/DefaultVertexFormat.hpp"
 #include "game/core/DispenserBootstrap.hpp"
+#include "game/item/ShieldItem.hpp"
 #include "game/core/EnderCrystal.hpp"
 #include "game/core/EnderMan.hpp"
 #include "game/core/FaceInfo.hpp"
@@ -1749,7 +1750,8 @@ void Minecraft::tick(bool handleInput, bool lastTickOfFrame)
 
                 if (mPlayer->isUsingItem())
                 {
-                    if (!g_pInput->ButtonDown(playerIdx, EControllerActions_Use))
+                    if (!g_pInput->ButtonDown(playerIdx, EControllerActions_Use)
+                        && !ShieldItem::isCrouchBlocking(mPlayer.get()))
                         mGameMode->releaseUsingItem(mPlayer);
                 }
                 else if (mGameMode->isInputAllowed(EControllerActions_Use)

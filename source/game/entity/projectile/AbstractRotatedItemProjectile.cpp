@@ -196,6 +196,13 @@ bool AbstractRotatedItemProjectile::onHit(const HitResult* result)
         mInGround = true;
         mShake = 7;
         setCritArrow(false);
+        if (!mLevel->mIsClientSide)
+        {
+            // Arrows normally send position only once per second. Publish the
+            // impact immediately so clients cannot keep flying past the floor.
+            mHasImpulse = true;
+            markHurt();
+        }
         if (state->getMaterial() != Material::AIR)
         {
             mInTile->entityInside(mLevel, pos, state, shared_from_this());
@@ -221,6 +228,8 @@ boost::shared_ptr<Entity> AbstractRotatedItemProjectile::findHitEntity(Vec3* fro
         boost::shared_ptr<Entity> entity = entities->at(i);
         if (entity == mOwner && mFlightTime < 5)
             continue;
+        if (entity == mLastDeflectedEntity.lock() && mFlightTime < 5)
+            continue;
         HitResult* hit = entity->mBoundingBox->grow(0.3)->clip(from, to);
         if (hit != NULL)
         {
@@ -230,6 +239,7 @@ boost::shared_ptr<Entity> AbstractRotatedItemProjectile::findHitEntity(Vec3* fro
                 hitEntity = entity;
                 nearestDistance = distance;
             }
+            delete hit;
         }
     }
     return hitEntity;
@@ -424,6 +434,25 @@ void AbstractRotatedItemProjectile::tick()
 void AbstractRotatedItemProjectile::lerpTo(double x, double y, double z, float yRot, float xRot, int steps,
                                            bool teleport)
 {
+    if (mInGround)
+    {
+        // A client may have hit a different block before the server's rebound
+        // arrived. Do not carry that local "stuck" state to a position in air.
+        const BlockPos impactPos(mXTile, mYTile, mZTile);
+        const BlockState* state = mLevel->getBlockState(impactPos);
+        const AABB* shape = state->getClipAABB(mLevel, impactPos);
+        if (shape == Block::NULL_AABB
+            || !shape->move(impactPos)->grow(0.1)->contains(x, y, z))
+        {
+            mInGround = false;
+            mInGroundTime = 0;
+            mLife = 0;
+            mShake = 0;
+            mXTile = mYTile = mZTile = -1;
+            mInTile = Blocks::air;
+            mInData = 0;
+        }
+    }
     setPos(x, y, z);
     setRot(yRot, xRot);
 }

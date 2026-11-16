@@ -69,7 +69,7 @@ public:
                                           float translationY, float translationZ, float scaleX, float scaleY,
                                           float scaleZ);
 
-    static ItemTransforms* getTransforms(const ItemInstance* item, LivingEntity* entity);
+    static ItemTransforms* getTransforms(const ItemInstance* item, LivingEntity* entity, TransformType context = NONE);
     static void apply(ItemTransform* transform, bool leftHand);
     void apply(TransformType type);
     bool hasTransform(TransformType type);

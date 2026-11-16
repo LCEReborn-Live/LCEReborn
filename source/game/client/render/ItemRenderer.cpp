@@ -40,6 +40,36 @@
 #include "game/world/block/Blocks.hpp"
 #include "game/world/generation/MultiplayerLocalPlayer.hpp"
 #include "game/item/ItemId.hpp"
+#if LCE_PLATFORM_PC
+#include "game/client/render/ShieldModel.hpp"
+#include "game/client/render/ModelDefinition.hpp"
+#include "game/client/render/TextureUtil.hpp"
+#include "game/core/BufferedImage.hpp"
+#include "platform/pc/PcPaths.hpp"
+#include <cstdlib>
+#include <cstring>
+
+static int experimentalShieldTexture(Textures* textures)
+{
+    static int texture = -1;
+    static bool attempted = false;
+    if (!attempted)
+    {
+        attempted = true;
+        int width = 0, height = 0;
+        int* pixels = NULL;
+        const std::string path = PcResourceRoot() + "/experimental/shield_base_1_14.png";
+        if (TextureUtil::LoadTextureData(path.c_str(), &width, &height, &pixels) == 0 && width == 64 && height == 64)
+        {
+            BufferedImage* image = new BufferedImage(width, height, 1);
+            std::memcpy(image->getData(), pixels, width * height * sizeof(int));
+            texture = textures->getTexture(image, C4JRender::eTextureFormat_RGBA8, false);
+        }
+        std::free(pixels);
+    }
+    return texture;
+}
+#endif
 
 extern Renderer* gRenderer;
 
@@ -466,13 +496,27 @@ void ItemRenderer::renderStatic(const not_null_ptr<ItemInstance>& item, boost::s
     GlStateManager::blendFunc(4, 5);
     GlStateManager::enableRescaleNormal();
     GlStateManager::pushMatrix();
-    ItemTransforms* transforms = ItemTransforms::getTransforms(item.get(), entity.get());
+    ItemTransforms* transforms = ItemTransforms::getTransforms(item.get(), entity.get(), transformType);
     ItemTransforms::apply(transforms->getTransform(transformType), leftHand);
     GlStateManager::pushMatrix();
     GlStateManager::translatef(-0.5F, -0.5F, -0.5F);
 
     Block* block = Block::byItem(item->getItem());
     int blockId = Block::getId(block);
+#if LCE_PLATFORM_PC
+    // Use the built-in model in the hotbar and inventory too. Java's GUI
+    // transform supplies its icon angle and scale without a separate flat sprite.
+    if (Item::getId(item->getItem()) == 442 && experimentalShieldTexture(minecraft->mTextures) >= 0)
+    {
+        static ShieldModel* model = new ShieldModel(ModelDefinition());
+        minecraft->mTextures->bind(experimentalShieldTexture(minecraft->mTextures));
+        // Built-in entity models in Java retain the -0.5 origin above. Cancelling
+        // it here displaces the shield in both hands and breaks the model poses.
+        GlStateManager::scalef(1.0F, -1.0F, -1.0F);
+        model->render(true);
+    }
+    else
+#endif
     if (item->getItem() == Items::trident && transformType != ItemTransforms::GUI
         && transformType != ItemTransforms::FIXED)
     {

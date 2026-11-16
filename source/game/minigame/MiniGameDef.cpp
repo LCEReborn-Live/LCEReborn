@@ -532,6 +532,72 @@ const MiniGameDef::PlayerEquipmentInfo& MiniGameDef::ModeVariationLootGroup::Get
     return mPlayerEquipment;
 }
 
+#if LCE_PLATFORM_PC
+namespace
+{
+void AddBattleShieldLoot(std::vector<MiniGameDef::LootSetDef>& lootSets)
+{
+    Item* shield = Item::byId(442);
+    if (shield == NULL || Item::getId(shield) != 442)
+        return;
+
+    // Use the enchanted diamond sword's rare-chest kit as the reference.
+    // Normal Battle uses the same HV tier with weaker weapons, so give all
+    // Battle loot sets the same shield rarity without adding it to common loot.
+    int weight = 0;
+    int score = 0;
+    for (const MiniGameDef::LootSetDef& lootSet : lootSets)
+    {
+        const MiniGameDef::ModeVariationLootGroup* group = lootSet.getLootGroup(L"HVItems");
+        for (const MiniGameDef::ChestKitInfo& kit : group->mKits)
+        {
+            for (const not_null_ptr<ItemInstance>& item : kit.mItems)
+            {
+                if (item->getItem() == Items::diamondSword && item->isEnchanted())
+                {
+                    weight = kit.mWeight;
+                    score = kit.mKpScore;
+                    break;
+                }
+            }
+            if (weight > 0)
+                break;
+        }
+        if (weight > 0)
+            break;
+    }
+    if (weight <= 0)
+        return;
+
+    for (MiniGameDef::LootSetDef& lootSet : lootSets)
+    {
+        auto found = lootSet.mGroups.find(L"HVItems");
+        if (found == lootSet.mGroups.end())
+            continue;
+        MiniGameDef::ModeVariationLootGroup& group = found->second;
+        if (group.mDistributionMethod != MiniGameDef::eLootDistributionMethod_KitKPRandom
+            && group.mDistributionMethod != MiniGameDef::eLootDistributionMethod_KitKPGreedy)
+            continue;
+
+        bool hasShield = false;
+        for (const MiniGameDef::ChestKitInfo& kit : group.mKits)
+            for (const not_null_ptr<ItemInstance>& item : kit.mItems)
+                hasShield = hasShield || item->getItem() == shield;
+        for (const MiniGameDef::ChestItemsInfo& item : group)
+            hasShield = hasShield || item.mItem->getItem() == shield;
+        if (hasShield)
+            continue;
+
+        MiniGameDef::ChestKitInfo kit;
+        kit.mWeight = weight;
+        kit.mKpScore = score;
+        kit.mItems.push_back(not_null_ptr<ItemInstance>(new ItemInstance(shield, 1)));
+        group.mKits.push_back(kit);
+    }
+}
+}
+#endif
+
 MiniGameDef::MiniGameDef(const XmlObject& object)
     : mOptionDefaults(),
       mOptionLists(),
@@ -676,6 +742,11 @@ MiniGameDef::MiniGameDef(const XmlObject& object)
             }
         }
     }
+
+#if LCE_PLATFORM_PC
+    if (mId == eMiniGameId_Battle)
+        AddBattleShieldLoot(mLootSets);
+#endif
 
     const XmlObject* blockTicking = object.child(L"BlockTicking");
     mBlockData.mTickOverride = (*blockTicking)[L"override"].maybeBool();

@@ -205,6 +205,20 @@ void ItemEntityRenderer::render(boost::shared_ptr<Entity>& entity, double x, dou
     bool special = item->getItem() == Items::skull || item->getItem() == Items::banner
                    || item->getItem() == Item::byBlock(Blocks::conduit);
 
+#if LCE_PLATFORM_PC
+    if (Item::getId(item->getItem()) == 442 && !mItemFrame)
+    {
+        // Dropped shields use the same built-in model as the inventory, with
+        // its ground transform. Extruding the atlas icon flattens the handle
+        // and produces a different silhouette from the actual shield model.
+        GlStateManager::rotatef((((float)itemEntity->getAge() + partialTick) / 20.0F + itemEntity->mBobOffs)
+                                    * Mth::RAD_TO_DEG,
+                                0.0F, 1.0F, 0.0F);
+        mItemRenderer->renderStatic(item, boost::shared_ptr<LivingEntity>(), ItemTransforms::GROUND,
+                                    1.0F, false, NULL);
+    }
+    else
+#endif
     if (special
         || (item->getItem()->getIconType() == 0 && block != NULL
             && BlockRenderer::canRender(block->defaultBlockState()->getRenderShape())))

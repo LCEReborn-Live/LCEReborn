@@ -1,5 +1,6 @@
 #include "game/item/ItemTransforms.hpp"
 #include "game/core/EntityType.hpp"
+#include "game/core/HumanoidArm.hpp"
 
 #include <cstddef>
 
@@ -364,7 +365,7 @@ ItemTransforms* ItemTransforms::set_firstperson_hands(float rotationX, float rot
     return this;
 }
 
-ItemTransforms* ItemTransforms::getTransforms(const ItemInstance* item, LivingEntity* entity)
+ItemTransforms* ItemTransforms::getTransforms(const ItemInstance* item, LivingEntity* entity, TransformType context)
 {
     if (entity != NULL)
     {
@@ -414,15 +415,17 @@ ItemTransforms* ItemTransforms::getTransforms(const ItemInstance* item, LivingEn
     }
     case 442:
     {
+        // Java 1.14.4 shield.json / shield_blocking.json. These transforms use
+        // the built-in entity origin (including renderStatic's -0.5 translation).
         static ItemTransforms* shield =
             (new ItemTransforms())
                 ->set_thirdperson_righthand(0.0f, 90.0f, 0.0f, 10.0f, 6.0f, -4.0f, 1.0f, 1.0f, 1.0f)
                 ->set_thirdperson_lefthand(0.0f, 90.0f, 0.0f, 10.0f, 6.0f, 12.0f, 1.0f, 1.0f, 1.0f)
                 ->set_firstperson_righthand(0.0f, 180.0f, 5.0f, -10.0f, 2.0f, -10.0f, 1.25f, 1.25f, 1.25f)
                 ->set_firstperson_lefthand(0.0f, 180.0f, 5.0f, 10.0f, 0.0f, -10.0f, 1.25f, 1.25f, 1.25f)
-                ->set_gui(15.0f, -25.0f, -5.0f, 3.0f, 3.0f, 0.0f, 0.65f, 0.65f, 0.65f)
-                ->set_fixed(0.0f, 180.0f, 0.0f, -4.0f, 4.0f, -5.0f, 0.5f, 0.5f, 0.5f)
-                ->set_ground(0.0f, 0.0f, 0.0f, 2.0f, 4.0f, 2.0f, 0.25f, 0.25f, 0.25f);
+                ->set_gui(15.0f, -25.0f, -5.0f, 2.0f, 3.0f, 0.0f, 0.65f, 0.65f, 0.65f)
+                ->set_fixed(0.0f, 180.0f, 0.0f, -2.0f, 4.0f, -5.0f, 0.5f, 0.5f, 0.5f)
+                ->set_ground(0.0f, 0.0f, 0.0f, 4.0f, 4.0f, 2.0f, 0.25f, 0.25f, 0.25f);
         static ItemTransforms* blockingShield =
             (new ItemTransforms())
                 ->set_thirdperson_righthand(45.0f, 135.0f, 0.0f, 3.51f, 11.0f, -2.0f, 1.0f, 1.0f, 1.0f)
@@ -430,8 +433,19 @@ ItemTransforms* ItemTransforms::getTransforms(const ItemInstance* item, LivingEn
                 ->set_firstperson_righthand(0.0f, 180.0f, -5.0f, -15.0f, 5.0f, -11.0f, 1.25f, 1.25f, 1.25f)
                 ->set_firstperson_lefthand(0.0f, 180.0f, -5.0f, 5.0f, 5.0f, -11.0f, 1.25f, 1.25f, 1.25f)
                 ->set_gui(15.0f, -25.0f, -5.0f, 2.0f, 3.0f, 0.0f, 0.65f, 0.65f, 0.65f);
-        if (entity != NULL && entity->isBlocking())
-            return blockingShield;
+        if (entity != NULL && entity->isBlocking() && !entity->getUseItem()->isEmpty()
+            && entity->getUseItem()->getItem() == item->getItem())
+        {
+            const bool leftContext = context == FIRST_PERSON_LEFT_HAND || context == THIRD_PERSON_LEFT_HAND;
+            const bool rightContext = context == FIRST_PERSON_RIGHT_HAND || context == THIRD_PERSON_RIGHT_HAND;
+            const bool mainHand = entity->getUsedItemHand() == InteractionHand::eInteractionHand_MainHand;
+            const bool activeRight = (entity->getMainArm() == HumanoidArm::RIGHT) == mainHand;
+            // The first-person renderer can retain an equivalent item instance
+            // after inventory sync. Select by the actual arm, not pointer identity.
+            if ((leftContext && !activeRight) || (rightContext && activeRight)
+                || (context == NONE && entity->getUseItem().get() == item))
+                return blockingShield;
+        }
         return shield;
     }
     case 425:

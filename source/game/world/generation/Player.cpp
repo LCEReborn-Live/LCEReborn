@@ -58,6 +58,7 @@
 #include "game/item/Container.hpp"
 #include "game/item/Inventory.hpp"
 #include "game/item/ItemCooldowns.hpp"
+#include "game/item/ShieldItem.hpp"
 #include "game/item/ItemInstance.hpp"
 #include "game/item/ItemId.hpp"
 #include "game/item/EnchantmentHelper.hpp"
@@ -101,7 +102,6 @@
 #include "game/item/ArmorItem.hpp"
 #include "game/world/block/BlockId.hpp"
 #include "game/item/ElytraItem.hpp"
-#include "game/item/AxeItem.hpp"
 #include "game/world/block/Block.hpp"
 #include "game/world/block/DoorBlock.hpp"
 #include "game/world/block/FenceGateBlock.hpp"
@@ -951,12 +951,18 @@ void Player::UpdateSize()
     SetNormalSize();
 }
 
-void Player::hurtCurrentlyUsedShield(float)
+void Player::hurtCurrentlyUsedShield(float damage)
 {
-}
+#if LCE_PLATFORM_PC
+    not_null_ptr<ItemInstance> shield = getUseItem();
+    if (mLevel->mIsClientSide || shield->isEmpty() || Item::getId(shield->getItem()) != 442 || damage < 3.0f)
+        return;
 
-void Player::disableShield(bool)
-{
+    boost::shared_ptr<Player> player = boost::dynamic_pointer_cast<Player>(shared_from_this());
+    shield->hurtAndBreak(1 + static_cast<int>(std::floor(damage)), player);
+#else
+    (void)damage;
+#endif
 }
 
 void Player::crit(boost::shared_ptr<Entity>)
@@ -2221,6 +2227,10 @@ void Player::_init()
 
 void Player::tick()
 {
+    // The authoritative server uses the existing sneak and item-use entity flags.
+    if (!mLevel->mIsClientSide)
+        ShieldItem::updateCrouchBlocking(this);
+
     if (!gApp.IsAppPaused())
         CheckTimerAchievements();
 
@@ -2827,13 +2837,58 @@ bool Player::hurt(const DamageSource* source, float damage)
     return LivingEntity::hurt(source, damage);
 }
 
+bool Player::isDamageSourceBlocked(const DamageSource* source)
+{
+    if (!LivingEntity::isDamageSourceBlocked(source))
+        return false;
+
+#if LCE_PLATFORM_PC
+    not_null_ptr<ItemInstance> shield = getUseItem();
+    if (!shield->isEmpty() && Item::getId(shield->getItem()) == 442)
+    {
+        // Shields only stop sources in front of the player. This matches the
+        // Java shield's 180-degree blocking arc while remaining server-authoritative.
+        Vec3* sourcePosition = source->getSourcePosition();
+        if (sourcePosition == NULL)
+            return false;
+
+        Vec3* view = getViewVector(1.0f);
+        const double toSourceX = sourcePosition->x - mX;
+        const double toSourceZ = sourcePosition->z - mZ;
+        const double horizontalLength = std::sqrt(toSourceX * toSourceX + toSourceZ * toSourceZ);
+        if (horizontalLength < 1.0e-6)
+            return true;
+
+        return (toSourceX * view->x + toSourceZ * view->z) >= 0.0;
+    }
+#endif
+
+    return true;
+}
+
 void Player::blockUsingShield(const boost::shared_ptr<LivingEntity>& attacker)
 {
     LivingEntity::blockUsingShield(attacker);
-    if (dynamic_cast<AxeItem*>(attacker->getMainHandItem()->getItem()) != NULL)
+
+    // Ordinary blocked melee hits keep the defender stationary. Knockback
+    // enchantments are the exception: let their impulse pass through the shield.
+    boost::shared_ptr<LivingEntity> defender = boost::static_pointer_cast<LivingEntity>(shared_from_this());
+    const int knockbackLevel = EnchantmentHelper::getKnockbackBonus(attacker, defender);
+    if (knockbackLevel > 0)
     {
-        disableShield(true);
+        const double dx = mX - attacker->mX;
+        const double dz = mZ - attacker->mZ;
+        const double horizontalLength = std::sqrt(dx * dx + dz * dz);
+        if (horizontalLength > 1.0e-6)
+        {
+            Entity::push(dx * knockbackLevel * 0.5 / horizontalLength, 0.1, dz * knockbackLevel * 0.5 / horizontalLength);
+            if (!mLevel->mIsClientSide)
+                markHurt();
+        }
     }
+
+    // PS4 Legacy shields stay raised after axe hits, including Vindicators.
+    // Durability is handled by hurtCurrentlyUsedShield() for every blocked hit.
 }
 
 void Player::actuallyHurt(const DamageSource* source, float damage)

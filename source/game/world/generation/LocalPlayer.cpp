@@ -3,6 +3,7 @@
 #include "game/world/block/BlockId.hpp"
 #include "game/core/EntityType.hpp"
 #include "game/world/generation/LocalPlayer.hpp"
+#include "game/item/ShieldItem.hpp"
 
 #include <algorithm>
 #include <cfloat>
@@ -718,6 +719,7 @@ void LocalPlayer::aiStep()
     const bool wasSneaking = mInput->mSneaking;
     const float previousForward = mInput->mMoveForward;
     mInput->tick(this);
+    ShieldItem::updateCrouchBlocking(this);
 
     bool movingFreely = true;
     if (mInput->mMoveForward < 0.8f && mInput->mMoveForward > -0.8f && mInput->mMoveStrafe < 0.8f
@@ -734,8 +736,13 @@ void LocalPlayer::aiStep()
     if (isUsingItem() && !isPassenger())
     {
         mSprintDelay = 0;
-        mInput->mMoveStrafe *= 0.2f;
-        mInput->mMoveForward *= 0.2f;
+        // Sneaking already reduces movement speed; do not apply the item-use
+        // slowdown a second time while crouch-blocking with the shield.
+        if (!ShieldItem::isCrouchBlocking(this))
+        {
+            mInput->mMoveStrafe *= 0.2f;
+            mInput->mMoveForward *= 0.2f;
+        }
     }
 
     const int autoJumpTime = mAutoJumpTime;
@@ -1683,16 +1690,29 @@ unsigned char LocalPlayer::handleMouseClick(int button)
                 return 0;
             }
 
-            for (int handIndex = 0; handIndex < 1; ++handIndex)
+            for (int handIndex = 0; handIndex < 2; ++handIndex)
             {
                 const InteractionHand::EInteractionHand useHand = static_cast<InteractionHand::EInteractionHand>(
                     handIndex);
                 not_null_ptr<ItemInstance> heldItem = player->getItemInHand(useHand);
 
+                // The original client only uses the main hand. Limit the experimental
+                // second-hand path to the locally enabled shield.
+                if (handIndex != 0 &&
+#if LCE_PLATFORM_PC
+                    (heldItem->isEmpty() || Item::getId(heldItem->getItem()) != 442)
+#else
+                    true
+#endif
+                   )
+                    continue;
+
                 if (hitResult != NULL)
                 {
                     switch (hitResult->mType)
                     {
+                    case HitResult::MISS:
+                        break;
                     case HitResult::ENTITY:
                         if (gameMode->interact(player, hitResult->mEntity, player->getItemInHand(useHand), useHand)
                             == InteractionResult::eInteractionResult_Success)

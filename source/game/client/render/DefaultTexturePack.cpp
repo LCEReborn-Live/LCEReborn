@@ -14,8 +14,8 @@
 
 extern "C" void OSReport(const char*, ...);
 
-DefaultTexturePack::DefaultTexturePack()
-    : AbstractTexturePack(0, NULL, L10N::GetString(IDS_DEFAULT_TEXTUREPACK_NAME), NULL)
+DefaultTexturePack::DefaultTexturePack(unsigned int id)
+    : AbstractTexturePack(id, NULL, L10N::GetString(IDS_DEFAULT_TEXTUREPACK_NAME), NULL)
 {
     loadIcon();
     loadName();

@@ -94,6 +94,7 @@ protected:
     bool mInGround;
     int mInGroundTime;
     int mFlightTime;
+    boost::weak_ptr<Entity> mLastDeflectedEntity;
     bool mClampedToLevel;
     ePickup mPickup;
     int mShake;

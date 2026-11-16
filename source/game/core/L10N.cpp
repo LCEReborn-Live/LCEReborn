@@ -3,6 +3,7 @@
 #include "game/core/CMinecraftApp.hpp"
 #include "game/core/CConsoleMinecraftApp.hpp"
 #include "game/core/ExtraStrings.hpp"
+#include "game/core/ShieldStrings.hpp"
 #include "game/data/StringTable.hpp"
 
 static StringTable* g_stringTable = NULL;
@@ -12,6 +13,9 @@ const wchar_t* ExtraString(int id)
 {
     switch (id)
     {
+    case IDS_LCE_ITEM_SHIELD:
+    case IDS_LCE_DESC_SHIELD:
+        return LocalizedShieldString(XGetLanguage(), id == IDS_LCE_DESC_SHIELD);
     case IDS_LCE_CHAT:
         return L"Chat";
     case IDS_LCE_CHAT_SEND:

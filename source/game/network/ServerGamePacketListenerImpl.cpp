@@ -1,4 +1,5 @@
 #include "game/network/ServerGamePacketListenerImpl.hpp"
+#include "game/item/ShieldItem.hpp"
 #include "game/core/EntityType.hpp"
 #include "game/core/GameRules.hpp"
 #include <algorithm>
@@ -867,9 +868,11 @@ void ServerGamePacketListenerImpl::handlePlayerCommand(boost::shared_ptr<Serverb
     {
     case ServerboundPlayerCommandPacket::PRESS_SHIFT_KEY:
         mPlayer->setSneaking(true);
+        ShieldItem::updateCrouchBlocking(mPlayer.get());
         break;
     case ServerboundPlayerCommandPacket::RELEASE_SHIFT_KEY:
         mPlayer->setSneaking(false);
+        ShieldItem::updateCrouchBlocking(mPlayer.get());
         break;
     case ServerboundPlayerCommandPacket::STOP_SLEEPING:
         if (mPlayer->isSleeping())

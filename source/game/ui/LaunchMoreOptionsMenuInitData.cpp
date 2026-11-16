@@ -1,5 +1,6 @@
 #include "game/ui/LaunchMoreOptionsMenuInitData.hpp"
 
+
 LaunchMoreOptionsMenuInitData::LaunchMoreOptionsMenuInitData()
 {
     mSettingsChanged = false;

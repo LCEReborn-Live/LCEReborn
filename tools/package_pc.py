@@ -61,12 +61,12 @@ if LINUX:
                       "tls", "wayland-decoration-client", "wayland-graphics-integration-client",
                       "wayland-shell-integration", "xcbglintegrations")
     QT_PLATFORMS = ("libqxcb.so", "libqwayland.so")
-    ALLOWED_NAME = re.compile(r"(^[^.]+$|\.so(\.\d+)*$|\.(png|ico|txt|mp3|js|json)$)")
+    ALLOWED_NAME = re.compile(r"(^[^.]+$|\.so(\.\d+)*$|\.(png|ico|txt|mp3|js|json|pck)$)", re.I)
 else:
     SYSTEM = "pc"
     PROGRAMS = ("LCEReborn.exe", "LCERebornLauncher.exe", "LCERebornServer.exe", "LCERebornUpdateHelper.exe")
     QT_PLUGIN_DIRS = ("generic", "imageformats", "networkinformation", "platforms", "styles", "tls")
-    ALLOWED_NAME = re.compile(r"\.(exe|dll|png|ico|txt|js|json|mp3)$", re.I)
+    ALLOWED_NAME = re.compile(r"\.(exe|dll|png|ico|txt|js|json|mp3|pck)$", re.I)
 REDIST_URL = "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"
 
 
@@ -212,6 +212,12 @@ def program_files(build):
         for name in sorted(names):
             path = os.path.join(folder, name)
             files.append((path, "resources/" + os.path.relpath(path, resources).replace(os.sep, "/")))
+    packs = os.path.join(build, "packs")
+    if os.path.isdir(packs):
+        for folder, _, names in os.walk(packs):
+            for name in sorted(names):
+                path = os.path.join(folder, name)
+                files.append((path, "packs/" + os.path.relpath(path, packs).replace(os.sep, "/")))
     live = os.path.join(ROOT, "live")
     for folder, _, names in os.walk(live):
         for name in sorted(names):

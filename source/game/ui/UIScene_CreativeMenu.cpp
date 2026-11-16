@@ -1641,6 +1641,9 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::armorStand, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::turtleHelmet, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::trident, 1, 0)));
+#if LCE_PLATFORM_PC
+    builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Item::byId(442), 1, 0)));
+#endif
     builder.POTION(Items::tippedArrow, Potions::NIGHT_VISION);
     builder.POTION(Items::tippedArrow, Potions::INVISIBILITY);
     builder.POTION(Items::tippedArrow, Potions::LEAPING);

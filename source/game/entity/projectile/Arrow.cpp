@@ -68,6 +68,11 @@ void Arrow::setKnockback(int knockback)
     mKnockback = knockback;
 }
 
+int Arrow::getKnockback() const
+{
+    return mKnockback;
+}
+
 void Arrow::setEnchantPower(int power)
 {
     mEnchantPower = power;
@@ -115,7 +120,21 @@ void Arrow::onHitEntity(const HitResult* result)
     if (Minecraft::GetInstance()->GetMiniGame()->HasFeatureArrowCanKnockback())
         wholeDamage = 0;
 
-    if (entity->hurt(source, static_cast<float>(wholeDamage)))
+    boost::shared_ptr<LivingEntity> livingTarget = boost::dynamic_pointer_cast<LivingEntity>(entity);
+    const bool shieldBlock = wholeDamage > 0 && livingTarget
+                             && eTYPE_DERIVED_FROM(EntityType::PLAYER, entity->GetType())
+                             && livingTarget->isDamageSourceBlocked(source);
+
+    // The client's hurt() result is not the server's damage decision (it often
+    // returns false even for a successful hit). Only predict a visible shield
+    // block here; otherwise wait for the server rather than inventing a bounce.
+    if (mLevel->mIsClientSide && !shieldBlock)
+    {
+        delete source;
+        return;
+    }
+
+    if (!mLevel->mIsClientSide && entity->hurt(source, static_cast<float>(wholeDamage)))
     {
         if (eTYPE_DERIVED_FROM(EntityType::LIVING_ENTITY, result->mEntity->GetType()))
         {
@@ -149,13 +168,45 @@ void Arrow::onHitEntity(const HitResult* result)
     }
     else
     {
+        if (shieldBlock && speed > 1.0e-6f)
+        {
+            // Collision detection uses a swept ray. Reflect at its contact
+            // point, not at the arrow's position at the start of the tick.
+            const AABB* bounds = entity->mBoundingBox->grow(0.3);
+            const double nx = mXd / speed;
+            const double ny = mYd / speed;
+            const double nz = mZd / speed;
+            Vec3* from = Vec3::newTemp(mX, mY, mZ);
+            if (bounds->contains(from))
+            {
+                // A point-blank arrow may start inside the collision box.
+                // Trace from behind it so the rebound starts outside the box.
+                const double backtrack = bounds->getSize() * 3.0 + 0.1;
+                from = Vec3::newTemp(mX - nx * backtrack, mY - ny * backtrack, mZ - nz * backtrack);
+            }
+            HitResult* contact = bounds->clip(from, Vec3::newTemp(mX + mXd, mY + mYd, mZ + mZd));
+            if (contact != NULL)
+            {
+                setPos(contact->mLocation->x - nx * 0.05, contact->mLocation->y - ny * 0.05,
+                       contact->mLocation->z - nz * 0.05);
+                delete contact;
+            }
+        }
+
         mXd *= -0.1f;
         mYd *= -0.1f;
         mZd *= -0.1f;
         mFlightTime = 0;
+        mLastDeflectedEntity = entity;
         mYRot += 180.0f;
         mYRotO += 180.0f;
         setCritArrow(false);
+        if (!mLevel->mIsClientSide)
+        {
+            // Send the corrected position and reversed velocity this tick.
+            mHasImpulse = true;
+            markHurt();
+        }
         if (!mLevel->mIsClientSide && mXd * mXd + mYd * mYd + mZd * mZd < 0.001f)
         {
             if (mPickup == ePickup_Allowed)

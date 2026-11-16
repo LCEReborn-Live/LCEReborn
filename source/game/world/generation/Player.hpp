@@ -324,6 +324,7 @@ public:
     virtual void SetThirdPersonView(int32_t view);
     uint32_t isAllowedToFly();
     bool hurt(const DamageSource* source, float damage);
+    virtual bool isDamageSourceBlocked(const DamageSource* source);
     void blockUsingShield(const boost::shared_ptr<LivingEntity>& attacker);
     virtual uint32_t CanChangeThirdPersonView();
     uint32_t hasInvisiblePrivilege();
@@ -350,7 +351,6 @@ public:
     virtual void openItemInstanceGui(not_null_ptr<ItemInstance> item, InteractionHand::EInteractionHand hand);
     virtual uint32_t interactOn(boost::shared_ptr<Entity> entity, InteractionHand::EInteractionHand hand);
     virtual void attack(boost::shared_ptr<Entity> entity);
-    virtual void disableShield(bool force);
     void onSyncedDataUpdated(const EntityDataAccessor_Base* accessor);
     void remove();
     bool isInWall();

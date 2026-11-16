@@ -232,6 +232,11 @@ lce_add_program(LCERebornServer ServerMain.cpp)
 add_custom_command(TARGET LCEReborn POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/resources/pc"
           "$<TARGET_FILE_DIR:LCEReborn>/resources")
+if(EXISTS "${CMAKE_SOURCE_DIR}/packs")
+  add_custom_command(TARGET LCEReborn POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/packs"
+            "$<TARGET_FILE_DIR:LCEReborn>/packs")
+endif()
 
 option(LCE_BUILD_LAUNCHER "Build the Qt launcher (needs python tools/build/qt.py first)" ON)
 if(LCE_BUILD_LAUNCHER)

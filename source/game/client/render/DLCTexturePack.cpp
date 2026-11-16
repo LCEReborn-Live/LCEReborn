@@ -20,6 +20,8 @@
 #include "game/core/DataInputStream.hpp"
 #include "game/core/File.hpp"
 #include "game/core/Minecraft.hpp"
+#include "game/core/L10N.hpp"
+#include "game/core/StringIds.hpp"
 #include "game/core/RiderPositionOverrides.hpp"
 #include "game/data/StringTable.hpp"
 #include "game/server/MinecraftServer.hpp"
@@ -33,8 +35,24 @@
 
 extern C4JStorage* gStorage;
 
+namespace
+{
+const unsigned int kLiveBuiltInTexturePackSourceId = 2050;
+
+bool isLiveBuiltInTexturePack(DLCPack* pack)
+{
+    return pack != NULL && (pack->GetPackId() & 0x00ffffff) == kLiveBuiltInTexturePackSourceId;
+}
+}
+
 void DLCTexturePack::loadIcon()
 {
+    if (isLiveBuiltInTexturePack(m_dlcPack) && m_pParentPack != NULL)
+    {
+        m_pIconData = m_pParentPack->getPackIcon(m_iconSize);
+        return;
+    }
+
     if (m_dlcPack->doesPackContainFile(DLCManager::eDLCType_Texture, L"icon", true, true))
     {
         DLCFile* file = m_dlcPack->getFile(DLCManager::eDLCType_Texture, L"icon", true, true);
@@ -114,6 +132,9 @@ DLCPack* DLCTexturePack::getDLCPack()
 
 std::wstring DLCTexturePack::getDesc1()
 {
+    if (isLiveBuiltInTexturePack(m_dlcPack))
+        return L10N::GetString(IDS_DEFAULT_TEXTUREPACK);
+
     if (m_stringTable == NULL)
         return m_desc1;
     std::wstring description = m_stringTable->getString(L"IDS_TP_DESCRIPTION");
@@ -124,6 +145,9 @@ std::wstring DLCTexturePack::getDesc1()
 
 std::wstring DLCTexturePack::getName()
 {
+    if (isLiveBuiltInTexturePack(m_dlcPack))
+        return L10N::GetString(IDS_DEFAULT_TEXTUREPACK_NAME);
+
     if (m_stringTable == NULL)
         return m_name.empty() ? m_dlcPack->getName() : m_name;
     std::wstring name = m_stringTable->getString(L"IDS_DISPLAY_NAME");
@@ -141,6 +165,9 @@ std::wstring DLCTexturePack::getWorldName()
 
 void DLCTexturePack::loadComparison()
 {
+    if (isLiveBuiltInTexturePack(m_dlcPack))
+        return;
+
     if (m_dlcPack->doesPackContainFile(DLCManager::eDLCType_Texture, L"comparison", true, true))
     {
         DLCFile* file = m_dlcPack->getFile(DLCManager::eDLCType_Texture, L"comparison", true, true);
@@ -187,7 +214,9 @@ std::wstring DLCTexturePack::getAnimationString(const std::wstring& fileName, co
 BufferedImage* DLCTexturePack::getImageResource(const std::wstring& fileName, bool bSingleImage, bool bTitleUpdate,
                                                 const std::wstring& path)
 {
-    if (m_loadedPack != NULL)
+    const std::wstring packFileName = L"res/" + fileName;
+    if (m_loadedPack != NULL
+        && m_loadedPack->doesPackContainFile(DLCManager::eDLCType_Texture, packFileName, true, true))
         return new BufferedImage(m_loadedPack, L"/" + fileName, bSingleImage);
     return m_pParentPack->getImageResource(fileName, bSingleImage, bTitleUpdate, path);
 }

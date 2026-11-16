@@ -1817,6 +1817,16 @@ void CMinecraftApp::MountNextDLC(int32_t pad)
     {
         mDLCInstallProcessCompleted = true;
         mDLCInstallPending = false;
+        // A DLC-backed default pack cannot mount its data until the ordinary
+        // DLC enumeration has released its temporary mount. Loading here keeps
+        // it a built-in default instead of selecting it through the UI.
+        if (!IsDedicatedServer() && Minecraft::GetInstance() != NULL
+            && Minecraft::GetInstance()->mTexturePackRepository != NULL)
+        {
+            TexturePack* defaultPack = TexturePackRepository::defaultTexturePack;
+            if (defaultPack != NULL && !defaultPack->hasData() && !defaultPack->isLoadingData())
+                defaultPack->loadData();
+        }
         if (!IsDedicatedServer())
             gConsoleUIController.HandleDLCMountingComplete();
     }

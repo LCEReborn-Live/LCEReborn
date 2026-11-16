@@ -112,7 +112,8 @@ void PlayerRenderer::setModelProperties(boost::shared_ptr<Player> player, float 
         if (!mainHandItem->isEmpty())
         {
             mainHandPose = HumanoidModel::eArmPose_Item;
-            if (player->getUseItemRemainingTicks() > 0)
+            if (player->getUseItemRemainingTicks() > 0
+                && player->getUsedItemHand() == InteractionHand::eInteractionHand_MainHand)
             {
                 int useAnimation = mainHandItem->getUseAnimation();
                 if (useAnimation == UseAnim_block)
@@ -143,7 +144,8 @@ void PlayerRenderer::setModelProperties(boost::shared_ptr<Player> player, float 
         if (!offhandItem->isEmpty())
         {
             offhandPose = HumanoidModel::eArmPose_Item;
-            if (player->getUseItemRemainingTicks() > 0)
+            if (player->getUseItemRemainingTicks() > 0
+                && player->getUsedItemHand() == InteractionHand::eInteractionHand_OffHand)
             {
                 if (offhandItem->getUseAnimation() == UseAnim_block)
                 {

@@ -267,8 +267,10 @@ void DLCTexturePack::loadColourTable()
 
 void DLCTexturePack::loadStructureManager()
 {
+    // DLC packs provide textures, not structures. Structure templates still
+    // need the game's DataFixerUpper to upgrade NBT without a DataVersion tag.
     delete m_pStructureManager;
-    m_pStructureManager = new StructureManager(NULL);
+    m_pStructureManager = new StructureManager(Minecraft::GetInstance()->getFixerUpper());
 }
 
 bool DLCTexturePack::hasData()

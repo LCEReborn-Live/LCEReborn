@@ -285,27 +285,19 @@ BufferedImage* Textures::readImage(_TEXTURE_NAME textureName, const std::wstring
 {
     MemSect(32);
     bool titleUpdate = IsTUImage(textureName, name);
-    std::wstring path = L"";
-    bool useSelected = mTexturePackRepository->getSelected() != TexturePackRepository::defaultTexturePack
-        && mTexturePackRepository->getSelected()->hasFile(L"res/" + name, false);
-    BufferedImage* image;
-    if (useSelected)
-    {
-        path = mTexturePackRepository->getSelected()->getPath(titleUpdate, NULL);
-        image = mTexturePackRepository->getSelected()->getImageResource(name, false, titleUpdate, path);
-    }
-    else
-    {
-        path = TexturePackRepository::defaultTexturePack->getPath(titleUpdate, NULL);
-        if (!IsOriginalImage(textureName, name) && !titleUpdate)
-        {
-            image = TexturePackRepository::defaultTexturePack->getImageResource(L"1_2_2/" + name, false, false, path);
-        }
-        else
-        {
-            image = TexturePackRepository::defaultTexturePack->getImageResource(name, false, titleUpdate, path);
-        }
-    }
+    TexturePack* selected = mTexturePackRepository->getSelected();
+    bool useSelected = selected != TexturePackRepository::defaultTexturePack
+        && selected->hasFile(L"res/" + name, false);
+    TexturePack* pack = useSelected ? selected : TexturePackRepository::defaultTexturePack;
+    std::wstring path = pack->getPath(titleUpdate, NULL);
+    std::wstring imageName = name;
+    // Old Textures still uses the base game's layout when selected as a pack.
+    // DLC packs provide their own paths; base textures added in 1.2.2 live in
+    // that subdirectory, while original and title-update images do not.
+    bool useBaseLayout = !useSelected || dynamic_cast<DefaultTexturePack*>(pack) != NULL;
+    if (useBaseLayout && !IsOriginalImage(textureName, name) && !titleUpdate)
+        imageName = L"1_2_2/" + name;
+    BufferedImage* image = pack->getImageResource(imageName, false, titleUpdate, path);
     MemSect(0);
     return image;
 }

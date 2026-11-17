@@ -1439,8 +1439,16 @@ void MainWindow::OnGameFinished(int exitCode, bool crashed)
     mPendingLiveJoinOwner.clear();
     if (mLiveBridge) mLiveBridge->closeWriteChannel();
     if (crashed || exitCode != 0)
-        mLog->AddLauncherMessage(LogLevel::Error, crashed ? QString("The game crashed.")
-                                                          : QString("The game exited with code %1.").arg(exitCode));
+    {
+        QString code = QString::number(exitCode);
+#ifdef Q_OS_WIN
+        code += QString(" / 0x%1").arg(QString::number(static_cast<quint32>(exitCode), 16)
+                                          .toUpper().rightJustified(8, QLatin1Char('0')));
+#endif
+        mLog->AddLauncherMessage(LogLevel::Error,
+                                crashed ? QString("The game crashed (exit code %1).").arg(code)
+                                        : QString("The game exited with code %1.").arg(code));
+    }
     else
         mLog->AddLauncherMessage(LogLevel::Info, "The game closed.");
     if (mCloseAfterGame && !crashed && exitCode == 0)

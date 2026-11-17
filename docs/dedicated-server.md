@@ -12,19 +12,45 @@ server also remains in the full portable client package for compatibility.
 
 ## Game data
 
-Copy an existing prepared `assets` folder from the launcher installation into
-the server folder. On Linux, launcher data normally lives in
-`~/.local/share/LCEReborn/assets`; on Windows, it lives beside the installed
-launcher. Alternatively, prepare the data on a headless host with Python 3:
+Run `start-server.cmd` (Windows) or `./start-server.sh` (Linux). If game data is
+missing, it automatically downloads the base game and Update 688, verifies their
+SHA-256 checksums, extracts them and imports the merged content into `assets/`.
+Subsequent starts reuse that folder. Allow at least **10 GB of free disk space**
+for downloads, unpacked dumps and prepared content. Interrupted downloads resume
+when you run preparation again.
 
-```sh
-python3 tools/prepare_server.py --base "/path/to/base" --update "/path/to/update688"
+To prepare the data separately, without starting a world:
+
+```bat
+prepare-server.cmd
 ```
 
-On Windows use `python` instead of `python3`. Inputs must be extracted title
+```sh
+./prepare-server.sh
+```
+
+Windows downloads a checksum-pinned, private Python runtime into `tools/python/`.
+It does not install Python globally or change PATH. Linux requires `python3`;
+on Ubuntu/Debian, install it with `sudo apt install python3` if missing.
+
+You can instead copy an existing prepared `assets` folder from the launcher
+installation into the server folder. On Linux, launcher data normally lives in
+`~/.local/share/LCEReborn/assets`; on Windows, it lives beside the installed
+launcher. To import already extracted local game dumps without downloading:
+
+```sh
+./prepare-server.sh --base "/path/to/base" --update "/path/to/update688"
+```
+
+On Windows use `prepare-server.cmd` instead. Inputs must be extracted title
 folders containing `code`, `content` and `meta`. The update must be version 688.
 The tool uses the existing import/merge logic and refuses to replace an existing
 output folder. Pass `--output` to select another new assets folder.
+
+Archives are cached in `downloads/game-files/`; pass `--cache` to preparation to
+use another cache directory. Existing or incomplete `assets/` directories are
+never silently replaced. `--content-dir` on the startup script selects existing
+prepared data elsewhere and skips automatic preparation; `--help` also skips it.
 
 ## Start
 

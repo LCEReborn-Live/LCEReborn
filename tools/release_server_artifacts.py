@@ -63,10 +63,9 @@ def package_portable(archive, system, source, version, output):
         glibc = max((value.decode() for value in versions), key=lambda value: tuple(map(int, value.split('.'))))
     entries = [(binary_name, binary)]
     entries.extend((name, data) for name, data in sorted(files.items()) if name.startswith('packs/') and name.endswith('.pck'))
-    for relative in ('tools/prepare_server.py', 'tools/prepare.py', 'tools/gamedata/rpl.py',
-                     'tools/gamedata/shaders.py', 'tools/gamedata/recipe-v688.json'):
-        entries.append((relative, Path(common.ROOT, relative).read_bytes()))
-    entries.extend([package_server.start_script(system), ('README.txt', package_server.readme(source, system, glibc)),
+    for file, relative in package_server.setup_files(system):
+        entries.append((relative, Path(file).read_bytes()))
+    entries.extend([package_server.start_script(system), package_server.prepare_script(system), ('README.txt', package_server.readme(source, system, glibc)),
                     ('LICENSE.txt', Path(common.ROOT, 'LICENSE').read_bytes()),
                     ('third_party/NOTICES.txt', engine_notices + '\nServer source: ' + source['repository'] + '/tree/' + source['commit'] + '\n')])
     for identifier in sorted(identifiers):

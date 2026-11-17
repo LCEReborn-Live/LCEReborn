@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test dedicated server packaging
-        run: python -m unittest discover -s tools/tests -p test_server_package.py
+        run: python -m unittest discover -s tools/tests -p 'test_server*.py'
       - name: Download existing Windows build
         uses: actions/download-artifact@v7
         with:

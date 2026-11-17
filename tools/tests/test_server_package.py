@@ -47,6 +47,8 @@ class ServerPackageTest(unittest.TestCase):
 
     def assert_contents(self, names):
         self.assertIn('tools/prepare_server.py', names)
+        self.assertIn('tools/server_download.py', names)
+        self.assertIn('tools/game-downloads.json', names)
         self.assertIn('tools/prepare.py', names)
         self.assertIn('tools/gamedata/shaders.py', names)
         self.assertIn('LICENSE.txt', names)
@@ -63,6 +65,10 @@ class ServerPackageTest(unittest.TestCase):
             self.assert_contents(names)
             self.assertIn('LCERebornServer.exe', names)
             self.assertIn('start-server.cmd', names)
+            self.assertIn('prepare-server.cmd', names)
+            self.assertIn('tools/bootstrap-server.ps1', names)
+            self.assertIn('tools/python-runtime.json', names)
+            self.assertIn(b'prepare-server.cmd', archive.read('start-server.cmd'))
             self.assertEqual(archive.read('LCERebornServer.exe'), b'server fixture')
             self.assertIn(b'cd /d "%~dp0"', archive.read('start-server.cmd'))
             self.assertIn(b'Visual C++', archive.read('README.txt'))
@@ -74,6 +80,7 @@ class ServerPackageTest(unittest.TestCase):
             self.assert_contents({member.name.removeprefix('LCERebornServer/') for member in members})
             self.assertEqual(archive.getmember('LCERebornServer/LCERebornServer').mode, 0o755)
             self.assertEqual(archive.getmember('LCERebornServer/start-server.sh').mode, 0o755)
+            self.assertEqual(archive.getmember('LCERebornServer/prepare-server.sh').mode, 0o755)
             self.assertEqual(archive.getmember('LCERebornServer/tools/prepare_server.py').mode, 0o644)
             self.assertIn(b'glibc 2.35', archive.extractfile('LCERebornServer/README.txt').read())
 

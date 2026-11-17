@@ -26,6 +26,7 @@ qt_add_executable(LCERebornLauncher WIN32 MACOSX_BUNDLE
   BlockIcons.cpp
   BuildVersion.cpp
   GameArt.cpp
+  GameDownload.cpp
   GameFiles.cpp
   GameLog.cpp
   GameRunner.cpp
@@ -71,9 +72,28 @@ if(LCE_BUILD_LIVE_JOIN_TESTS)
   set_target_properties(LCERebornLiveJoinUrlTest LCERebornLiveJoinIpcTest PROPERTIES
     CXX_STANDARD 17 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 endif()
+option(LCE_BUILD_GAME_DOWNLOAD_TESTS "Build the isolated game download/import integration check" OFF)
+if(LCE_BUILD_GAME_DOWNLOAD_TESTS)
+  add_executable(LCERebornGameFilesTest "${CMAKE_SOURCE_DIR}/tools/tests/game_files_test.cpp"
+    GameDownload.cpp GameFiles.cpp)
+  target_link_libraries(LCERebornGameFilesTest PRIVATE Qt6::Widgets Qt6::Network)
+  set_target_properties(LCERebornGameFilesTest PROPERTIES
+    CXX_STANDARD 17 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+  add_executable(LCERebornSetupPageTest "${CMAKE_SOURCE_DIR}/tools/tests/setup_page_test.cpp"
+    SetupPage.cpp GameDownload.cpp GameFiles.cpp Widgets.cpp Theme.cpp GameArt.cpp)
+  target_link_libraries(LCERebornSetupPageTest PRIVATE Qt6::Widgets Qt6::Network)
+  set_target_properties(LCERebornSetupPageTest PROPERTIES
+    CXX_STANDARD 17 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+  qt_add_resources(LCERebornSetupPageTest launcher_setup_test_resources PREFIX /launcher
+    FILES "${CMAKE_SOURCE_DIR}/resources/launcher/icon.png" "${CMAKE_SOURCE_DIR}/resources/pc/icon.png")
+endif()
 set_target_properties(LCERebornLauncher PROPERTIES
   CXX_STANDARD 17
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
+add_custom_command(TARGET LCERebornLauncher POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_SOURCE_DIR}/live" "$<TARGET_FILE_DIR:LCERebornLauncher>/live"
+  COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_SOURCE_DIR}/resources/pc" "$<TARGET_FILE_DIR:LCERebornLauncher>/resources")
 
 if(WIN32)
   add_executable(LCERebornUpdateHelper WIN32 UpdateHelper.cpp)

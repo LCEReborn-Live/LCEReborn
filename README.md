@@ -35,11 +35,13 @@
 
 ### Installation
 
+Hosting a world? Separate **Windows and Linux dedicated-server packages** are also produced for releases. See [server setup](docs/dedicated-server.md).
+
 1. Download the installer, portable archive, or Linux AppImage from the [releases page](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
-2. Start the launcher and import **your own dumps** of the base game and Update 688.
+2. Start the launcher and choose **Download & install**, or import **your own dumps** of the base game and Update 688.
 3. Sign in to Live from the launcher, choose a profile, and select **Play**.
 
-Game data, saves, and update files are not included in downloads. The launcher imports the files from your own copy of the game.
+Game data and saves are not bundled with the client download. The launcher can download and verify the game files during setup, or import them from your own copy. See [game data installation](docs/game-downloads.md).
 
 ### Live networking
 
@@ -90,11 +92,13 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 
 ### Установка
 
+Для хостинга мира также собираются отдельные **dedicated-серверы для Windows и Linux**. Подробнее: [настройка сервера](docs/dedicated-server.md).
+
 1. Скачайте установщик, portable-архив или Linux AppImage со [страницы релизов](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
-2. Запустите лаунчер и импортируйте **собственные дампы** базовой игры и Update 688.
+2. Запустите лаунчер и выберите **Download & install** или импортируйте **собственные дампы** базовой игры и Update 688.
 3. Войдите в Live через кнопку в лаунчере, выберите профиль и нажмите **Play**.
 
-Игровые данные, сохранения и файлы обновления не входят в загрузки. Лаунчер импортирует файлы вашей копии игры с компьютера.
+Игровые данные и сохранения не входят в архив клиента. Во время настройки лаунчер может скачать и проверить игровые файлы или импортировать файлы вашей копии игры. Подробнее: [установка игровых данных](docs/game-downloads.md).
 
 ### Сеть Live
 

@@ -1,0 +1,64 @@
+name: Publish dedicated server packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Windows/Linux client build to reuse
+        required: true
+        type: string
+      release_tag:
+        description: Existing release tag to attach the servers to
+        required: true
+        default: v1.2.3
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-servers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Test dedicated server packaging
+        run: python -m unittest discover -s tools/tests -p test_server_package.py
+      - name: Download existing Windows build
+        uses: actions/download-artifact@v7
+        with:
+          name: LCEReborn-Live-Windows
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: build/server-source-artifacts/windows
+      - name: Download existing Linux build
+        uses: actions/download-artifact@v7
+        with:
+          name: LCEReborn-Live-Linux
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: build/server-source-artifacts/linux
+      - name: Prepare standalone server archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python tools/release_server_artifacts.py --run-id "$SOURCE_RUN_ID" --tag "$RELEASE_TAG"
+      - name: Attach servers to the existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY" >/dev/null
+          shopt -s nullglob
+          files=(build/server-release/LCEReborn-Live-Server-*)
+          if (( ${#files[@]} != 2 )); then echo "Expected two dedicated server packages" >&2; exit 1; fi
+          gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$RELEASE_REPOSITORY" --clobber

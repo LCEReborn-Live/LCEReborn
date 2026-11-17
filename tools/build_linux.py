@@ -100,6 +100,8 @@ def main():
             steps.append("mkdir -p /build/live-runtime && cp /src/build/live-runtime/* /build/live-runtime/")
             steps.append("python3 /src/tools/package_pc.py --build /build" + (" --allow-dirty" if args.allow_dirty
                                                                               else ""))
+            steps.append("python3 /src/tools/package_server.py --build /build" + (" --allow-dirty" if args.allow_dirty
+                                                                                  else ""))
         command = ["docker", "run", "--rm", "-v", ROOT + ":/src", "-v", QT_VOLUME + ":/src/build/qt",
                    "-v", BUILD_VOLUME + ":/build", image, "sh", "-c", " && ".join(steps)]
         print("+ docker run %s %s" % (image, " && ".join(steps)), flush=True)

@@ -221,7 +221,7 @@ def program_files(build):
     live = os.path.join(ROOT, "live")
     for folder, _, names in os.walk(live):
         for name in sorted(names):
-            if os.path.splitext(name)[1].lower() not in (".js", ".json"):
+            if os.path.splitext(name)[1].lower() not in (".js", ".json", ".txt"):
                 continue
             path = os.path.join(folder, name)
             files.append((path, "live/" + os.path.relpath(path, live).replace(os.sep, "/")))
@@ -562,8 +562,8 @@ def readme_text(source, glibc):
             "A PC build of LCEReborn, the reconstructed source of Minecraft: Wii U\n"
             "Edition. Build %s.\n\n"
             "This download contains no game content. Start %s:\n"
-            "the first time, it asks for your own dumps of the base game and update\n"
-            "688 and imports them into %s"
+            "the first time, choose Download & install, or import your own extracted\n"
+            "base game and Update 688 folders. The imported content is kept in %s"
             "%s\n"
             "%s"
             "%s"

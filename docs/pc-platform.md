@@ -27,7 +27,7 @@ PC and Wii U players can play together.
 
 ## Dedicated server
 
-`LCERebornServer` comes in the same package and runs a world with no window. It needs the content the launcher imported.
+`LCERebornServer` runs a world with no window. Releases provide separate Windows ZIP and Linux tar.gz server downloads; it also remains in the full portable client package. See [dedicated server setup](dedicated-server.md) for headless installation and startup.
 
 - **Windows:** run it from the package folder.
 - **Linux:** run it from the tar.gz, not the AppImage, with `--content-dir ~/.local/share/LCEReborn/assets`.

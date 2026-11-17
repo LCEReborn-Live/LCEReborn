@@ -8,12 +8,14 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
+#include <QScrollArea>
 #include <QStyle>
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
 
 #include "GameFiles.hpp"
+#include "GameDownload.hpp"
 #include "LauncherPaths.hpp"
 #include "Widgets.hpp"
 
@@ -31,7 +33,7 @@ void SetCheck(QLabel* label, const QString& text, const char* style)
 }
 
 SetupPage::SetupPage(QWidget* parent)
-    : QWidget(parent), mImport(new PlayButton(this)), mCancel(new QPushButton("Cancel", this)),
+    : QWidget(parent), mImport(new PlayButton(this)), mDownload(new PlayButton(this)), mCancel(new QPushButton("Cancel", this)),
       mBack(new QPushButton("Back to the launcher", this)), mProgress(new QProgressBar(this)),
       mProgressText(new QLabel(this)), mValidateTimer(new QTimer(this))
 {
@@ -47,13 +49,12 @@ SetupPage::SetupPage(QWidget* parent)
     brand->addWidget(mark);
     brand->addWidget(wordmark, 1);
 
-    auto* statement = new QLabel("Bring your own game.", panel);
+    auto* statement = new QLabel("Get ready to play.", panel);
     statement->setObjectName("SetupStatement");
     statement->setWordWrap(true);
     auto* explanation = new QLabel(
-        "LCEReborn runs Minecraft: Wii U Edition on PC from your own copy of the game. Point it at the title "
-        "folders you dumped from your Wii U and it imports the game's content. Nothing is downloaded, and nothing "
-        "leaves this computer.",
+        "Download and install the game files automatically, or choose the extracted base game and Update 688 "
+        "folders already on your computer. Downloads can resume if interrupted.",
         panel);
     explanation->setWordWrap(true);
     auto* packs = new QLabel(
@@ -77,6 +78,8 @@ SetupPage::SetupPage(QWidget* parent)
 
     mImport->SetLabels("Import game files", "Copies the content into the launcher");
     mImport->setFixedSize(340, 62);
+    mDownload->SetLabels("Download & install", "Installs the game and Update 688");
+    mDownload->setMinimumHeight(62);
     mProgress->setRange(0, 1000);
     mProgress->setTextVisible(false);
     mProgress->hide();
@@ -84,15 +87,30 @@ SetupPage::SetupPage(QWidget* parent)
     mProgressText->setWordWrap(true);
     mCancel->hide();
 
-    auto* well = new GameWell(panel);
+    auto* scroll = new QScrollArea(panel);
+    mScroll = scroll;
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto* well = new GameWell(scroll);
+    scroll->setWidget(well);
     auto* steps = new QVBoxLayout(well);
     steps->setContentsMargins(24, 22, 24, 22);
-    steps->setSpacing(22);
-    steps->addWidget(MakeStep(1, "Base game", "The extracted title folder of Minecraft: Wii U Edition, with code, "
+    steps->setSpacing(14);
+    steps->addWidget(mDownload);
+    mLocalFields = new QWidget(well);
+    auto* localSteps = new QVBoxLayout(mLocalFields);
+    localSteps->setContentsMargins(0, 0, 0, 0);
+    localSteps->setSpacing(14);
+    auto* localHint = new QLabel("Or import local game folders:", mLocalFields);
+    localHint->setObjectName("StepHint");
+    localSteps->addWidget(localHint);
+    localSteps->addWidget(MakeStep(1, "Base game", "The extracted title folder of Minecraft: Wii U Edition, with code, "
                                               "content and meta inside.",
                               &mBase, false));
-    steps->addWidget(MakeStep(2, "Update 688", "The extracted folder of the game's update, version 688.", &mUpdate,
+    localSteps->addWidget(MakeStep(2, "Update 688", "The extracted folder of the game's update, version 688.", &mUpdate,
                               true));
+    steps->addWidget(mLocalFields);
     steps->addStretch(1);
     steps->addWidget(mProgress);
     steps->addWidget(mProgressText);
@@ -105,7 +123,7 @@ SetupPage::SetupPage(QWidget* parent)
     auto* columns = new QHBoxLayout(panel);
     columns->setSpacing(24);
     columns->addWidget(introWidget);
-    columns->addWidget(well, 1);
+    columns->addWidget(scroll, 1);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(60, 40, 60, 40);
@@ -119,9 +137,12 @@ SetupPage::SetupPage(QWidget* parent)
     mValidateTimer->setInterval(250);
     connect(mValidateTimer, &QTimer::timeout, this, &SetupPage::Validate);
     connect(mImport, &PlayButton::clicked, this, &SetupPage::Start);
+    connect(mDownload, &PlayButton::clicked, this, &SetupPage::Download);
     connect(mCancel, &QPushButton::clicked, this, [this] {
         if (mPreparer != nullptr)
             mPreparer->Cancel();
+        if (mDownloader != nullptr)
+            mDownloader->Cancel();
         mCancel->setEnabled(false);
     });
     connect(mBack, &QPushButton::clicked, this, &SetupPage::BackRequested);
@@ -131,6 +152,12 @@ SetupPage::SetupPage(QWidget* parent)
 
 SetupPage::~SetupPage()
 {
+    if (mDownloader != nullptr)
+    {
+        disconnect(mDownloader, nullptr, this, nullptr);
+        delete mDownloader;
+        mDownloader = nullptr;
+    }
     if (mThread != nullptr)
     {
         mPreparer->Cancel();
@@ -157,6 +184,7 @@ QWidget* SetupPage::MakeStep(int number, const QString& title, const QString& hi
     step->check->setWordWrap(true);
     step->valid = false;
     auto* browse = new QPushButton("Browse...", widget);
+    step->browse = browse;
     auto* fieldRow = new QHBoxLayout;
     fieldRow->setSpacing(8);
     fieldRow->addWidget(step->field, 1);
@@ -237,11 +265,46 @@ void SetupPage::SetBusy(bool busy)
 {
     mBase.field->setEnabled(!busy);
     mUpdate.field->setEnabled(!busy);
+    mBase.browse->setEnabled(!busy);
+    mUpdate.browse->setEnabled(!busy);
     mImport->setVisible(!busy);
+    mDownload->setVisible(!busy);
+    mLocalFields->setVisible(!busy);
     mProgress->setVisible(busy);
     mCancel->setVisible(busy);
     mCancel->setEnabled(busy);
     mBack->setVisible(mCanGoBack && !busy);
+}
+
+void SetupPage::Download()
+{
+    if (IsBusy()) return;
+    mDownloader = new GameDownload(this);
+    connect(mDownloader, &GameDownload::Ready, this, [this](const QString& key, const QString& root) {
+        (key == "base" ? mBase : mUpdate).field->setText(QDir::toNativeSeparators(root));
+    });
+    connect(mDownloader, &GameDownload::Progress, this, [this](const QString& text, qint64 done, qint64 total) {
+        mProgress->setRange(0, total > 0 ? 1000 : 0);
+        if (total > 0) mProgress->setValue(static_cast<int>(done * 1000 / total));
+        mProgressText->setText(text);
+    });
+    connect(mDownloader, &GameDownload::Finished, this, [this](bool succeeded, const QString& error) {
+        mDownloader->deleteLater();
+        mDownloader = nullptr;
+        SetBusy(false);
+        mProgress->setRange(0, 1000);
+        Validate();
+        if (succeeded) Start();
+        else
+        {
+            SetCheck(mProgressText, error == kCancelled ? "Download cancelled. You can resume it later." : error,
+                     error == kCancelled ? "StepHint" : "StepBad");
+            emit Message(error == kCancelled ? LogLevel::Info : LogLevel::Error, mProgressText->text());
+            QTimer::singleShot(0, this, [this] { mScroll->ensureWidgetVisible(mProgressText); });
+        }
+    });
+    SetBusy(true);
+    mDownloader->Start();
 }
 
 void SetupPage::OnProgress(qint64 filesDone, qint64 filesTotal, qint64 bytesDone, qint64 bytesTotal)

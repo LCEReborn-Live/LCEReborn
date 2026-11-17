@@ -1536,7 +1536,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
     if (mSetup->IsBusy())
     {
         const auto answer = QMessageBox::question(
-            this, "Close the Launcher", "The game files are still being imported. Stop and close the launcher?");
+            this, "Close the Launcher", "Game setup is still in progress. Stop and close the launcher?");
         if (answer != QMessageBox::Yes)
         {
             event->ignore();

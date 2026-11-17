@@ -43,6 +43,12 @@ jobs:
             build/qt
           key: windows-build-deps-${{ hashFiles('tools/build/deps.json', 'tools/build/qt.json') }}
 
+      - name: Check game data downloader
+        run: node --test tools/tests/game_download_test.mjs
+
+      - name: Check dedicated server packaging
+        run: python -m unittest discover -s tools/tests -p test_server_package.py
+
       - name: Prepare bundled Node.js runtime
         shell: pwsh
         run: |
@@ -78,6 +84,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/package_pc.py --build build/pc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/package_server.py --build build/pc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Name Windows dedicated server package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0' }
+          $server = @(Get-ChildItem build -Filter 'LCEReborn-server-windows-*.zip')
+          if ($server.Count -ne 1) { throw 'Expected exactly one Windows dedicated server package' }
+          Move-Item -LiteralPath $server[0].FullName -Destination "build/LCEReborn-Live-Server-Windows-$version.zip"
 
       - name: Build Windows installer
         shell: pwsh
@@ -110,6 +127,7 @@ jobs:
           path: |
             build/LCEReborn-Live-Portable-*.zip
             build/release/LCEReborn-Live-Installer-*.exe
+            build/LCEReborn-Live-Server-Windows-*.zip
           if-no-files-found: error
 
 
@@ -136,6 +154,12 @@ jobs:
       - name: Install Docker
         uses: docker/setup-buildx-action@v3
 
+      - name: Check game data downloader
+        run: node --test tools/tests/game_download_test.mjs
+
+      - name: Check dedicated server packaging
+        run: python -m unittest discover -s tools/tests -p test_server_package.py
+
       - name: Build and package Linux client
         shell: bash
         run: |
@@ -147,6 +171,7 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then version="0.1.0"; fi
           mv build/LCEReborn-linux-*.AppImage "build/LCEReborn-Live-Linux-$version.AppImage"
           mv build/LCEReborn-linux-*.tar.gz "build/LCEReborn-Live-Linux-Portable-$version.tar.gz"
+          mv build/LCEReborn-server-linux-*.tar.gz "build/LCEReborn-Live-Server-Linux-$version.tar.gz"
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
@@ -155,6 +180,7 @@ jobs:
           path: |
             build/LCEReborn-Live-Linux-*.AppImage
             build/LCEReborn-Live-Linux-Portable-*.tar.gz
+            build/LCEReborn-Live-Server-Linux-*.tar.gz
           if-no-files-found: error
 
   release:

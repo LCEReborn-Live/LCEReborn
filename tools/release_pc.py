@@ -48,6 +48,7 @@ TOOLS = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(TOOLS)
 sys.path.insert(0, TOOLS)
 import package_pc  # noqa: E402
+import package_server  # noqa: E402
 from package_pc import PackageError  # noqa: E402
 
 CHANGELOG = os.path.join(ROOT, "release", "CHANGELOG.md")
@@ -185,6 +186,8 @@ def main():
         build(folder)
         info = build_info(folder)
         outputs, source = package_pc.package(folder, args.allow_dirty)
+        server_outputs, _ = package_server.package(folder, args.allow_dirty, source=source)
+        outputs.extend(server_outputs)
         commit = source["commit"]
         if info["COMMIT"] != commit[:len(info["COMMIT"])]:
             raise PackageError("The build is of %s, not of HEAD %s" % (info["COMMIT"], commit[:12]))

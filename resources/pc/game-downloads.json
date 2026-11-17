@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "base": {
+    "url": "https://drive.google.com/file/d/1W8BqyQGSXPosEPU1xtCkhXTWbv7oOtYB/view",
+    "size": 1057094846,
+    "sha256": "f798f644fb485dc49731a51f4902b0cf9be5e5d314e2b7645a69a72d885db40a",
+    "unpackedBytes": 1107677260,
+    "titleId": "00050000101D9D00",
+    "version": 1
+  },
+  "update": {
+    "url": "https://drive.google.com/file/d/1wCHCfqfqojCzHzns5Pyvgzs2wBHZi8HC/view",
+    "size": 2437136602,
+    "sha256": "59258f1dd8a039ac6718761bccb19f3ac8721bd18a29c89265d88c69c73d8762",
+    "unpackedBytes": 2565348489,
+    "titleId": "00050000101D9D00",
+    "version": 688
+  }
+}

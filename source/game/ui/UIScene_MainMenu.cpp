@@ -276,6 +276,19 @@ void UIScene_MainMenu::customDrawSplash(fuiRect* rect)
     GlStateManager::scalef(factor, factor, factor);
     font->drawShadow(m_splash, -(font->width(m_splash) / 2), -8, 0xffffff00);
     GlStateManager::popMatrix();
+
+    // Keep the game's title art intact and add the LCEReborn identity as a
+    // small subtitle beneath the existing logo/splash area on the main menu.
+    const std::wstring branding = L"LCEReborn-Live";
+    const float brandingWidth = static_cast<float>(font->width(branding));
+    const float availableWidth = std::max(1.0f, (rect->xMax - rect->xMin) * 0.9f);
+    const float brandingScale = std::min(1.0f, availableWidth / brandingWidth);
+    GlStateManager::pushMatrix();
+    GlStateManager::translatef((rect->xMax - rect->xMin) * 0.5f, rect->yMax + 10.0f, 0.0f);
+    GlStateManager::scalef(brandingScale, brandingScale, brandingScale);
+    font->drawShadow(branding, -font->width(branding) / 2, 0, 0xffeeeeee);
+    GlStateManager::popMatrix();
+
     GlStateManager::disableRescaleNormal();
     GlStateManager::enableDepthTest();
 }

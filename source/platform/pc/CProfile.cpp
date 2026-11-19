@@ -476,8 +476,9 @@ int CProfile::SignInAs(int pad, const PcPlayerProfile* chosen)
     const std::string& launchUuid = PcGetLaunchOptions().uuid;
     if (chosen != NULL)
         profile.uuid = UuidFromHex(chosen->uuid);
-    // The launcher's profile UUID is the persistent world identity. Never
-    // replace it with a generated Live-account UUID during launch.
+    // The launcher supplies an account-stable UUID derived from Live. Keep
+    // that UUID across devices so worlds and inventory remain with the same
+    // player identity.
     if (quadrant == 0 && launchUuid.size() == 32)
         profile.uuid = UuidFromHex(launchUuid);
     profile.onlineAccount = false;

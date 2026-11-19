@@ -25,9 +25,10 @@ PC and Wii U players can play together.
 - **Open to LAN:** opens a world you started offline, from the pause menu.
 - **Joining:** the Join tab lists games on your network. Add Server saves any other address.
 
-The launcher's profile UUID is always preserved. Signing in to LCE Live does
-not replace it or create a new player identity, so items and progress in
-existing worlds remain attached to the same player.
+When signed in to LCE Live, the primary player's game UUID is derived from the
+Live account ID. The same Live account therefore keeps the same player identity
+and world progress on every device. Without a Live session, the launcher
+profile UUID is used.
 
 Live achievement progress is also shared by account. The client downloads the
 account's unlocked achievements, merges them with local progress, and uploads

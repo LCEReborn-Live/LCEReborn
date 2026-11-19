@@ -25,6 +25,8 @@ PC and Wii U players can play together.
 - **Open to LAN:** opens a world you started offline, from the pause menu.
 - **Joining:** the Join tab lists games on your network. Add Server saves any other address.
 
+When signed in to LCE Live, the primary player's game UUID is derived from the Live account ID. The same Live account therefore keeps the same player identity when joining a world from another device. Without a Live session, the launcher's local profile UUID is used.
+
 ## Dedicated server
 
 `LCERebornServer` runs a world with no window. Releases provide separate Windows ZIP and Linux tar.gz server downloads; it also remains in the full portable client package. See [dedicated server setup](dedicated-server.md) for headless installation and startup.

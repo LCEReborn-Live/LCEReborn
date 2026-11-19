@@ -17,10 +17,8 @@ TexturePack* TexturePackRepository::defaultTexturePack = NULL;
 
 namespace
 {
-// This is the pack ID declared by the bundled 1.14 TexturePack.pck. It is
-// installed as the repository's default, not shown as a selectable DLC pack.
-const unsigned int kLiveBuiltInTexturePackSourceId = 2050;
-const unsigned int kLegacyTexturePackId = 0x00fffffe;
+const unsigned int kModernTexturePackSourceId = 2050;
+const unsigned int kClassicTexturePackId = 0x00fffffe;
 }
 
 TexturePackRepository::TexturePackRepository(File file, Minecraft* minecraft)
@@ -42,7 +40,7 @@ TexturePackRepository::TexturePackRepository(File file, Minecraft* minecraft)
     m_unknown0 = 0;
     m_unknown1 = NULL;
     m_previousSelected = NULL;
-    m_liveDefaultPackRegistered = false;
+    m_modernDefaultPackRegistered = false;
 }
 
 TexturePack* TexturePackRepository::getSelected()
@@ -112,18 +110,18 @@ bool TexturePackRepository::selectTexturePackById(unsigned int packId, bool forc
     if (iterator != m_texturePacksById.end())
     {
         TexturePack* texturePack = iterator->second;
-        if (texturePack != m_selected)
+        const bool selectionChanged = texturePack != m_selected;
+        if (selectionChanged)
         {
             selectSkin(texturePack);
-            if (texturePack->hasData())
-            {
-                gApp.StartReloadingTexturePack();
-            }
-            else
-            {
-                texturePack->loadData();
-            }
         }
+        if (texturePack->hasData())
+        {
+            if (selectionChanged)
+                gApp.StartReloadingTexturePack();
+        }
+        else if (!texturePack->isLoadingData())
+            texturePack->loadData();
         result = true;
     }
     else
@@ -152,18 +150,11 @@ TexturePack* TexturePackRepository::addTexturePackFromDLC(DLCPack* dlcPack, unsi
     unsigned int id = packId & 0x00ffffff;
     if (dlcPack != NULL)
     {
-        if (!m_liveDefaultPackRegistered && id == kLiveBuiltInTexturePackSourceId)
+        if (!m_modernDefaultPackRegistered && id == kModernTexturePackSourceId)
         {
-            // Preserve the former default as a normal, optional "Old Textures"
-            // pack. The DLC pack itself receives ID 0, so all ordinary code sees
-            // its contents as the built-in default rather than as a selected add-on.
             TexturePack* previousDefault = defaultTexturePack;
-            TexturePack* legacyTexturePack = new LegacyTexturePack(kLegacyTexturePackId);
-            texturePack = new DLCTexturePack(0, dlcPack, legacyTexturePack);
-
-            // DLC metadata may create colour and material tables while the PCK
-            // data is mounted. Initialise their base tables before publishing
-            // this object as the repository-wide default.
+            TexturePack* classicPack = new LegacyTexturePack(kClassicTexturePackId);
+            texturePack = new DLCTexturePack(0, dlcPack, classicPack);
             texturePack->loadColourTable();
             texturePack->loadMaterialTable();
             texturePack->loadStructureManager();
@@ -177,16 +168,16 @@ TexturePack* TexturePackRepository::addTexturePackFromDLC(DLCPack* dlcPack, unsi
                     break;
                 }
             }
-            m_allTexturePacks->push_back(legacyTexturePack);
+            m_allTexturePacks->insert(m_allTexturePacks->begin() + 1, classicPack);
             m_texturePacksById[0] = texturePack;
-            m_texturePacksById[kLegacyTexturePackId] = legacyTexturePack;
+            m_texturePacksById[kClassicTexturePackId] = classicPack;
             defaultTexturePack = texturePack;
             if (m_selected == previousDefault)
             {
                 m_previousSelected = previousDefault;
                 m_selected = texturePack;
             }
-            m_liveDefaultPackRegistered = true;
+            m_modernDefaultPackRegistered = true;
         }
         else
         {

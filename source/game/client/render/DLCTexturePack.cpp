@@ -2,6 +2,12 @@
 
 #include <string>
 
+#if LCE_PLATFORM_PC
+#include <SDL3/SDL.h>
+
+#include "platform/pc/PcPaths.hpp"
+#endif
+
 #include "game/client/render/DLCModelsFile.hpp"
 #include "game/client/audio/DLCAudioFile.hpp"
 #include "game/client/audio/SoundEngine.hpp"
@@ -43,13 +49,32 @@ bool isLiveBuiltInTexturePack(DLCPack* pack)
 {
     return pack != NULL && (pack->GetPackId() & 0x00ffffff) == kLiveBuiltInTexturePackSourceId;
 }
+
+#if LCE_PLATFORM_PC
+const void* getModernTexturePackIcon(unsigned int& size)
+{
+    static bool attempted = false;
+    static void* data = NULL;
+    static size_t length = 0;
+    if (!attempted)
+    {
+        attempted = true;
+        const std::string path = PcResourceRoot() + "/modern-textures-icon.jpg";
+        data = SDL_LoadFile(path.c_str(), &length);
+    }
+    size = static_cast<unsigned int>(length);
+    return data;
+}
+#endif
 }
 
 void DLCTexturePack::loadIcon()
 {
-    if (isLiveBuiltInTexturePack(m_dlcPack) && m_pParentPack != NULL)
+    if (isLiveBuiltInTexturePack(m_dlcPack))
     {
-        m_pIconData = m_pParentPack->getPackIcon(m_iconSize);
+#if LCE_PLATFORM_PC
+        m_pIconData = getModernTexturePackIcon(m_iconSize);
+#endif
         return;
     }
 
@@ -133,7 +158,7 @@ DLCPack* DLCTexturePack::getDLCPack()
 std::wstring DLCTexturePack::getDesc1()
 {
     if (isLiveBuiltInTexturePack(m_dlcPack))
-        return L10N::GetString(IDS_DEFAULT_TEXTUREPACK);
+        return L"The modernized look and feel of Minecraft";
 
     if (m_stringTable == NULL)
         return m_desc1;
@@ -146,7 +171,7 @@ std::wstring DLCTexturePack::getDesc1()
 std::wstring DLCTexturePack::getName()
 {
     if (isLiveBuiltInTexturePack(m_dlcPack))
-        return L10N::GetString(IDS_DEFAULT_TEXTUREPACK_NAME);
+        return L"Modern Textures";
 
     if (m_stringTable == NULL)
         return m_name.empty() ? m_dlcPack->getName() : m_name;
@@ -386,7 +411,11 @@ int DLCTexturePack::packMounted(void* data, int userIndex, unsigned int result, 
                         }
                     }
 
-                    if (parentPack->getDLCItemsCount(DLCManager::eDLCType_Audio) > 0)
+                    // The bundled Modern Textures PCK contains audio metadata but
+                    // ships no matching Bink streams. Keep the game's base music
+                    // active instead of retrying missing files from this pack.
+                    if (!isLiveBuiltInTexturePack(pack->m_dlcPack)
+                        && parentPack->getDLCItemsCount(DLCManager::eDLCType_Audio) > 0)
                     {
                         DLCAudioFile* audioFile = static_cast<DLCAudioFile*>(
                             parentPack->getFile(DLCManager::eDLCType_Audio, 0, true, true));

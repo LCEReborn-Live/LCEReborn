@@ -1496,10 +1496,10 @@ void MainWindow::ShowPacksNotice()
 {
     QSettings(LauncherPaths::SettingsFile(), QSettings::IniFormat).setValue("notices/packsFolder", true);
     QMessageBox notice(QMessageBox::Information, "Packs",
-                       "DLC and skin packs no longer load from the game files. The packs that came free with the "
-                       "game still load on their own, but packs you bought need adding again.\n\n"
-                       "Copy the folders of the packs you own from content/WiiU/DLC in your update 688 dump into "
-                       "the packs folder, and they load the next time you play.",
+                       "DLC and skin packs in your imported game content load automatically. If a pack is not "
+                       "included there, you can add it from the Packs folder.\n\n"
+                       "Copy the pack folder from content/WiiU/DLC or content/WiiU/CU/DLC in your update 688 dump "
+                       "into the packs folder, and it loads the next time you play.",
                        QMessageBox::NoButton, this);
     QPushButton* open = notice.addButton("Open Packs Folder", QMessageBox::ActionRole);
     notice.addButton(QMessageBox::Ok);

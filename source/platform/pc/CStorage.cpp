@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <system_error>
+#include <unordered_set>
 
 #include "game/world/generation/PlayerUID.hpp"
 #include "platform/BuiltInPacks.hpp"
@@ -1870,6 +1871,36 @@ unsigned int CStorage::EnumerateLocalDLCPackages()
     m_installedContent.clear();
     for (unsigned int index = 0; index < BUILT_IN_PACK_COUNT; ++index)
         AddPack(BUILT_IN_PACKS[index], EPackSource_BuiltIn);
+
+    // Also discover user-owned DLC in the imported game content. The fixed list
+    // above covers packs bundled with the game, while installed/owned content
+    // can vary between users and update dumps.
+    std::unordered_set<std::string> knownPaths;
+    for (std::vector<CONTENT_DATA>::const_iterator it = m_installedContent.begin(); it != m_installedContent.end(); ++it)
+    {
+        std::string path = it->path;
+        std::transform(path.begin(), path.end(), path.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        knownPaths.insert(path);
+    }
+    const char* const dlcRoots[] = {"/vol/content/WiiU/DLC", "/vol/content/WiiU/CU/DLC"};
+    for (unsigned int rootIndex = 0; rootIndex < sizeof(dlcRoots) / sizeof(dlcRoots[0]); ++rootIndex)
+    {
+        std::vector<DirectoryEntry> dlcEntries;
+        if (!ListDirectory(dlcRoots[rootIndex], dlcEntries))
+            continue;
+        for (std::vector<DirectoryEntry>::const_iterator it = dlcEntries.begin(); it != dlcEntries.end(); ++it)
+        {
+            if (it->name == "." || it->name == ".." || (!it->isDirectory && !IsPackFile(it->name)))
+                continue;
+            const std::string path = std::string(dlcRoots[rootIndex]) + "/" + it->name;
+            std::string normalizedPath = path;
+            std::transform(normalizedPath.begin(), normalizedPath.end(), normalizedPath.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (knownPaths.insert(normalizedPath).second)
+                AddPack(path, EPackSource_BuiltIn);
+        }
+    }
 
     const std::string root = "/vol/packs";
     std::error_code error;

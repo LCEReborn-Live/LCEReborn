@@ -3105,6 +3105,8 @@ void MinecraftWorld_RunStaticCtors()
 
 ClientPacketListener* Minecraft::getConnection(int playerIdx)
 {
+    if (playerIdx < 0 || playerIdx >= 4 || mLocalPlayers[playerIdx] == NULL)
+        return NULL;
     return mLocalPlayers[playerIdx]->mPacketListener;
 }
 

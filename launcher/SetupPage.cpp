@@ -58,8 +58,8 @@ SetupPage::SetupPage(QWidget* parent)
         panel);
     explanation->setWordWrap(true);
     auto* packs = new QLabel(
-        "DLC packs you own and custom .pck packs work too: once the game is set up, copy each pack's folder "
-        "into the packs folder, which Packs on the game's main menu opens.",
+        "DLC found in your imported game content loads automatically. You can also add owned DLC and custom .pck "
+        "packs through the Packs folder on the game's main menu.",
         panel);
     packs->setWordWrap(true);
 

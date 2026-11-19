@@ -38,12 +38,12 @@ void DefaultTexturePack::loadIcon()
 
 void DefaultTexturePack::loadName()
 {
-    m_name = L10N::GetString(IDS_DEFAULT_TEXTUREPACK_NAME);
+    m_name = L"Minecraft";
 }
 
 void DefaultTexturePack::loadDescription()
 {
-    m_desc1 = L"LOCALISE ME: The default look of Minecraft";
+    m_desc1 = L"The classic Minecraft textures, icons and user interface!";
 }
 
 void DefaultTexturePack::loadCustomModels()
@@ -90,12 +90,12 @@ bool DefaultTexturePack::isTerrainUpdateCompatible()
 
 std::wstring DefaultTexturePack::getName()
 {
-    return L10N::GetString(IDS_DEFAULT_TEXTUREPACK_NAME);
+    return L"Minecraft";
 }
 
 std::wstring DefaultTexturePack::getDesc1()
 {
-    return L10N::GetString(IDS_DEFAULT_TEXTUREPACK);
+    return L"The classic Minecraft textures, icons and user interface!";
 }
 
 InputStream* DefaultTexturePack::getResourceImplementation(const std::wstring& fileName)

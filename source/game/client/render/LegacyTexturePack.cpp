@@ -4,10 +4,10 @@ LegacyTexturePack::LegacyTexturePack(unsigned int id) : DefaultTexturePack(id) {
 
 std::wstring LegacyTexturePack::getName()
 {
-    return L"Old Textures";
+    return L"Minecraft";
 }
 
 std::wstring LegacyTexturePack::getDesc1()
 {
-    return L"The original LCEReborn textures.";
+    return L"The classic Minecraft textures, icons and user interface!";
 }

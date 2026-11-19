@@ -63,7 +63,7 @@ private:
     boost::unordered_map<unsigned int, TexturePack*> m_texturePacksById;
     TexturePack* m_selected;
     TexturePack* m_previousSelected;
-    bool m_liveDefaultPackRegistered;
+    bool m_modernDefaultPackRegistered;
     bool m_skinReloaded;
 };
 

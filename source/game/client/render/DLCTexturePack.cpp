@@ -1,10 +1,11 @@
 #include "game/client/render/DLCTexturePack.hpp"
 
+#include <fstream>
+#include <iterator>
 #include <string>
+#include <vector>
 
 #if LCE_PLATFORM_PC
-#include <SDL3/SDL.h>
-
 #include "platform/pc/PcPaths.hpp"
 #endif
 
@@ -54,16 +55,17 @@ bool isLiveBuiltInTexturePack(DLCPack* pack)
 const void* getModernTexturePackIcon(unsigned int& size)
 {
     static bool attempted = false;
-    static void* data = NULL;
-    static size_t length = 0;
+    static std::vector<char> data;
     if (!attempted)
     {
         attempted = true;
         const std::string path = PcResourceRoot() + "/modern-textures-icon.jpg";
-        data = SDL_LoadFile(path.c_str(), &length);
+        std::ifstream stream(path.c_str(), std::ios::binary);
+        if (stream)
+            data.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
     }
-    size = static_cast<unsigned int>(length);
-    return data;
+    size = static_cast<unsigned int>(data.size());
+    return data.empty() ? NULL : data.data();
 }
 #endif
 }

@@ -11,7 +11,6 @@
 #include <QFrame>
 #include <QDateTime>
 #include <QDataStream>
-#include <QCryptographicHash>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QPropertyAnimation>
@@ -74,12 +73,6 @@ namespace
 #ifdef Q_OS_WIN
 unsigned int gLiveInviteSoundGeneration = 0;
 #endif
-
-QString LivePlayerUuid(qint64 userId)
-{
-    const QByteArray identity = QByteArray("LCEReborn-Live-player-v1:") + QByteArray::number(userId);
-    return QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex().left(32);
-}
 
 void PlayLiveInviteSound(QObject* context)
 {
@@ -1248,8 +1241,6 @@ void MainWindow::StartGame()
     Profile activeProfile = *profile;
     if (!mLiveName.isEmpty())
         activeProfile.username = mLiveName;
-    if (!mLiveToken.isEmpty() && mLiveUserId > 0)
-        activeProfile.uuid = LivePlayerUuid(mLiveUserId);
     QString liveSkinPath;
     QString liveCapePath;
     if (!mLiveToken.isEmpty() && mLiveUserId > 0)
@@ -1567,4 +1558,3 @@ void MainWindow::closeEvent(QCloseEvent* event)
     SaveProfiles();
     event->accept();
 }
-

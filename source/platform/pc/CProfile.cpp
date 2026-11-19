@@ -476,9 +476,8 @@ int CProfile::SignInAs(int pad, const PcPlayerProfile* chosen)
     const std::string& launchUuid = PcGetLaunchOptions().uuid;
     if (chosen != NULL)
         profile.uuid = UuidFromHex(chosen->uuid);
-    // The launcher can supply an account-stable identity (for example, the
-    // UUID derived from the signed-in LCE Live account). Keep that identity
-    // for the primary player even when a saved local profile was selected.
+    // The launcher's profile UUID is the persistent world identity. Never
+    // replace it with a generated Live-account UUID during launch.
     if (quadrant == 0 && launchUuid.size() == 32)
         profile.uuid = UuidFromHex(launchUuid);
     profile.onlineAccount = false;

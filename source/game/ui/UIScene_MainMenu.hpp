@@ -11,6 +11,7 @@
 #include "platform/C4JStorage.hpp"
 
 class UILayer;
+class fuiRenderNode;
 struct fuiRect;
 
 class UIScene_MainMenu : public UIScene
@@ -53,6 +54,7 @@ public:
 
 private:
     void layoutLiveMenuButtons();
+    void installMainMenuLogo(fuiRenderNode* root);
 
     UIControl_Button m_buttons[8];
     UIControl m_timer;
@@ -66,6 +68,8 @@ private:
     float m_splashHeight;
     std::vector<std::wstring> m_splashes;
     std::wstring m_splash;
+    bool m_mainMenuLogoTextureRegistered;
+    bool m_mainMenuLogoInstalled;
     int m_pendingAction;
 };
 

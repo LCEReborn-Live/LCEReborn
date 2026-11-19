@@ -44,13 +44,6 @@ extern C4JStorage* gStorage;
 
 namespace
 {
-const unsigned int kLiveBuiltInTexturePackSourceId = 2050;
-
-bool isLiveBuiltInTexturePack(DLCPack* pack)
-{
-    return pack != NULL && (pack->GetPackId() & 0x00ffffff) == kLiveBuiltInTexturePackSourceId;
-}
-
 #if LCE_PLATFORM_PC
 const void* getModernTexturePackIcon(unsigned int& size)
 {
@@ -70,9 +63,14 @@ const void* getModernTexturePackIcon(unsigned int& size)
 #endif
 }
 
+bool DLCTexturePack::IsModernTexturePack(DLCPack* pack)
+{
+    return pack != NULL && pack->getName().find(L"1.14") != std::wstring::npos;
+}
+
 void DLCTexturePack::loadIcon()
 {
-    if (isLiveBuiltInTexturePack(m_dlcPack))
+    if (IsModernTexturePack(m_dlcPack))
     {
 #if LCE_PLATFORM_PC
         m_pIconData = getModernTexturePackIcon(m_iconSize);
@@ -159,7 +157,7 @@ DLCPack* DLCTexturePack::getDLCPack()
 
 std::wstring DLCTexturePack::getDesc1()
 {
-    if (isLiveBuiltInTexturePack(m_dlcPack))
+    if (IsModernTexturePack(m_dlcPack))
         return L"The modernized look and feel of Minecraft";
 
     if (m_stringTable == NULL)
@@ -172,7 +170,7 @@ std::wstring DLCTexturePack::getDesc1()
 
 std::wstring DLCTexturePack::getName()
 {
-    if (isLiveBuiltInTexturePack(m_dlcPack))
+    if (IsModernTexturePack(m_dlcPack))
         return L"Modern Textures";
 
     if (m_stringTable == NULL)
@@ -192,7 +190,7 @@ std::wstring DLCTexturePack::getWorldName()
 
 void DLCTexturePack::loadComparison()
 {
-    if (isLiveBuiltInTexturePack(m_dlcPack))
+    if (IsModernTexturePack(m_dlcPack))
         return;
 
     if (m_dlcPack->doesPackContainFile(DLCManager::eDLCType_Texture, L"comparison", true, true))
@@ -413,10 +411,10 @@ int DLCTexturePack::packMounted(void* data, int userIndex, unsigned int result, 
                         }
                     }
 
-                    // The bundled Modern Textures PCK contains audio metadata but
+                    // The 1.14 Texture Pack PCK contains audio metadata but
                     // ships no matching Bink streams. Keep the game's base music
                     // active instead of retrying missing files from this pack.
-                    if (!isLiveBuiltInTexturePack(pack->m_dlcPack)
+                    if (!IsModernTexturePack(pack->m_dlcPack)
                         && parentPack->getDLCItemsCount(DLCManager::eDLCType_Audio) > 0)
                     {
                         DLCAudioFile* audioFile = static_cast<DLCAudioFile*>(

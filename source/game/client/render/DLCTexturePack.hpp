@@ -12,6 +12,8 @@ class StringTable;
 class DLCTexturePack : public AbstractTexturePack
 {
 public:
+    static bool IsModernTexturePack(DLCPack* pack);
+
     DLCTexturePack(unsigned int id, DLCPack* pack, TexturePack* parentPack);
     virtual ~DLCTexturePack();
 

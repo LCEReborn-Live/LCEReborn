@@ -17,7 +17,6 @@ TexturePack* TexturePackRepository::defaultTexturePack = NULL;
 
 namespace
 {
-const unsigned int kModernTexturePackSourceId = 2050;
 const unsigned int kClassicTexturePackId = 0x00fffffe;
 }
 
@@ -150,7 +149,7 @@ TexturePack* TexturePackRepository::addTexturePackFromDLC(DLCPack* dlcPack, unsi
     unsigned int id = packId & 0x00ffffff;
     if (dlcPack != NULL)
     {
-        if (!m_modernDefaultPackRegistered && id == kModernTexturePackSourceId)
+        if (!m_modernDefaultPackRegistered && DLCTexturePack::IsModernTexturePack(dlcPack))
         {
             TexturePack* previousDefault = defaultTexturePack;
             TexturePack* classicPack = new LegacyTexturePack(kClassicTexturePackId);

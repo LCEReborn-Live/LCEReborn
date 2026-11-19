@@ -42,6 +42,8 @@
 #include "game/ui/FJ_FuiNode.hpp"
 #if LCE_PLATFORM_PC
 #include "platform/pc/PcLiveBridge.hpp"
+#include "platform/pc/PcPaths.hpp"
+#include "game/ui/fui.hpp"
 #endif
 #include "game/ui/ScreenSizeCalculator.hpp"
 #include "game/ui/fuiFile.hpp"

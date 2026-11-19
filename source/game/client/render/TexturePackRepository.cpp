@@ -149,7 +149,14 @@ TexturePack* TexturePackRepository::addTexturePackFromDLC(DLCPack* dlcPack, unsi
     unsigned int id = packId & 0x00ffffff;
     if (dlcPack != NULL)
     {
-        if (!m_modernDefaultPackRegistered && DLCTexturePack::IsModernTexturePack(dlcPack))
+        const bool modernTexturePack = DLCTexturePack::IsModernTexturePack(dlcPack);
+        if (modernTexturePack && m_modernDefaultPackRegistered)
+        {
+            // The same PCK may be found in the bundled packs folder and in an
+            // imported Wii U DLC directory. Keep a single selectable entry.
+            return getTexturePackById(0);
+        }
+        if (modernTexturePack)
         {
             TexturePack* previousDefault = defaultTexturePack;
             TexturePack* classicPack = new LegacyTexturePack(kClassicTexturePackId);

@@ -60,6 +60,19 @@ const std::string& PcPacksRoot()
     return root;
 }
 
+const std::string& PcBundledPacksRoot()
+{
+    static std::string root = []() {
+        std::filesystem::path installRoot = std::filesystem::u8path(PcResourceRoot());
+        if (installRoot.filename() == "pc")
+            installRoot = installRoot.parent_path();
+        if (installRoot.filename() == "resources")
+            installRoot = installRoot.parent_path();
+        return (installRoot / "packs").lexically_normal().generic_string();
+    }();
+    return root;
+}
+
 const std::string& PcResourceRoot()
 {
     static std::string root = ResourceRootFromOption(PcGetLaunchOptions().resourceDir);

@@ -1751,9 +1751,10 @@ void CMinecraftApp::HandleDLC(DLCPack* pack)
         if (!IsPackFileName(files[index]))
             continue;
         const unsigned int packId = mDLCManager.retrievePackIDFromDLCDataFile(files[index]);
-        DLCPack* loaded = packId != 0 ? mDLCManager.getPackFromPackID(packId) : NULL;
-        if (loaded == NULL || loaded == pack)
-            mDLCManager.readDLCDataFile(numItemsAdded, files[index], pack, packId, false);
+        // Different DLC containers may legitimately use the same PackID. They
+        // are distinct by their mounted root and must both be parsed so they
+        // appear as separate texture packs.
+        mDLCManager.readDLCDataFile(numItemsAdded, files[index], pack, packId, false);
         break;
     }
 

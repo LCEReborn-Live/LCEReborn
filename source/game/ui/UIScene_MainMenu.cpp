@@ -4,9 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <fstream>
-#include <iterator>
-#include <vector>
 
 #include "game/core/CConsoleMinecraftApp.hpp"
 #include "game/core/CMinecraftApp.hpp"
@@ -42,13 +39,10 @@
 #include "game/ui/FJ_FuiNode.hpp"
 #if LCE_PLATFORM_PC
 #include "platform/pc/PcLiveBridge.hpp"
-#include "platform/pc/PcPaths.hpp"
-#include "game/ui/fui.hpp"
 #endif
 #include "game/ui/ScreenSizeCalculator.hpp"
 #include "game/ui/fuiFile.hpp"
 #include "game/ui/fuiRenderNode.hpp"
-#include "game/ui/fuiRenderNodeCodeGenRect.hpp"
 #include "game/ui/fuiRect.hpp"
 #include "game/ui/UIString.hpp"
 #include "game/util/Random.hpp"
@@ -76,9 +70,7 @@ UIScene_MainMenu::UIScene_MainMenu(int sceneType, void*, UILayer* layer)
     : UIScene(sceneType, layer),
       m_timer(),
       m_splashes(),
-      m_splash(),
-      m_mainMenuLogoTextureRegistered(false),
-      m_mainMenuLogoInstalled(false)
+      m_splash()
 {
     Entity::fjDebugCheckSmallIdLeaks();
     gApp.SetDRCIconEnabled(true);
@@ -173,59 +165,7 @@ unsigned int UIScene_MainMenu::mapElementsAndNames()
         m_timer.setupControl(this, root, std::string("Timer"));
         m_controls.push_back(&m_timer);
     }
-    installMainMenuLogo(root);
     return 1;
-}
-
-void UIScene_MainMenu::installMainMenuLogo(fuiRenderNode* root)
-{
-#if LCE_PLATFORM_PC
-    if (root == NULL || m_stageWidth <= 0 || m_stageHeight <= 0)
-        return;
-
-    static const std::wstring textureName(L"LCERebornMainMenuLogo");
-    if (!m_mainMenuLogoTextureRegistered)
-    {
-        const std::string path = PcResourceRoot() + "/main-menu-logo.png";
-        std::ifstream stream(path.c_str(), std::ios::binary);
-        if (!stream)
-            return;
-
-        std::vector<char> bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-        if (bytes.empty())
-            return;
-
-        unsigned char* textureData = new unsigned char[bytes.size()];
-        std::copy(bytes.begin(), bytes.end(), textureData);
-        registerSubstitutionTexture(textureName, textureData, static_cast<unsigned int>(bytes.size()), true);
-        m_mainMenuLogoTextureRegistered = true;
-    }
-
-    unsigned int textureWidth = 0;
-    unsigned int textureHeight = 0;
-    bool hasAlpha = false;
-    const int texture = static_cast<int>(gFui->getCustomTexture(textureName, &textureWidth, &textureHeight, &hasAlpha));
-    if (texture < 0)
-        return;
-
-    const float aspectRatio = 2431.0f / 635.0f;
-    const float maxWidth = static_cast<float>(m_stageWidth) * 0.70f;
-    const float maxHeight = static_cast<float>(m_stageHeight) * 0.29f;
-    const float width = std::min(maxWidth, maxHeight * aspectRatio);
-    const float height = width / aspectRatio;
-    const float left = (static_cast<float>(m_stageWidth) - width) * 0.5f;
-    const float top = static_cast<float>(m_stageHeight) * 0.025f;
-
-    fuiRect bounds;
-    bounds.xMin = left;
-    bounds.xMax = left + width;
-    bounds.yMin = top;
-    bounds.yMax = top + height;
-    fuiRenderNodeCodeGenRect* logo = new fuiRenderNodeCodeGenRect(root, &bounds, "MainMenuLogo", textureWidth,
-                                                                  textureHeight, texture, true, hasAlpha);
-    root->getFuiNode()->addChild(logo);
-    m_mainMenuLogoInstalled = true;
-#endif
 }
 
 void UIScene_MainMenu::proceedToScene(int, EUIScene scene)
@@ -309,7 +249,7 @@ void UIScene_MainMenu::updateTooltips()
 void UIScene_MainMenu::updateComponents()
 {
     m_layer->showComponent(m_playerId, s_componentDRC, true);
-    m_layer->showComponent(m_playerId, s_componentTV, !m_mainMenuLogoInstalled);
+    m_layer->showComponent(m_playerId, s_componentTV, true);
 }
 
 void UIScene_MainMenu::customDrawSplash(fuiRect* rect)
@@ -344,10 +284,7 @@ void UIScene_MainMenu::customDrawSplash(fuiRect* rect)
 void UIScene_MainMenu::customDraw(const char* name, fuiRect* rect)
 {
     if (std::strcmp(name, "Splash") == 0)
-    {
-        if (!m_mainMenuLogoInstalled)
-            customDrawSplash(rect);
-    }
+        customDrawSplash(rect);
 }
 
 std::wstring UIScene_MainMenu::getMoviePath()

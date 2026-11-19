@@ -1,5 +1,7 @@
 #include "game/client/render/DLCTexturePack.hpp"
 
+#include <algorithm>
+#include <cwctype>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -44,6 +46,21 @@ extern C4JStorage* gStorage;
 
 namespace
 {
+std::wstring packFilePath(DLCPack* pack, const std::wstring& name)
+{
+    DLCPack* root = pack;
+    while (root != NULL && root->GetParentPack() != NULL)
+        root = root->GetParentPack();
+
+    if (root != NULL && !root->GetRootPath().empty())
+    {
+        const std::wstring path = root->GetRootPath() + L"/Data/" + name;
+        if (File(path).exists())
+            return path;
+    }
+    return gApp.getFilePath(pack->GetPackId(), name, true, L"TPACK:");
+}
+
 #if LCE_PLATFORM_PC
 const void* getModernTexturePackIcon(unsigned int& size)
 {
@@ -65,7 +82,22 @@ const void* getModernTexturePackIcon(unsigned int& size)
 
 bool DLCTexturePack::IsModernTexturePack(DLCPack* pack)
 {
-    return pack != NULL && pack->getName().find(L"1.14") != std::wstring::npos;
+    // The PCK display name can differ between releases, so recognize the
+    // separate modern pack by its source folder as well as its PCK name.
+    if (pack == NULL)
+        return false;
+
+    std::wstring name = pack->getName();
+    std::wstring root = pack->GetRootPath();
+    std::transform(name.begin(), name.end(), name.begin(),
+                   [](wchar_t character) { return static_cast<wchar_t>(std::towlower(character)); });
+    std::transform(root.begin(), root.end(), root.begin(),
+                   [](wchar_t character) { return static_cast<wchar_t>(std::towlower(character)); });
+
+    return name.find(L"1.14 texture pack") != std::wstring::npos
+           || name.find(L"modern textures") != std::wstring::npos
+           || root.find(L"/1.14 texture pack") != std::wstring::npos
+           || root.find(L"\\1.14 texture pack") != std::wstring::npos;
 }
 
 void DLCTexturePack::loadIcon()
@@ -380,7 +412,7 @@ int DLCTexturePack::packMounted(void* data, int userIndex, unsigned int result, 
         else
         {
             if (!gApp.mDLCManager.readDLCDataFile(
-                    numItemsAdded, gApp.getFilePath(pack->m_dlcPack->GetPackId(), dataPath, true, L"TPACK:"),
+                    numItemsAdded, packFilePath(pack->m_dlcPack, dataPath),
                     pack->m_loadedPack, pack->m_dlcPack->GetPackId(), false))
             {
                 delete pack->m_loadedPack;
@@ -390,7 +422,7 @@ int DLCTexturePack::packMounted(void* data, int userIndex, unsigned int result, 
             {
                 if (pack->m_loadedPack != NULL)
                 {
-                    File mediaArchive(gApp.getFilePath(pack->m_dlcPack->GetPackId(), L"media.arc", true, L"TPACK:"));
+                    File mediaArchive(packFilePath(pack->m_dlcPack, L"media.arc"));
                     if (mediaArchive.exists())
                     {
                         delete pack->m_archiveFile;
@@ -405,13 +437,12 @@ int DLCTexturePack::packMounted(void* data, int userIndex, unsigned int result, 
                         LevelGenerationOptions::loadGameRulesHeaders(parentPack, pack->m_stringTable, options);
                         if (options->requiresBaseSave() && !options->getBaseSavePath().empty())
                         {
-                            File baseSave(gApp.getFilePath(pack->m_dlcPack->GetPackId(), options->getBaseSavePath(),
-                                                           true, L"TPACK:"));
+                            File baseSave(packFilePath(pack->m_dlcPack, options->getBaseSavePath()));
                             options->setBaseSaveData(baseSave);
                         }
                     }
 
-                    // The 1.14 Texture Pack PCK contains audio metadata but
+                    // The New Textures PCK contains audio metadata but
                     // ships no matching Bink streams. Keep the game's base music
                     // active instead of retrying missing files from this pack.
                     if (!IsModernTexturePack(pack->m_dlcPack)

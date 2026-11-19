@@ -59,7 +59,7 @@ const void* getModernTexturePackIcon(unsigned int& size)
     if (!attempted)
     {
         attempted = true;
-        const std::string path = PcResourceRoot() + "/modern-textures-icon.jpg";
+        const std::string path = PcResourceRoot() + "/modern-textures-icon.png";
         std::ifstream stream(path.c_str(), std::ios::binary);
         if (stream)
             data.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());

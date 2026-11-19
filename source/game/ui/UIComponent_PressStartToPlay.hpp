@@ -64,6 +64,7 @@ private:
     unsigned long long m_lastLiveNotification = 0;
     bool m_socialToastShowing = false;
     std::string m_lastAchievementSnapshot;
+    std::string m_lastCloudAchievementSnapshot;
     std::vector<Toast> m_socialToasts;
     bool m_showSaveIcon;
     bool m_showAutosaveTimer;

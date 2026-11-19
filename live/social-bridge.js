@@ -216,11 +216,23 @@ export class SocialBridge {
     this.syncBusy = true;
     try {
       const text = await this.read('achievements.txt');
-      if (!text || text === this.sentAchievements) return;
-      const unlocked = text.trim().split(',').filter(Boolean).map(Number);
-      if (unlocked.length > 93 || unlocked.some(id => !Number.isInteger(id) || id < 0 || id > 96)) return;
-      await this.request('/v1/me/achievements', 'PUT', { catalog, unlocked });
-      this.sentAchievements = text;
+      const local = text ? text.trim().split(',').filter(Boolean).map(Number) : [];
+      if (local.some(id => !Number.isInteger(id) || id < 0 || id > 96)) return;
+
+      const remote = await this.request('/v1/me/achievements');
+      if (remote.catalog !== catalog || !Array.isArray(remote.unlocked) || remote.unlocked.length > 93) return;
+      const remoteIds = remote.unlocked.map(item => item.id);
+      if (remoteIds.some(id => !Number.isInteger(id) || id < 0 || id > 96)) return;
+
+      const unlockedSet = new Set([...local, ...remoteIds]);
+      const unlocked = [...unlockedSet].sort((a, b) => a - b);
+      const cloudText = unlocked.join(',') + (unlocked.length ? '\n' : '');
+      await this.write('achievements-cloud.txt', cloudText);
+
+      if (JSON.stringify(unlocked) !== JSON.stringify(remoteIds.sort((a, b) => a - b))) {
+        await this.request('/v1/me/achievements', 'PUT', { catalog, unlocked });
+      }
+      this.sentAchievements = local.join(',');
     } catch { this.achievementRetryAt = this.now() + 60000; }
     finally { this.syncBusy = false; }
   }

@@ -27,6 +27,11 @@ PC and Wii U players can play together.
 
 When signed in to LCE Live, the primary player's game UUID is derived from the Live account ID. The same Live account therefore keeps the same player identity when joining a world from another device. Without a Live session, the launcher's local profile UUID is used.
 
+Live achievement progress is also shared by account. The client downloads the
+account's unlocked achievements, merges them with local progress, and uploads
+the combined result. Changing devices therefore preserves achievement progress
+without replacing locally earned progress.
+
 ## Dedicated server
 
 `LCERebornServer` runs a world with no window. Releases provide separate Windows ZIP and Linux tar.gz server downloads; it also remains in the full portable client package. See [dedicated server setup](dedicated-server.md) for headless installation and startup.

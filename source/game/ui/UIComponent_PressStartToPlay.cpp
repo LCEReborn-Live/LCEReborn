@@ -461,6 +461,34 @@ void UIComponent_PressStartToPlay::PollLiveSocial()
             }
             std::fclose(events);
         }
+        FILE* cloudAchievements = PcLiveBridge::Open(L"achievements-cloud.txt", L"rb");
+        if (cloudAchievements)
+        {
+            char text[1024];
+            const size_t size = std::fread(text, 1, sizeof(text) - 1, cloudAchievements);
+            std::fclose(cloudAchievements);
+            text[size] = '\0';
+            std::string snapshot(text);
+            snapshot.erase(snapshot.find_last_not_of(" \t\r\n") + 1);
+            if (snapshot != m_lastCloudAchievementSnapshot)
+            {
+                m_lastCloudAchievementSnapshot = snapshot;
+                if (!snapshot.empty())
+                {
+                    std::istringstream input(snapshot);
+                    std::string value;
+                    while (std::getline(input, value, ','))
+                    {
+                        char* end = NULL;
+                        const long id = std::strtol(value.c_str(), &end, 10);
+                        if (value.empty() || end == value.c_str() || *end != '\0' || id < 0 || id > 96)
+                            continue;
+                        if (!gProfile->IsAwardsFlagSet(0, static_cast<int>(id)))
+                            gProfile->Award(0, static_cast<int>(id), false);
+                    }
+                }
+            }
+        }
         // Only the launcher's primary profile belongs to this Live account.
         // Never upload split-screen guest progress to the signed-in owner.
         std::string achievements;

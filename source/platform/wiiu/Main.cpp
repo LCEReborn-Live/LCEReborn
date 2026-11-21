@@ -31,6 +31,7 @@
 #include "platform/wiiu/NintendoFileSystem_WiiU.hpp"
 #include "platform/wiiu/WiiUFileSystemHelpers.hpp"
 #include "platform/wiiu/WiiU_Runtime.hpp"
+#include "platform/wiiu/WiiULiveSignIn.hpp"
 #include "platform/wiiu/FJ_WiiUDRC.hpp"
 #include "game/client/render/Renderer.hpp"
 #include "game/core/CriticalSection.hpp"
@@ -317,6 +318,7 @@ int main()
         }
 
         minecraft->mSoundEngine->playMusicTick();
+        WiiULiveSignIn::TickPresence(gApp.GetGameStarted() != 0);
         InfoBarManager::StartTimingCategory(InfoBarManager::eTimingCagegory_UITick);
         gConsoleUIController.tick();
         InfoBarManager::EndTimingCategory(InfoBarManager::eTimingCagegory_UITick);

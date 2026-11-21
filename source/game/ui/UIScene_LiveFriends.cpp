@@ -406,6 +406,7 @@ void UIScene_LiveFriends::customDraw(const char* name, fuiRect* rect)
         if (profile.kind == 'R') details = L"Wants to be your friend";
         else if (profile.kind == 'S') details = L"Friend request sent";
         else if (profile.kind == 'I') details = L"Invited you to play";
+        else if (const wchar_t* status = profile.WiiUStatus()) details = status;
         else if (profile.online && profile.presence == "minigame")
         {
             if (profile.activity == "battle") details = L"Playing Battle";
@@ -651,6 +652,7 @@ bool UIScene_LiveFriends::ReadSocial()
         entry.revision = fields.size() > 6 ? fields[6] : "0";
         entry.joinable = fields.size() > 7 && fields[7] == "1";
         entry.world = fields.size() > 8 ? fields[8] : "";
+        entry.platform = fields.size() > 9 ? fields[9] : "";
         if (!entry.id || entry.username.empty()) continue;
         if (entry.kind == 'F') m_entries[eTab_Friends].push_back(entry);
         else if (entry.kind == 'R' || entry.kind == 'S') m_entries[eTab_Requests].push_back(entry);
@@ -745,10 +747,20 @@ void UIScene_LiveFriends::PollLive()
     }
 }
 
+const wchar_t* UIScene_LiveFriends::Entry::WiiUStatus() const
+{
+    if (!online || platform != "wiiu") return NULL;
+    return presence == "game" || presence == "minigame" ? L"Playing on Wii U" : L"Online on Wii U";
+}
+
 std::wstring UIScene_LiveFriends::EntryLabel(const Entry& entry) const
 {
     std::wstring label = Widen(entry.username);
-    if (entry.kind == 'F') return label;
+    if (entry.kind == 'F')
+    {
+        if (const wchar_t* status = entry.WiiUStatus())
+            label.append(L"  |  ").append(status);
+    }
     else if (entry.kind == 'R') label += L"  |  Friend request";
     else if (entry.kind == 'S') label += L"  |  Request sent";
     else if (entry.kind == 'I')

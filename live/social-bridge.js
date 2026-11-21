@@ -139,7 +139,7 @@ export class SocialBridge {
   async publish() {
     const text = this.rows.map(row => [row.kind, row.id, row.username, row.online ? 1 : 0,
       field(row.presence), field(row.activity), row.revision,
-      this.worlds.some(world => Number(world.ownerId) === row.id) ? 1 : 0, field(row.name)].join('\t')).join('\n');
+      this.worlds.some(world => Number(world.ownerId) === row.id) ? 1 : 0, field(row.name), field(row.platform)].join('\t')).join('\n');
     // Serialize writes: world discovery and social polling may complete together.
     this.publishing = (this.publishing || Promise.resolve()).catch(() => {}).then(() => this.write('social.tsv', text));
     await this.publishing;

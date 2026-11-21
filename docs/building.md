@@ -25,6 +25,12 @@ Cemu -g build/LCEReborn.wuhb
 
 The bundle is a title of its own (`0005000F5C4F365C`) with its own saves, so it doesn't need the game installed in Cemu or on the console, and it won't see saves from the retail game. To run it on a Wii U, copy it to `wiiu/apps/` on the SD card. Packs go in `wiiu/LCEReborn/packs` on the same card.
 
+## GitHub Actions
+
+The **Wii U build** workflow runs on manual dispatch. Register a dedicated x64 Linux self-hosted runner with the `wiiu` label, Python 3.8 or newer, and access to a running Docker daemon. In the repository's Actions variables, set `WIIU_UPDATE_DUMP` to the absolute path of your extracted Update 688 on that runner. Keep the dump outside the runner's checkout directory.
+
+The `wiiu-rpx` artifact contains `Minecraft.Client.rpx` and its link map. To make a `.wuhb` locally, run the preparation step above with your base and update dumps, place the downloaded RPX at `build/Minecraft.Client.rpx`, and run the packaging step above.
+
 ## Options for `build.py`
 
 | Option | What it does |

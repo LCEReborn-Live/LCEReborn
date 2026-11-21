@@ -1,0 +1,46 @@
+name: Wii U build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wiiu-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, x64, wiiu]
+    timeout-minutes: 360
+    steps:
+      - name: Check out source and FFL
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Generate Wii U build inputs
+        shell: bash
+        env:
+          WIIU_UPDATE_DUMP: ${{ vars.WIIU_UPDATE_DUMP }}
+        run: |
+          if [[ -z "$WIIU_UPDATE_DUMP" || ! -d "$WIIU_UPDATE_DUMP" ]]; then
+            echo '::error::Set WIIU_UPDATE_DUMP to the extracted Update 688 directory on the runner.'
+            exit 1
+          fi
+          docker info --format '{{.ServerVersion}}'
+          python3 tools/prepare.py --shaders-only --update "$WIIU_UPDATE_DUMP"
+
+      - name: Build the Wii U RPX
+        run: python3 tools/build.py
+
+      - name: Upload the RPX and link map
+        uses: actions/upload-artifact@v7
+        with:
+          name: wiiu-rpx
+          if-no-files-found: error
+          path: |
+            build/Minecraft.Client.rpx
+            build/Minecraft.Client.map

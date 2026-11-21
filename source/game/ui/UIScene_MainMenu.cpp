@@ -121,6 +121,10 @@ UIScene_MainMenu::UIScene_MainMenu(int sceneType, void*, UILayer* layer)
 
 UIScene_MainMenu::~UIScene_MainMenu()
 {
+#if LCE_PLATFORM_WIIU
+    if (m_liveSignInPad >= 0)
+        WiiULiveSignIn::Cancel();
+#endif
     m_layer->removeComponent(s_componentDRC);
     m_layer->removeComponent(s_componentTV);
 }
@@ -175,6 +179,10 @@ void UIScene_MainMenu::proceedToScene(int, EUIScene scene)
 
 void UIScene_MainMenu::handleReload()
 {
+#if LCE_PLATFORM_WIIU
+    m_buttons[7].setLabel(UIString(L"LCE Live"), false, false);
+    layoutLiveMenuButtons();
+#else
 #if LCE_PLATFORM_PC
     if (PcLiveBridge::Enabled())
     {
@@ -184,12 +192,17 @@ void UIScene_MainMenu::handleReload()
     }
 #endif
     removeControl(&m_buttons[7], false);
+#endif
 }
 
 void UIScene_MainMenu::layoutLiveMenuButtons()
 {
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
 #if LCE_PLATFORM_PC
-    if (!PcLiveBridge::Enabled() || m_buttons[5].getFuiRenderNode() == NULL
+    if (!PcLiveBridge::Enabled())
+        return;
+#endif
+    if (m_buttons[5].getFuiRenderNode() == NULL
         || m_buttons[6].getFuiRenderNode() == NULL || m_buttons[7].getFuiRenderNode() == NULL)
         return;
 
@@ -295,6 +308,9 @@ std::wstring UIScene_MainMenu::getMoviePath()
 void UIScene_MainMenu::tick()
 {
     UIScene::tick();
+#if LCE_PLATFORM_WIIU
+    updateLiveSignIn();
+#endif
     if (hasFocus(m_playerId))
     {
         PackReceiver::Get().releasePacks();
@@ -320,6 +336,69 @@ void UIScene_MainMenu::tick()
         }
     }
 }
+
+#if LCE_PLATFORM_WIIU
+int UIScene_MainMenu::closeLiveSignIn(void* context, int, C4JStorage::EMessageResult)
+{
+    UIScene_MainMenu* menu = static_cast<UIScene_MainMenu*>(context);
+    WiiULiveSignIn::Cancel();
+    menu->m_liveSignInPad = -1;
+    menu->m_liveDialogStatus = WiiULiveSignIn::Status::Idle;
+    return 0;
+}
+
+void UIScene_MainMenu::updateLiveSignIn()
+{
+    using WiiULiveSignIn::Status;
+    const Status status = WiiULiveSignIn::Update();
+    if (m_liveSignInPad < 0 || status == m_liveDialogStatus || gConsoleUIController.IsReloadingSkin())
+        return;
+
+    if (m_liveDialogStatus != Status::Idle)
+    {
+        if (!gConsoleUIController.NavigateBack(m_liveSignInPad, true, EUIScene_None, EUILayer_Alert))
+            return;
+        m_liveDialogStatus = Status::Idle;
+    }
+
+    const bool waiting = status == Status::Starting || status == Status::Waiting;
+    std::wstring text;
+    switch (status)
+    {
+    case Status::Starting:
+        text = L"Getting a sign-in code for LCE Live...";
+        break;
+    case Status::Waiting:
+    {
+        const std::string& code = WiiULiveSignIn::UserCode();
+        text = L"On your phone or PC, open lcereborn.xyz/authorize and enter this code:\n\n";
+        text.append(code.begin(), code.end());
+        break;
+    }
+    case Status::SignedIn:
+    {
+        const std::string& username = WiiULiveSignIn::Username();
+        text = L"Signed in to LCE Live as ";
+        text.append(username.begin(), username.end());
+        break;
+    }
+    case Status::Denied:
+        text = L"Sign-in was declined. Select LCE Live to try again.";
+        break;
+    case Status::Expired:
+        text = L"Your code expired. Select LCE Live for a new code.";
+        break;
+    default:
+        text = L"Could not connect to LCE Live. Select LCE Live to try again.";
+        break;
+    }
+
+    int button = waiting ? IDS_CONFIRM_CANCEL : IDS_CONFIRM_OK;
+    if (gConsoleUIController.RequestErrorMessage(IDS_MUST_SIGN_IN_TITLE, IDS_MUST_SIGN_IN_TEXT, &button, 1,
+                                                 m_liveSignInPad, closeLiveSignIn, this, &text[0], true) == 2)
+        m_liveDialogStatus = status;
+}
+#endif
 
 void UIScene_MainMenu::handleInput(int playerId, int action, bool repeat, bool pressed, bool released, bool&)
 {
@@ -712,6 +791,11 @@ void UIScene_MainMenu::handlePress(int controlId, int)
             gConsoleUIController.NavigateToScene(pad, EUIScene_LiveFriends, NULL, EUILayer_Scene,
                                                  EUIGroup_PlayerDefault);
         }
+#elif LCE_PLATFORM_WIIU
+        gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+        m_liveSignInPad = pad;
+        WiiULiveSignIn::Start();
+        updateLiveSignIn();
 #endif
         return;
     }
@@ -778,6 +862,8 @@ void UIScene_MainMenu::handleGainFocus(bool hadFocus)
     m_buttons[6].setVisible(true);
 #if LCE_PLATFORM_PC
     m_buttons[7].setVisible(PcLiveBridge::Enabled());
+#elif LCE_PLATFORM_WIIU
+    m_buttons[7].setVisible(true);
 #else
     m_buttons[7].setVisible(false);
 #endif

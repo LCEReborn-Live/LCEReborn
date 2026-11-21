@@ -35,10 +35,10 @@ async function setup(t) {
 
 test('friends preserve identity, reflect joinability, and notify only new requests/invites', async t => {
   const { social, state, calls, read } = await setup(t);
-  state.friends = [{ id: 4, username: 'FriendOne', online: true, presence: 'minigame', activity: 'tumble' }];
+  state.friends = [{ id: 4, username: 'FriendOne', online: true, presence: 'minigame', activity: 'tumble', platform: 'wiiu' }];
   state.incoming = [{ id: 5, username: 'AlreadyPending' }];
   await social.refresh();
-  assert.match(await read('social.tsv'), /^F\t4\tFriendOne\t1\tminigame\ttumble\t0\t0\t/);
+  assert.match(await read('social.tsv'), /^F\t4\tFriendOne\t1\tminigame\ttumble\t0\t0\t\twiiu\n/);
   assert.equal(await read('social-events.tsv'), '', 'Login does not replay old notifications');
   await social.updateWorlds([{ ownerId: '4', owner: 'FriendOne', port: 1234 }]);
   assert.match(await read('social.tsv'), /tumble\t0\t1/);

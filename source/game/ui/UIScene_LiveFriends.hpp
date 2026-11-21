@@ -43,11 +43,13 @@ private:
         std::string username;
         std::string presence;
         std::string activity;
+        std::string platform;
         std::string world;
         bool online;
         bool joinable;
         std::string revision;
         Entry() : kind(0), id(0), online(false), joinable(false), revision("0") {}
+        const wchar_t* WiiUStatus() const;
     };
     struct FaceTexture
     {

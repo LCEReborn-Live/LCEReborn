@@ -9,6 +9,9 @@
 #include "game/ui/UIControl_Button.hpp"
 #include "game/ui/UILayer.hpp"
 #include "platform/C4JStorage.hpp"
+#if LCE_PLATFORM_WIIU
+#include "platform/wiiu/WiiULiveSignIn.hpp"
+#endif
 
 class UILayer;
 struct fuiRect;
@@ -53,6 +56,12 @@ public:
 
 private:
     void layoutLiveMenuButtons();
+#if LCE_PLATFORM_WIIU
+    void updateLiveSignIn();
+    static int closeLiveSignIn(void* context, int pad, C4JStorage::EMessageResult result);
+    int m_liveSignInPad = -1;
+    WiiULiveSignIn::Status m_liveDialogStatus = WiiULiveSignIn::Status::Idle;
+#endif
 
     UIControl_Button m_buttons[8];
     UIControl m_timer;

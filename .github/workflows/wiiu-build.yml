@@ -120,7 +120,7 @@ jobs:
 
           1. In a [checkout of this build's source](https://github.com/{repo}/tree/{revision}), run `python tools/prepare.py --base "<base dump>" --update "<Update 688 dump>"`.
           2. Save the downloaded RPX as `build/Minecraft.Client.rpx` and run `python tools/package.py --update "<Update 688 dump>"`.
-          3. Open `build/LCEReborn.wuhb` in Cemu, or copy it to `wiiu/apps/` on your Wii U's SD card and launch it with Aroma.
+          3. Run `python tools/launch_cemu.py "<path to Cemu>"` to open the bundle with the Live API's root certificate, or copy `build/LCEReborn.wuhb` to `wiiu/apps/` on your Wii U's SD card and launch it with Aroma.
           4. In the game, select **LCE Live**. Enter the code at [lcereborn.xyz/authorize](https://lcereborn.xyz/authorize) on a phone or PC, then confirm the sign-in.
 
           See the [Wii U setup guide](https://github.com/{repo}/blob/{revision}/docs/building.md) for details.

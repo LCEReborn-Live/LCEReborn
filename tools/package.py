@@ -11,7 +11,7 @@ Run tools/prepare.py and tools/build.py first. This writes build/LCEReborn.wuhb:
   content/        assets/, the game content tools/prepare.py made from your dumps
 
 The bundle is its own title with its own saves; it needs no Wii U game installed.
-Open it in Cemu (File > Load, or Cemu -g build/LCEReborn.wuhb), or copy it to
+Open it in Cemu with tools/launch_cemu.py, or copy it to
 wiiu/apps/ on the SD card for Aroma.
 """
 import argparse
@@ -120,7 +120,7 @@ def main(argv):
         print("error: %s" % error, file=sys.stderr)
         return 1
     print("packaged %s (title %016X)" % (os.path.relpath(BUNDLE, ROOT), wuhb.title_id(LONG_NAME, SHORT_NAME, AUTHOR)))
-    print("run it with: Cemu -g \"%s\"" % BUNDLE)
+    print('run it with: python tools/launch_cemu.py "<path to Cemu>"')
     return 0
 
 

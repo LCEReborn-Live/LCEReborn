@@ -16,7 +16,7 @@ This builds `Minecraft.Client.rpx` and packages it as a homebrew bundle, `build/
 python tools/prepare.py --base <base game dump> --update <update v688 dump>
 python tools/build.py
 python tools/package.py --update <update v688 dump>
-Cemu -g build/LCEReborn.wuhb
+python tools/launch_cemu.py <path to Cemu>
 ```
 
 1. **`prepare.py`** pulls the shaders and game content out of your dumps into `source/platform/wiiu/shaders/` and `assets/`. Both are ignored by git.
@@ -24,6 +24,8 @@ Cemu -g build/LCEReborn.wuhb
 3. **`package.py`** writes the bundle: the RPX as `code/root.rpx`, the menu icon and boot screens from your update dump's `meta/`, and `assets/` as `content/`. It's about 1.5 GB and holds your game files, so don't share it.
 
 The bundle is a title of its own (`0005000F5C4F365C`) with its own saves, so it doesn't need the game installed in Cemu or on the console, and it won't see saves from the retail game. To run it on a Wii U, copy it to `wiiu/apps/` on the SD card. Packs go in `wiiu/LCEReborn/packs` on the same card.
+
+On Windows, pass a quoted path such as `"C:\Games\Cemu\Cemu.exe"`. If Cemu is on `PATH`, omit the path. Close any running Cemu instance before starting the bundle this way. The launcher gives the new emulator process the verified [ISRG Root X1 certificate](https://letsencrypt.org/certificates/) used by LCE Live. This leaves TLS verification enabled and requires no changes to the system trust store.
 
 ## GitHub Actions
 

@@ -1,8 +1,11 @@
 #include "platform/wiiu/WiiULiveSignIn.hpp"
+#include "game/core/CriticalSection.hpp"
 #include "game/core/System.hpp"
 #include <coreinit/thread.h>
 #include <curl/curl.h>
 #include <cwchar>
+#include <deque>
+#include <utility>
 
 namespace WiiULiveSignIn
 {
@@ -11,12 +14,23 @@ namespace
 const char kStartUrl[] = "https://api.lcereborn.xyz/v1/device/start";
 const char kTokenUrl[] = "https://api.lcereborn.xyz/v1/device/token";
 const char kPresenceUrl[] = "https://api.lcereborn.xyz/v1/presence";
+const char kApiUrl[] = "https://api.lcereborn.xyz/v1";
 // Cafe nlibcurl uses an NSSL verification bitmask in place of standard curl's TLS options.
 const CURLoption kNsslVerifyOptions = static_cast<CURLoption>(211);
 const long kVerifyPeerHostnameAndDate = 7;
-const size_t kMaxResponse = 8192;
+const size_t kMaxResponse = 256 * 1024;
 
-enum class Request { None, Start, Poll, Presence };
+enum class Request { None, Start, Poll, Presence, Api };
+
+struct ApiRequest
+{
+    std::string url;
+    std::string body;
+    bool post;
+    std::function<void(long, const std::string&)> complete;
+};
+std::deque<ApiRequest> pendingApi;
+ApiRequest activeApi;
 
 alignas(32) OSThread thread;
 alignas(32) unsigned char stack[128 * 1024];
@@ -26,6 +40,9 @@ bool restartAfterRequest = false;
 std::string deviceCode;
 std::string userCode;
 std::string username;
+std::string playerUuid;
+C4JCriticalSection identityLock;
+bool apiSignedIn = false;
 std::string sessionToken;
 std::string response;
 long responseStatus = 0;
@@ -90,17 +107,27 @@ int SendRequest(int, const char**)
     static curl_slist headers = {contentType, NULL};
     static curl_slist bearer = {NULL, NULL};
     body = "{}";
+    bool post = true;
     headers.next = NULL;
     if (request == Request::Poll)
     {
         url = kTokenUrl;
         body = "{\"device_code\":\"" + deviceCode + "\"}";
     }
+    else if (request == Request::Api)
+    {
+        url = activeApi.url.c_str();
+        body = activeApi.body;
+        post = activeApi.post;
+    }
     else if (request == Request::Presence)
     {
         url = kPresenceUrl;
         body = requestedPlaying ? "{\"status\":\"game\",\"activity\":\"world\",\"platform\":\"wiiu\"}"
                                 : "{\"status\":\"launcher\",\"platform\":\"wiiu\"}";
+    }
+    if (request == Request::Api || request == Request::Presence)
+    {
         authorization = "Authorization: Bearer " + sessionToken;
         bearer.data = &authorization[0];
         headers.next = &bearer;
@@ -112,8 +139,8 @@ int SendRequest(int, const char**)
     }
     if (SetOption(curl, CURLOPT_URL, url)
         && SetOption(curl, CURLOPT_HTTPHEADER, &headers)
-        && SetOption(curl, CURLOPT_POST, 1L)
-        && SetOption(curl, CURLOPT_POSTFIELDS, body.c_str())
+        && (post ? SetOption(curl, CURLOPT_POST, 1L) && SetOption(curl, CURLOPT_POSTFIELDS, body.c_str())
+                 : SetOption(curl, CURLOPT_HTTPGET, 1L))
         && SetOption(curl, CURLOPT_TIMEOUT, 10L)
         && SetOption(curl, CURLOPT_CONNECTTIMEOUT, 5L)
         && SetOption(curl, CURLOPT_FOLLOWLOCATION, 0L)
@@ -220,6 +247,10 @@ Status Finish(Request finished, long long now)
             {
                 sessionToken = token;
                 username = name;
+                EnterCriticalSection(&identityLock);
+                playerUuid = StringField("player_uuid", lowerHex, 32, 32);
+                apiSignedIn = true;
+                LeaveCriticalSection(&identityLock);
                 presenceAfter = 0;
                 presenceRetryAt = 0;
                 return Status::SignedIn;
@@ -229,6 +260,8 @@ Status Finish(Request finished, long long now)
     return Status::Failed;
 }
 }
+
+void Init() { InitializeCriticalSection(&identityLock); }
 
 void Start()
 {
@@ -259,15 +292,23 @@ Status Update()
         OSJoinThread(&thread, NULL);
         const Request finished = request;
         request = Request::None;
-        if (finished == Request::Presence)
+        if ((finished == Request::Presence || finished == Request::Api) && responseStatus == 401)
         {
-            if (responseStatus == 401)
-            {
-                sessionToken.clear();
-                username.clear();
-                status = Status::Idle;
-            }
-            else if (responseStatus == 200)
+            sessionToken.clear();
+            username.clear();
+            EnterCriticalSection(&identityLock);
+            apiSignedIn = false;
+            LeaveCriticalSection(&identityLock);
+            status = Status::Idle;
+        }
+        if (finished == Request::Api)
+        {
+            activeApi.complete(responseStatus, response);
+            activeApi = ApiRequest();
+        }
+        else if (finished == Request::Presence)
+        {
+            if (responseStatus == 200)
             {
                 reportedPlaying = requestedPlaying;
                 presenceAfter = now + 45000;
@@ -284,6 +325,15 @@ Status Update()
         {
             deviceCode.clear();
             userCode.clear();
+        }
+    }
+    if (status != Status::SignedIn)
+    {
+        while (!pendingApi.empty())
+        {
+            auto complete = pendingApi.front().complete;
+            pendingApi.pop_front();
+            complete(401, std::string());
         }
     }
     if (restartAfterRequest && request == Request::None)
@@ -303,14 +353,64 @@ Status Update()
 
 void TickPresence(bool playing)
 {
-    if (Update() != Status::SignedIn || request != Request::None)
+    const Status current = Update();
+    if (current != Status::SignedIn && !playing)
+    {
+        EnterCriticalSection(&identityLock);
+        playerUuid.clear();
+        LeaveCriticalSection(&identityLock);
+    }
+    if (current != Status::SignedIn || request != Request::None)
         return;
     const long long now = System::processTimeInMilliSecs();
-    if (now < presenceRetryAt || (playing == reportedPlaying && now < presenceAfter))
-        return;
-    requestedPlaying = playing;
-    if (!Send(Request::Presence))
+    if (now >= presenceRetryAt && (playing != reportedPlaying || now >= presenceAfter))
+    {
+        requestedPlaying = playing;
+        if (Send(Request::Presence))
+            return;
         presenceRetryAt = now + 10000;
+    }
+    if (!pendingApi.empty())
+    {
+        activeApi = std::move(pendingApi.front());
+        pendingApi.pop_front();
+        if (!Send(Request::Api))
+        {
+            activeApi.complete(0, std::string());
+            activeApi = ApiRequest();
+        }
+    }
+}
+
+bool IsSignedIn()
+{
+    EnterCriticalSection(&identityLock);
+    const bool signedIn = apiSignedIn;
+    LeaveCriticalSection(&identityLock);
+    return signedIn;
+}
+
+std::string PlayerUuid()
+{
+    EnterCriticalSection(&identityLock);
+    std::string uuid = playerUuid;
+    LeaveCriticalSection(&identityLock);
+    return uuid;
+}
+
+bool RequestApi(const char* path, const char* body,
+                const std::function<void(long, const std::string&)>& complete)
+{
+    if (!IsSignedIn() || path == NULL || *path != '/' || !complete || pendingApi.size() >= 12)
+        return false;
+    ApiRequest entry;
+    entry.url = std::string(kApiUrl) + path;
+    entry.post = body != NULL;
+    if (entry.post)
+        entry.body = body;
+    entry.complete = complete;
+    pendingApi.push_back(std::move(entry));
+    return true;
 }
 
 const std::string& UserCode() { return userCode; }

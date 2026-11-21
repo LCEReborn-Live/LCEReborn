@@ -18,6 +18,7 @@
 #include "platform/wiiu/CInput.hpp"
 #include "platform/wiiu/CStorage.hpp"
 #include "platform/wiiu/PlatformTiming.hpp"
+#include "platform/wiiu/WiiULiveSignIn.hpp"
 #include "platform/wiiu/WiiU_Runtime.hpp"
 
 
@@ -270,6 +271,12 @@ bool CProfile::IsSignedIn(int quadrant)
 
 bool CProfile::IsSignedInLive(int quadrant)
 {
+    if (quadrant == 0 && mProfiles[quadrant].signedIn && WiiULiveSignIn::IsSignedIn())
+    {
+        checkParentalControl(quadrant);
+        if (!mParentalControls[quadrant].enabled || !mParentalControls[quadrant].communicationBlocked)
+            return true;
+    }
     return mProfiles[quadrant].signedIn && mNetworkAvailable && mFriendPresenceOnline;
 }
 
@@ -425,6 +432,22 @@ PlayerUID CProfile::QuadrantOfflineXUID(int quadrant)
     MiiDataEntry* mii = mProfiles[quadrant].mii;
     if (mii == NULL)
         return PlayerUID(0);
+    const std::string liveUuid = quadrant == 0 ? WiiULiveSignIn::PlayerUuid() : std::string();
+    if (quadrant == 0 && liveUuid.size() == 32)
+    {
+        ACTUuid uuid;
+        for (size_t index = 0; index < sizeof(uuid.data); ++index)
+        {
+            const char high = liveUuid[index * 2];
+            const char low = liveUuid[index * 2 + 1];
+            uuid.data[index] = static_cast<unsigned char>(((high <= '9' ? high - '0' : high - 'a' + 10) << 4)
+                                                       | (low <= '9' ? low - '0' : low - 'a' + 10));
+        }
+        PlayerUID uid(0);
+        uid.uuid = uuid;
+        uid.flags = PlayerUID::FlagUuid | (g_pInputInstance->IsPadDRCController(quadrant) ? PlayerUID::FlagDrcController : 0);
+        return uid;
+    }
     if (mii->mIsAccountMii)
         return PlayerUID(mii->mUuid, mProfiles[quadrant].onlineAccount, g_pInputInstance->IsPadDRCController(quadrant));
     FFLCreateID* createId = (FFLCreateID*)mii->mCreatorId;

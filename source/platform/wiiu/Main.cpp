@@ -32,6 +32,8 @@
 #include "platform/wiiu/WiiUFileSystemHelpers.hpp"
 #include "platform/wiiu/WiiU_Runtime.hpp"
 #include "platform/wiiu/WiiULiveSignIn.hpp"
+#include "platform/wiiu/WiiULiveSocial.hpp"
+#include "platform/wiiu/WiiULiveGames.hpp"
 #include "platform/wiiu/FJ_WiiUDRC.hpp"
 #include "game/client/render/Renderer.hpp"
 #include "game/core/CriticalSection.hpp"
@@ -129,6 +131,7 @@ static OSThread gMainThread;
 int main()
 {
     OSBlockThreadsOnExit();
+    WiiULiveSignIn::Init();
     ShutdownManager::Initialise();
     CGameNetworkManager::sInstance.WiiU_SetBootFromFriendList();
 
@@ -319,6 +322,8 @@ int main()
 
         minecraft->mSoundEngine->playMusicTick();
         WiiULiveSignIn::TickPresence(gApp.GetGameStarted() != 0);
+        WiiULiveSocial::Tick();
+        WiiULiveGames::Tick();
         InfoBarManager::StartTimingCategory(InfoBarManager::eTimingCagegory_UITick);
         gConsoleUIController.tick();
         InfoBarManager::EndTimingCategory(InfoBarManager::eTimingCagegory_UITick);

@@ -11,6 +11,9 @@
 #include "game/world/block/Blocks.hpp"
 #include "platform/CProfile.hpp"
 #include "platform/CStorage.hpp"
+#if LCE_PLATFORM_WIIU
+#include "game/core/Minecraft.hpp"
+#endif
 
 #include <climits>
 #include <cstring>
@@ -384,6 +387,11 @@ void StatsCounter::save(int profile, bool force, unsigned char* data)
 
 void StatsCounter::writeStats()
 {
+#if LCE_PLATFORM_WIIU
+    const Minecraft* minecraft = Minecraft::GetInstance();
+    if (minecraft == NULL || minecraft->mStats[0] != this)
+        return;
+#endif
     static const int boards[] = {LeaderboardBoards::eBoard_Travelling, LeaderboardBoards::eBoard_Mining,
                                  LeaderboardBoards::eBoard_Farming, LeaderboardBoards::eBoard_Kills};
     LeaderboardManager::RegisterScore scores[4];

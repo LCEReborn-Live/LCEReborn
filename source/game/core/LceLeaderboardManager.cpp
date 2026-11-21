@@ -22,6 +22,9 @@
 #include "platform/CProfile.hpp"
 #if LCE_PLATFORM_PC
 #include "platform/pc/PcLiveBridge.hpp"
+#elif LCE_PLATFORM_WIIU
+#include "platform/pc/PcJson.hpp"
+#include "platform/wiiu/WiiULiveSignIn.hpp"
 #endif
 
 LeaderboardManager* g_pLeaderboardManager = new LceLeaderboardManager();
@@ -81,6 +84,30 @@ std::vector<std::string> SplitTabs(const std::string& line)
 std::wstring AsciiWide(const std::string& value)
 {
     return std::wstring(value.begin(), value.end());
+}
+#endif
+#if LCE_PLATFORM_WIIU
+const char* LiveBoardName(int board)
+{
+    static const char* const names[] = {"traveling", "mining", "farming", "kills"};
+    return board >= 0 && board < 4 ? names[board] : NULL;
+}
+
+const JsonValue& LiveField(const JsonValue& value, const wchar_t* name)
+{
+    static const JsonValue empty;
+    const auto found = value.members.find(name);
+    return found == value.members.end() ? empty : found->second;
+}
+
+unsigned int LiveNumber(const JsonValue& value)
+{
+    if (value.type != JsonValue::Number || value.text.empty()
+        || value.text.find_first_not_of(L"0123456789") != std::wstring::npos)
+        return 0;
+    const std::string ascii(value.text.begin(), value.text.end());
+    const unsigned long long number = std::strtoull(ascii.c_str(), NULL, 10);
+    return number <= 0xffffffffULL ? static_cast<unsigned int>(number) : 0;
 }
 #endif
 }
@@ -168,6 +195,27 @@ bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores
             std::to_wstring(++submitId) + L".tsv";
         WriteLiveFile(name.c_str(), contents.str());
     }
+#elif LCE_PLATFORM_WIIU
+    if (scores != NULL && WiiULiveSignIn::IsSignedIn())
+    {
+        for (unsigned int index = 0; index < count; ++index)
+        {
+            const RegisterScore& score = scores[index];
+            const char* board = LiveBoardName(score.m_eStatsType);
+            if (!board || score.m_usNumStats != LeaderboardBoards::ColumnCount(score.m_eStatsType)
+                || score.m_usNumStats > MAX_STATS_PER_SCORE)
+                continue;
+            std::string body = "{\"values\":[";
+            for (unsigned int column = 0; column < score.m_usNumStats; ++column)
+            {
+                if (column) body += ',';
+                body += std::to_string(score.m_auiStats[column]);
+            }
+            body += "]}";
+            const std::string path = std::string("/leaderboards/") + board;
+            WiiULiveSignIn::RequestApi(path.c_str(), body.c_str(), [](long, const std::string&) {});
+        }
+    }
 #else
     (void)count;
     (void)scores;
@@ -237,6 +285,10 @@ bool LceLeaderboardManager::ReadStats_Friends(LeaderboardReadListener* pReadList
     Begin(pReadListener, iUserIndex, eStatsType);
 #if LCE_PLATFORM_PC
     if (PcLiveBridge::Enabled())
+#elif LCE_PLATFORM_WIIU
+    if (m_pad == 0 && WiiULiveSignIn::IsSignedIn())
+#endif
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
     {
         m_fallbackToLocal = true;
         RequestFromLive("friends", uiStartRank, uiNumRows);
@@ -258,6 +310,10 @@ bool LceLeaderboardManager::ReadStats_MyScore(LeaderboardReadListener* pReadList
     Begin(pReadListener, iUserIndex, eStatsType);
 #if LCE_PLATFORM_PC
     if (PcLiveBridge::Enabled())
+#elif LCE_PLATFORM_WIIU
+    if (m_pad == 0 && WiiULiveSignIn::IsSignedIn())
+#endif
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
     {
         m_fallbackToLocal = true;
         RequestFromLive("mine", 1, uiNumRows);
@@ -274,6 +330,10 @@ bool LceLeaderboardManager::ReadStats_TopRank(LeaderboardReadListener* pReadList
     Begin(pReadListener, iUserIndex, eStatsType);
 #if LCE_PLATFORM_PC
     if (PcLiveBridge::Enabled())
+#elif LCE_PLATFORM_WIIU
+    if (m_pad == 0 && WiiULiveSignIn::IsSignedIn())
+#endif
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
     {
         RequestFromLive("overall", uiStartRank, uiNumRows);
         return true;
@@ -305,6 +365,52 @@ void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int sta
     }
     m_sentAt = System::processTimeInMilliSecs();
     m_pending = ePending_Live;
+#elif LCE_PLATFORM_WIIU
+    const char* board = LiveBoardName(m_board);
+    if (!board || !filter || count == 0 || count > 50)
+    {
+        Finish(eStatsReturn_Failed);
+        return;
+    }
+    const unsigned int id = ++m_requestId;
+    const std::string path = std::string("/leaderboards?board=") + board + "&filter=" + filter
+        + "&start=" + std::to_string(startRank ? startRank : 1) + "&count=" + std::to_string(count);
+    if (!WiiULiveSignIn::RequestApi(path.c_str(), NULL, [this, id](long status, const std::string& body) {
+        if (m_pending != ePending_Live || m_requestId != id)
+            return;
+        JsonValue root;
+        if (status != 200 || !PcJsonParse(body, root) || LiveField(root, L"rows").type != JsonValue::Array)
+        {
+            Finish(m_fallbackToLocal && AddLocalScore() ? eStatsReturn_Success : eStatsReturn_Failed);
+            return;
+        }
+        const int columns = LeaderboardBoards::ColumnCount(m_board);
+        for (const JsonValue& row : LiveField(root, L"rows").items)
+        {
+            const JsonValue& values = LiveField(row, L"values");
+            const unsigned int rank = LiveNumber(LiveField(row, L"rank"));
+            if (rank == 0 || values.type != JsonValue::Array || values.items.size() != static_cast<size_t>(columns)
+                || columns <= 0 || columns > MAX_STATS_PER_SCORE || m_rows.size() >= 50)
+                continue;
+            ReadScore score = {};
+            score.m_uiRank = rank;
+            score.m_wsGamertag = LiveField(row, L"username").text;
+            score.m_usNumStats = static_cast<unsigned short>(columns);
+            for (int column = 0; column < columns; ++column)
+                score.m_auiStats[column] = LiveNumber(values.items[column]);
+            m_rows.push_back(score);
+        }
+        m_totalRows = LiveNumber(LiveField(root, L"total"));
+        if (m_rows.empty() && m_fallbackToLocal && AddLocalScore())
+            m_totalRows = 1;
+        Finish(eStatsReturn_Success);
+    }))
+    {
+        Finish(m_fallbackToLocal && AddLocalScore() ? eStatsReturn_Success : eStatsReturn_Failed);
+        return;
+    }
+    m_pending = ePending_Live;
+    m_sentAt = System::processTimeInMilliSecs();
 #else
     (void)filter;
     (void)startRank;

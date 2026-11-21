@@ -81,7 +81,7 @@
 #include "game/ui/UIScene_Timer.hpp"
 #include "game/ui/UIScene_TradingMenu.hpp"
 #include "game/ui/UIScene_CustomMenu.hpp"
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
 #include "game/ui/UIScene_LiveFriends.hpp"
 #endif
 #include "game/ui/UIScene_DebugOverlayMenu.hpp"
@@ -458,7 +458,7 @@ bool UILayer::NavigateToScene(int player, EUIScene scene, void* data)
     case EUIScene_CustomMenu:
         created = new UIScene_CustomMenu(player, data, this);
         break;
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
     case EUIScene_LiveFriends:
         created = new UIScene_LiveFriends(player, data, this);
         break;

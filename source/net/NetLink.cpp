@@ -5,6 +5,12 @@
 #include "game/core/System.hpp"
 #include "platform/C4JEventImpl.hpp"
 #include "platform/C4JThreadImpl.hpp"
+#if LCE_PLATFORM_WIIU
+#include "platform/C4JThread.hpp"
+#include "platform/pc/PcJson.hpp"
+#include "platform/wiiu/WiiULiveGames.hpp"
+#include "platform/wiiu/WiiULiveSignIn.hpp"
+#endif
 
 namespace lcenet
 {
@@ -20,6 +26,17 @@ int64_t NowMs()
 {
     return System::processTimeInMilliSecs();
 }
+
+#if LCE_PLATFORM_WIIU
+struct Link::LiveJoinTicket
+{
+    C4JCriticalSection lock;
+    bool finished = false;
+    std::string ticket;
+    LiveJoinTicket() { InitializeCriticalSection(&lock); }
+    ~LiveJoinTicket() { DeleteCriticalSection(&lock); }
+};
+#endif
 
 Link::Link(unsigned int systemId, LinkHandler* handler)
     : m_systemId(systemId),
@@ -76,6 +93,44 @@ void Link::Connect(const Address& address)
 void Link::Connect(const std::string& address)
 {
     m_targetText = address;
+#if LCE_PLATFORM_WIIU
+    const std::string prefix = "live-direct:";
+    if (address.compare(0, prefix.size(), prefix) == 0)
+    {
+        m_liveJoinTicket = std::make_shared<LiveJoinTicket>();
+        const auto state = m_liveJoinTicket;
+        const size_t separator = address.find('@', prefix.size());
+        const unsigned int owner = WiiULiveGames::TicketOwner(address);
+        if (separator == std::string::npos || owner == 0)
+        {
+            state->finished = true;
+        }
+        else
+        {
+            m_targetText = address.substr(separator + 1);
+            const std::string path = "/servers/" + std::to_string(owner) + "/join-ticket";
+            if (!WiiULiveSignIn::RequestApi(path.c_str(), "{}", [state](long status, const std::string& body) {
+                JsonValue root;
+                std::string ticket;
+                if (status == 201 && PcJsonParse(body, root))
+                {
+                    const auto found = root.members.find(L"ticket");
+                    if (found != root.members.end() && found->second.type == JsonValue::String)
+                    {
+                        const std::wstring& text = found->second.text;
+                        if (text.size() == 64 && text.find_first_not_of(L"0123456789abcdef") == std::wstring::npos)
+                            ticket.assign(text.begin(), text.end());
+                    }
+                }
+                EnterCriticalSection(&state->lock);
+                state->ticket.swap(ticket);
+                state->finished = true;
+                LeaveCriticalSection(&state->lock);
+            }))
+                state->finished = true;
+        }
+    }
+#endif
     m_connecting = true;
     Start();
 }
@@ -257,6 +312,29 @@ void Link::ReadLoop()
     if (m_connecting)
     {
         std::string error;
+#if LCE_PLATFORM_WIIU
+        std::string ticket;
+        if (m_liveJoinTicket)
+        {
+            const int64_t deadline = NowMs() + kConnectTimeoutMs;
+            while (!Stopped() && NowMs() < deadline)
+            {
+                EnterCriticalSection(&m_liveJoinTicket->lock);
+                const bool finished = m_liveJoinTicket->finished;
+                if (finished)
+                    ticket.swap(m_liveJoinTicket->ticket);
+                LeaveCriticalSection(&m_liveJoinTicket->lock);
+                if (finished)
+                    break;
+                C4JThread::Sleep(20);
+            }
+            if (ticket.empty())
+            {
+                if (!Stopped()) Fail("Could not obtain a Live join ticket");
+                return;
+            }
+        }
+#endif
         if (!m_targetText.empty())
         {
             Address resolved;
@@ -276,6 +354,17 @@ void Link::ReadLoop()
             Fail(error);
             return;
         }
+#if LCE_PLATFORM_WIIU
+        if (!ticket.empty())
+        {
+            const std::string line = "{\"ticket\":\"" + ticket + "\"}\n";
+            if (!socket.SendAll(line.data(), line.size()))
+            {
+                Fail("Could not send the Live join ticket");
+                return;
+            }
+        }
+#endif
         EnterCriticalSection(&m_lock);
         bool stopped = m_stop;
         if (!stopped)

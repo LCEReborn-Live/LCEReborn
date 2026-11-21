@@ -7,7 +7,13 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#if LCE_PLATFORM_PC
 #include <chrono>
+#elif LCE_PLATFORM_WIIU
+#include "platform/CProfile.hpp"
+#include "platform/wiiu/WiiULiveSocial.hpp"
+#include "platform/wiiu/WiiULiveGames.hpp"
+#endif
 #include "game/ui/UILiveAvatar.hpp"
 #include "game/core/System.hpp"
 #include "game/ui/UIScene_AchievementsMenu.hpp"
@@ -67,6 +73,7 @@ std::wstring Widen(const std::string& text)
 
 bool ReadSkin(const std::wstring& name, std::vector<unsigned char>& data)
 {
+#if LCE_PLATFORM_PC
     FILE* file = PcLiveBridge::Open(name.c_str(), L"rb");
     if (file == NULL) return false;
     if (std::fseek(file, 0, SEEK_END) != 0)
@@ -84,6 +91,11 @@ bool ReadSkin(const std::wstring& name, std::vector<unsigned char>& data)
     const bool ok = std::fread(&data[0], 1, data.size(), file) == data.size();
     std::fclose(file);
     return ok;
+#else
+    (void)name;
+    (void)data;
+    return false;
+#endif
 }
 
 void CenterNodeOnStageX(FJ_FuiNode* node, float stageWidth)
@@ -514,7 +526,12 @@ int UIScene_LiveFriends::GetAchievementTexture(int id)
 
 std::wstring UIScene_LiveFriends::RegisterFaceIcon(const Entry& entry)
 {
+#if LCE_PLATFORM_PC
     return RegisterLiveFaceIcon(*this, entry.id, entry.revision);
+#else
+    (void)entry;
+    return std::wstring();
+#endif
 }
 
 void UIScene_LiveFriends::SetTabTitles()
@@ -614,6 +631,10 @@ void UIScene_LiveFriends::handleReload()
 
 bool UIScene_LiveFriends::ReadSocial()
 {
+#if LCE_PLATFORM_WIIU
+    const std::string snapshot = WiiULiveSocial::Snapshot();
+    const bool valid = true;
+#else
     FILE* file = PcLiveBridge::Open(L"social.tsv", L"rb");
     if (file == NULL) return false;
     std::string snapshot;
@@ -623,6 +644,7 @@ bool UIScene_LiveFriends::ReadSocial()
         snapshot.append(buffer, size);
     const bool valid = !std::ferror(file) && snapshot.size() < 65536;
     std::fclose(file);
+#endif
     if (!valid || (m_haveSnapshot && snapshot == m_snapshot)) return false;
     for (int tab = 0; tab < eTab_Count; ++tab)
     {
@@ -664,6 +686,10 @@ bool UIScene_LiveFriends::ReadSocial()
 void UIScene_LiveFriends::PollLive()
 {
     const long long now = System::processTimeInMilliSecs();
+#if LCE_PLATFORM_WIIU
+    m_liveConnected = WiiULiveSocial::Connected();
+    m_connectionText = m_liveConnected ? L"" : L"Connecting to Live...";
+#else
     const auto state = SplitTabs(ReadLiveText(L"social-status.tsv"));
     const unsigned long long nowEpochMs = static_cast<unsigned long long>(
         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -674,6 +700,7 @@ void UIScene_LiveFriends::PollLive()
         && statusEpochMs <= nowEpochMs && nowEpochMs - statusEpochMs < 30000;
     m_connectionText = m_liveConnected ? L"" : (state.size() > 2 ? Widen(state[2]) : L"Connecting to Live...");
     if (!m_liveConnected && m_connectionText.empty()) m_connectionText = L"Live connection lost. Retrying...";
+#endif
     if (!m_pendingAction.empty())
     {
         if (now - m_actionStarted > 15000)
@@ -683,7 +710,11 @@ void UIScene_LiveFriends::PollLive()
             m_message = L"Request timed out. Please try again.";
             if (timedOutInvite && !m_inviteQueue.empty()) m_nextQueuedInviteAt = now + 800;
         }
+#if LCE_PLATFORM_WIIU
+        const auto result = SplitTabs(WiiULiveSocial::ActionResult());
+#else
         const auto result = SplitTabs(ReadLiveText(L"social-result.tsv"));
+#endif
         if (result.size() >= 3 && result[0] == m_pendingAction)
         {
             const char completedOperation = m_pendingOperation;
@@ -699,7 +730,9 @@ void UIScene_LiveFriends::PollLive()
                     m_nextQueuedInviteAt = now + 1000;
                 }
             }
+#if LCE_PLATFORM_PC
             PcLiveBridge::Remove(L"social-result.tsv");
+#endif
             if (joining) { navigateBack(); return; }
         }
     }
@@ -715,10 +748,19 @@ void UIScene_LiveFriends::PollLive()
         m_achievementsReady = false;
         m_unlocked.clear();
         if (!m_inviteMode) m_message.clear();
+#if LCE_PLATFORM_PC
         FILE* file = PcLiveBridge::Open(L"social-profile.tmp", L"wb");
         if (file) { std::fprintf(file, "%u", id); std::fclose(file); PcLiveBridge::Rename(L"social-profile.tmp", L"social-profile.txt"); }
+#elif LCE_PLATFORM_WIIU
+        WiiULiveSocial::SelectProfile(m_tab == eTab_Friends ? id : 0);
+#endif
     }
+#if LCE_PLATFORM_PC
     const auto profile = SplitTabs(ReadLiveText(L"social-profile.tsv"));
+#elif LCE_PLATFORM_WIIU
+    const auto profile = SplitTabs(WiiULiveSocial::ProfileResult());
+#endif
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
     if (profile.size() >= 3 && std::strtoul(profile[0].c_str(), NULL, 10) == m_profileId)
     {
         m_achievementsReady = profile[1] == "ok";
@@ -733,6 +775,7 @@ void UIScene_LiveFriends::PollLive()
             if (info && info->icon[0] && std::find(m_unlocked.begin(), m_unlocked.end(), achievement) == m_unlocked.end()) m_unlocked.push_back(achievement);
         }
     }
+#endif
     if (m_inviteMode && m_pendingAction.empty() && !m_inviteQueue.empty() && now >= m_nextQueuedInviteAt)
     {
         const unsigned int nextInvite = m_inviteQueue.front();
@@ -817,6 +860,17 @@ void UIScene_LiveFriends::SendAction(char action, unsigned int id)
     }
     if (!m_liveConnected) { m_message = L"Live is offline. Try again shortly."; return; }
     const std::string request = std::to_string(System::currentRealTimeMillis());
+#if LCE_PLATFORM_WIIU
+    std::string target = std::to_string(id);
+    if (action == 'V')
+        for (const Entry& entry : m_entries[eTab_Friends])
+            if (entry.id == id) { target = entry.username; break; }
+    if (!WiiULiveSocial::SendAction(request, action, target))
+    {
+        m_message = L"Could not send the request.";
+        return;
+    }
+#else
     FILE* file = PcLiveBridge::Open(L"social-action.tmp", L"wb");
     if (file == NULL) { m_message = L"Could not send the request."; return; }
     std::fprintf(file, "%s\t%c\t%u", request.c_str(), action, id);
@@ -826,6 +880,7 @@ void UIScene_LiveFriends::SendAction(char action, unsigned int id)
         m_message = L"Could not send the request.";
         return;
     }
+#endif
     m_pendingAction = request;
     m_pendingOperation = action;
     m_actionStarted = System::processTimeInMilliSecs();
@@ -835,9 +890,19 @@ void UIScene_LiveFriends::SendAction(char action, unsigned int id)
 
 bool UIScene_LiveFriends::JoinEntry(const Entry& entry)
 {
+#if LCE_PLATFORM_WIIU
+    if (!gProfile->AllowedToPlayMultiplayer(m_playerId) || !WiiULiveGames::Join(entry.id))
+    {
+        m_message = L"No supported direct connection for this world.";
+        return false;
+    }
+    navigateBack();
+    return true;
+#else
     if (!entry.joinable) { m_message = L"No joinable world right now."; return false; }
     SendAction('J', entry.id);
     return !m_pendingAction.empty();
+#endif
 }
 
 void UIScene_LiveFriends::SelectTab(ETab tab)
@@ -906,6 +971,16 @@ int UIScene_LiveFriends::AddFriendKeyboardReturned(void* context, bool accepted)
             else
             {
                 const std::string request = std::to_string(System::currentRealTimeMillis());
+#if LCE_PLATFORM_WIIU
+                if (WiiULiveSocial::SendAction(request, 'N', username))
+                {
+                    scene->m_pendingAction = request;
+                    scene->m_pendingOperation = 'N';
+                    scene->m_actionStarted = System::processTimeInMilliSecs();
+                    scene->m_message = L"Sending friend request...";
+                }
+                else scene->m_message = L"Could not send the request.";
+#else
                 FILE* file = PcLiveBridge::Open(L"social-action.tmp", L"wb");
                 if (file)
                 {
@@ -919,6 +994,7 @@ int UIScene_LiveFriends::AddFriendKeyboardReturned(void* context, bool accepted)
                         scene->m_message = L"Sending friend request...";
                     }
                 }
+#endif
             }
         }
     }

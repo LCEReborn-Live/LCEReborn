@@ -341,9 +341,13 @@ void UIScene_MainMenu::tick()
 int UIScene_MainMenu::closeLiveSignIn(void* context, int, C4JStorage::EMessageResult)
 {
     UIScene_MainMenu* menu = static_cast<UIScene_MainMenu*>(context);
+    const int pad = menu->m_liveSignInPad;
+    const bool openFriends = menu->m_liveDialogStatus == WiiULiveSignIn::Status::SignedIn;
     WiiULiveSignIn::Cancel();
     menu->m_liveSignInPad = -1;
     menu->m_liveDialogStatus = WiiULiveSignIn::Status::Idle;
+    if (openFriends && pad >= 0)
+        gConsoleUIController.NavigateToScene(pad, EUIScene_LiveFriends, NULL, EUILayer_Scene, EUIGroup_PlayerDefault);
     return 0;
 }
 
@@ -797,6 +801,11 @@ void UIScene_MainMenu::handlePress(int controlId, int)
         }
 #elif LCE_PLATFORM_WIIU
         gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+        if (WiiULiveSignIn::IsSignedIn())
+        {
+            gConsoleUIController.NavigateToScene(pad, EUIScene_LiveFriends, NULL, EUILayer_Scene, EUIGroup_PlayerDefault);
+            return;
+        }
         m_liveSignInPad = pad;
         WiiULiveSignIn::Start();
         updateLiveSignIn();

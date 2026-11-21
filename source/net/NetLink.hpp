@@ -9,6 +9,9 @@
 
 #include "game/core/CriticalSection.hpp"
 #include "net/NetSocket.hpp"
+#if LCE_PLATFORM_WIIU
+#include <memory>
+#endif
 
 class C4JEventImpl;
 class C4JThreadImpl;
@@ -89,6 +92,10 @@ private:
     Address m_peer;
     Address m_target;
     std::string m_targetText;
+#if LCE_PLATFORM_WIIU
+    struct LiveJoinTicket;
+    std::shared_ptr<LiveJoinTicket> m_liveJoinTicket;
+#endif
     bool m_connecting;
     bool m_connected;
     bool m_stop;

@@ -26,6 +26,8 @@
 #include "net/ServerList.hpp"
 #if LCE_PLATFORM_PC
 #include "platform/pc/PcLiveBridge.hpp"
+#elif LCE_PLATFORM_WIIU
+#include "platform/wiiu/WiiULiveGames.hpp"
 #endif
 
 namespace
@@ -83,9 +85,28 @@ std::wstring LiveName(const char* utf8)
     return result.empty() ? L"Live world" : result;
 }
 
+#if LCE_PLATFORM_WIIU
+std::string Narrow(const std::wstring& text);
+#endif
+
 std::vector<LiveEntry> ReadLiveEntries(std::string& snapshot)
 {
     std::vector<LiveEntry> entries;
+#if LCE_PLATFORM_WIIU
+    for (const WiiULiveGames::Listing& listing : WiiULiveGames::Directory())
+    {
+        LiveEntry entry;
+        entry.address = listing.address;
+        entry.name = listing.name;
+        entry.miniGameId = listing.miniGame;
+        entry.matchmaking = listing.miniGame != 0;
+        entry.filters[0] = listing.filters[0];
+        entry.filters[1] = listing.filters[1];
+        snapshot += listing.address + '\t' + Narrow(listing.name) + '\t' + std::to_string(entry.miniGameId)
+            + '\t' + std::to_string(entry.filters[0]) + '\t' + std::to_string(entry.filters[1]) + '\n';
+        entries.push_back(entry);
+    }
+#else
     FILE* file = LiveFile(L"servers.txt", L"rb");
     if (!file) return entries;
     char line[512];
@@ -117,6 +138,7 @@ std::vector<LiveEntry> ReadLiveEntries(std::string& snapshot)
         entries.push_back(entry);
     }
     fclose(file);
+#endif
     return entries;
 }
 

@@ -72,6 +72,8 @@ C_UNITS = {'vendor/dlmalloc.cpp'}
 EDG_RUNTIME = re.compile(r'^cafe/libsedg/')
 # Platform layers of other targets; the Wii U build compiles source/platform/wiiu only.
 OTHER_PLATFORMS = re.compile(r'^platform/(?!wiiu/)[^/]+/')
+# This parser has no platform dependencies and also serves the native Live client.
+SHARED_PLATFORM_UNITS = {'platform/pc/PcJson.cpp'}
 TARGET = ['-target', 'powerpc-eabi', '-mcpu=750', '-O2', '-ffunction-sections', '-fdata-sections',
           '-fno-delete-null-pointer-checks']
 # Boost's configuration does not know the Cafe target and would build shared_ptr without threads; the
@@ -321,7 +323,7 @@ def game_units(out):
     game, c_units, edg = [], [], []
     for src in sorted(SOURCE.rglob('*.cpp')):
         rel = src.relative_to(SOURCE).as_posix()
-        if rel in GCC_ONLY_UNITS or OTHER_PLATFORMS.match(rel):
+        if rel in GCC_ONLY_UNITS or (OTHER_PLATFORMS.match(rel) and rel not in SHARED_PLATFORM_UNITS):
             continue
         unit = (src, out / 'obj' / Path(rel).with_suffix('.o'))
         if rel in C_UNITS:

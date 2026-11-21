@@ -10,6 +10,9 @@
 #include "platform/pc/PcLiveBridge.hpp"
 #include "game/ui/UILiveAvatar.hpp"
 #include <string>
+#if LCE_PLATFORM_WIIU
+#include "platform/wiiu/WiiULiveSocial.hpp"
+#endif
 #if LCE_PLATFORM_PC && defined(_WIN32)
 extern "C" unsigned int __stdcall mciSendStringW(const wchar_t*, wchar_t*, unsigned int, void*);
 #pragma comment(lib, "winmm.lib")
@@ -398,6 +401,20 @@ void UIComponent_PressStartToPlay::tick()
     UIScene::tick();
 #if LCE_PLATFORM_PC
     if (hasMovie() && !gConsoleUIController.IsExpectingOrReloadingSkin()) PollLiveSocial();
+#elif LCE_PLATFORM_WIIU
+    if (hasMovie() && !gConsoleUIController.IsExpectingOrReloadingSkin() && !m_achievementToastShowing
+        && !m_holdToShowAchievements && m_achievementToasts.empty())
+    {
+        Toast toast = {};
+        if (WiiULiveSocial::TakeNotification(toast.title, toast.description))
+        {
+            toast.social = true;
+            registerTexture(1);
+            toast.achievementIcon = UIScene_AchievementsMenu::GetInfo(1)->icon;
+            gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
+            ShowAchievementToast(toast);
+        }
+    }
 #endif
     Minecraft* minecraft = Minecraft::GetInstance();
     if (!gConsoleUIController.IsExpectingOrReloadingSkin() && hasMovie())

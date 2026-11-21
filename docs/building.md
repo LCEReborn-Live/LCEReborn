@@ -27,6 +27,8 @@ The bundle is a title of its own (`0005000F5C4F365C`) with its own saves, so it 
 
 On Windows, pass a quoted path such as `"C:\Games\Cemu\Cemu.exe"`. If Cemu is on `PATH`, omit the path. Close any running Cemu instance before starting the bundle this way. The launcher gives the new emulator process the verified [ISRG Root X1 certificate](https://letsencrypt.org/certificates/) used by LCE Live. This leaves TLS verification enabled and requires no changes to the system trust store.
 
+On a Wii U with the native NSSL service, the game adds the same root certificate to its LCE Live network context. The regular certificate and hostname checks remain enabled.
+
 ## GitHub Actions
 
 The **Wii U build** workflow runs on manual dispatch on a GitHub-hosted Linux runner. It verifies the Update 688 archive against the game download manifest, generates the build inputs, and uses the Docker build above.

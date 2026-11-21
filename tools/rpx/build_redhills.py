@@ -47,6 +47,7 @@ import json
 import os
 import re
 import shutil
+import ssl
 import subprocess
 import sys
 from pathlib import Path
@@ -263,6 +264,17 @@ def write_if_changed(path, text):
         path.write_text(text, encoding='utf-8')
 
 
+def live_root_certificate(out):
+    """Emit the same ISRG Root X1 used by the Cemu launcher as native NSSL DER bytes."""
+    pem = ROOT / 'tools/gamedata/isrg-root-x1.pem'
+    certificate = ssl.PEM_cert_to_DER_cert(pem.read_text(encoding='ascii'))
+    if hashlib.sha256(certificate).hexdigest() != '96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6':
+        raise SystemExit('ISRG Root X1 certificate fingerprint does not match')
+    lines = [', '.join('0x%02x' % byte for byte in certificate[offset:offset + 12]) + ',\n'
+             for offset in range(0, len(certificate), 12)]
+    write_if_changed(out / 'wiiu_live_root_ca.inc', ''.join(lines))
+
+
 def build_providers(build, out, jobs):
     """liblegacy_png.a and libquazal_zlib.a: libpng and NEX's private zlib, as the retail image links them."""
     third_party = build.third_party
@@ -466,9 +478,11 @@ def main():
     build = Build(args.redhills, args.wut, args.runtime16, third_party)
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
+    generated = out / 'generated'
+    live_root_certificate(generated)
 
     game, c_units, edg = game_units(out)
-    failed = compile_units(args.redhills, game + edg, build.game_flags, args.jobs, 'game')
+    failed = compile_units(args.redhills, game + edg, build.game_flags + ['-I' + str(generated)], args.jobs, 'game')
     failed += compile_units(args.redhills, c_units, build.game_c_flags, args.jobs, 'game C')
     if failed and not args.keep_going:
         return 1

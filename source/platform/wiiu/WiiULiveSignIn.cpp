@@ -1,8 +1,11 @@
 #include "platform/wiiu/WiiULiveSignIn.hpp"
 #include "game/core/CriticalSection.hpp"
 #include "game/core/System.hpp"
+#include <coreinit/dynload.h>
+#include <coreinit/ios.h>
 #include <coreinit/thread.h>
 #include <curl/curl.h>
+#include <nsysnet/nssl.h>
 #include <cwchar>
 #include <deque>
 #include <utility>
@@ -16,6 +19,7 @@ const char kTokenUrl[] = "https://api.lcereborn.xyz/v1/device/token";
 const char kPresenceUrl[] = "https://api.lcereborn.xyz/v1/presence";
 const char kApiUrl[] = "https://api.lcereborn.xyz/v1";
 // Cafe nlibcurl uses an NSSL verification bitmask in place of standard curl's TLS options.
+const CURLoption kNsslContext = static_cast<CURLoption>(210);
 const CURLoption kNsslVerifyOptions = static_cast<CURLoption>(211);
 const long kVerifyPeerHostnameAndDate = 7;
 const size_t kMaxResponse = 256 * 1024;
@@ -67,6 +71,56 @@ size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
     return length;
 }
 
+NSSLContextHandle CreateNativeTrustContext()
+{
+    OSDynLoad_Module module = NULL;
+    if (OSDynLoad_Acquire("nsysnet.rpl", &module) != OS_DYNLOAD_OK)
+        return -1;
+    decltype(&NSSLInit) initialise = NULL;
+    decltype(&NSSLFinish) finish = NULL;
+    decltype(&NSSLCreateContext) create = NULL;
+    decltype(&NSSLDestroyContext) destroy = NULL;
+    decltype(&NSSLAddServerPKIExternal) addRoot = NULL;
+    if (OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLInit", reinterpret_cast<void**>(&initialise)) != OS_DYNLOAD_OK
+        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLFinish", reinterpret_cast<void**>(&finish)) != OS_DYNLOAD_OK
+        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLCreateContext", reinterpret_cast<void**>(&create)) != OS_DYNLOAD_OK
+        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLDestroyContext", reinterpret_cast<void**>(&destroy)) != OS_DYNLOAD_OK
+        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLAddServerPKIExternal", reinterpret_cast<void**>(&addRoot)) != OS_DYNLOAD_OK)
+    {
+        OSDynLoad_Release(module);
+        return -1;
+    }
+
+    // The native IOS service is required. Cemu should use its host trust store
+    // because its emulated custom NSSL context can accept invalid chains.
+    const IOSHandle service = IOS_Open("/dev/nsec/nssl", IOS_OPEN_READWRITE);
+    if (service < 0)
+    {
+        OSDynLoad_Release(module);
+        return -1;
+    }
+    IOS_Close(service);
+    if (initialise() != NSSL_ERROR_OK)
+    {
+        OSDynLoad_Release(module);
+        return -1;
+    }
+
+    const NSSLContextHandle context = create(0);
+    if (context >= 0)
+    {
+        alignas(64) static const unsigned char root[] = {
+#include "wiiu_live_root_ca.inc"
+        };
+        if (addRoot(context, root, sizeof(root), 0) == NSSL_ERROR_OK)
+            return context;
+        destroy(context);
+    }
+    finish();
+    OSDynLoad_Release(module);
+    return -1;
+}
+
 template <typename T>
 bool SetOption(CURL* curl, CURLoption option, T value)
 {
@@ -98,6 +152,7 @@ int SendRequest(int, const char**)
         curlResult = CURLE_FAILED_INIT;
         return 0;
     }
+    static const NSSLContextHandle nativeTrust = CreateNativeTrustContext();
     const char* url = kStartUrl;
     static std::string body;
     static std::string authorization;
@@ -145,6 +200,7 @@ int SendRequest(int, const char**)
         && SetOption(curl, CURLOPT_CONNECTTIMEOUT, 5L)
         && SetOption(curl, CURLOPT_FOLLOWLOCATION, 0L)
         && SetOption(curl, kNsslVerifyOptions, kVerifyPeerHostnameAndDate)
+        && (nativeTrust < 0 || SetOption(curl, kNsslContext, static_cast<long>(nativeTrust)))
         && SetOption(curl, CURLOPT_WRITEFUNCTION, WriteResponse)
         && SetOption(curl, CURLOPT_WRITEDATA, &response))
     {

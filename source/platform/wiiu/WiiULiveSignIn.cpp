@@ -21,6 +21,7 @@ alignas(32) OSThread thread;
 alignas(32) unsigned char stack[128 * 1024];
 Request request = Request::None;
 Status status = Status::Idle;
+bool restartAfterRequest = false;
 std::string deviceCode;
 std::string userCode;
 std::string username;
@@ -47,23 +48,31 @@ size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
 
 int SendRequest(int, const char**)
 {
-    // nlibcurl owns the TLS connection. Keep a single HTTP header list for this client.
-    static curl_slist* headers = NULL;
-    if (headers == NULL)
+    static bool curlReady = false;
+    if (!curlReady)
     {
         if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK)
             return 0;
-        headers = curl_slist_append(NULL, "Content-Type: application/json");
+        curlReady = true;
     }
-    if (headers == NULL)
-        return 0;
 
-    CURL* curl = curl_easy_init();
+    // Reuse one handle for this worker. Cemu 2.6's cleanup reads the guest
+    // handle after freeing it, and presence requests run for the whole session.
+    static CURL* curl = NULL;
+    if (curl == NULL)
+        curl = curl_easy_init();
     if (curl == NULL)
         return 0;
     const char* url = kStartUrl;
-    std::string body = "{}";
-    curl_slist* requestHeaders = headers;
+    static std::string body;
+    static std::string authorization;
+    static char contentType[] = "Content-Type: application/json";
+    // nlibcurl borrows the list. Keep it in worker-owned storage and avoid
+    // Cemu 2.6's allocation callbacks in curl_slist_append.
+    static curl_slist headers = {contentType, NULL};
+    static curl_slist bearer = {NULL, NULL};
+    body = "{}";
+    headers.next = NULL;
     if (request == Request::Poll)
     {
         url = kTokenUrl;
@@ -74,35 +83,19 @@ int SendRequest(int, const char**)
         url = kPresenceUrl;
         body = requestedPlaying ? "{\"status\":\"game\",\"activity\":\"world\",\"platform\":\"wiiu\"}"
                                 : "{\"status\":\"launcher\",\"platform\":\"wiiu\"}";
-        static std::string headerToken;
-        static curl_slist* authenticatedHeaders = NULL;
-        if (headerToken != sessionToken)
-        {
-            curl_slist_free_all(authenticatedHeaders);
-            authenticatedHeaders = curl_slist_append(NULL, "Content-Type: application/json");
-            const std::string authorization = "Authorization: Bearer " + sessionToken;
-            curl_slist* updated = authenticatedHeaders == NULL ? NULL
-                : curl_slist_append(authenticatedHeaders, authorization.c_str());
-            if (updated != NULL)
-            {
-                authenticatedHeaders = updated;
-                headerToken = sessionToken;
-            }
-            else
-            {
-                curl_slist_free_all(authenticatedHeaders);
-                authenticatedHeaders = NULL;
-                headerToken.clear();
-            }
-        }
-        requestHeaders = authenticatedHeaders;
+        authorization = "Authorization: Bearer " + sessionToken;
+        bearer.data = &authorization[0];
+        headers.next = &bearer;
     }
-    if (requestHeaders != NULL
-        && curl_easy_setopt(curl, CURLOPT_URL, url) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_HTTPHEADER, requestHeaders) == CURLE_OK
+    else
+    {
+        authorization.clear();
+        bearer.data = NULL;
+    }
+    if (curl_easy_setopt(curl, CURLOPT_URL, url) == CURLE_OK
+        && curl_easy_setopt(curl, CURLOPT_HTTPHEADER, &headers) == CURLE_OK
         && curl_easy_setopt(curl, CURLOPT_POST, 1L) == CURLE_OK
         && curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str()) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(body.size())) == CURLE_OK
         && curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L) == CURLE_OK
         && curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L) == CURLE_OK
         && curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L) == CURLE_OK
@@ -111,7 +104,6 @@ int SendRequest(int, const char**)
         && curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response) == CURLE_OK
         && curl_easy_perform(curl) == CURLE_OK)
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseStatus);
-    curl_easy_cleanup(curl);
     return 0;
 }
 
@@ -215,14 +207,21 @@ Status Finish(Request finished, long long now)
 
 void Start()
 {
+    Update();
     if (!sessionToken.empty() || status == Status::Starting || status == Status::Waiting)
         return;
-    Update();
-    status = request == Request::None && Send(Request::Start) ? Status::Starting : Status::Failed;
+    if (request != Request::None)
+    {
+        restartAfterRequest = true;
+        status = Status::Starting;
+        return;
+    }
+    status = Send(Request::Start) ? Status::Starting : Status::Failed;
 }
 
 void Cancel()
 {
+    restartAfterRequest = false;
     if (status == Status::Starting || status == Status::Waiting)
         status = Status::Idle;
 }
@@ -253,7 +252,7 @@ Status Update()
                 presenceRetryAt = now + 10000;
             }
         }
-        else if (status == Status::Starting || status == Status::Waiting)
+        else if (!restartAfterRequest && (status == Status::Starting || status == Status::Waiting))
             status = Finish(finished, now);
         response.clear();
         if (status != Status::Waiting)
@@ -261,6 +260,11 @@ Status Update()
             deviceCode.clear();
             userCode.clear();
         }
+    }
+    if (restartAfterRequest && request == Request::None)
+    {
+        restartAfterRequest = false;
+        status = Send(Request::Start) ? Status::Starting : Status::Failed;
     }
     if (status == Status::Waiting && request == Request::None)
     {

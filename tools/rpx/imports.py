@@ -92,8 +92,8 @@ def import_map():
     combined = wut_import_map()
     combined.update(retail_import_map())
     # Wii U Live uses the system HTTPS library, which modern wut does not link.
-    for name in ('curl_global_init', 'curl_slist_append', 'curl_easy_init', 'curl_easy_setopt',
-                 'curl_easy_perform', 'curl_easy_getinfo', 'curl_easy_cleanup', 'curl_slist_free_all'):
+    for name in ('curl_global_init', 'curl_easy_init', 'curl_easy_setopt', 'curl_easy_perform',
+                 'curl_easy_getinfo'):
         combined.setdefault(name, ('nlibcurl', False))
     return combined
 

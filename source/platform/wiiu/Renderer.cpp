@@ -2771,6 +2771,8 @@ bool Renderer::InitFFL()
 
     if (FFLInitRes(sFFLWorkMemory, &sFFLInitDesc) != 0)
     {
+        free(sFFLWorkMemory);
+        sFFLWorkMemory = NULL;
         return false;
     }
 

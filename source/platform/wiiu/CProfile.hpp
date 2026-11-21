@@ -250,6 +250,7 @@ private:
     unsigned int mInitialisationData;
     ACTUuid mAccountUuid;
     FFLCreateID mAccountCreateId;
+    MiiDataEntry mAccountMiiFallback;
     struct ParentalControlState
     {
         bool loaded;

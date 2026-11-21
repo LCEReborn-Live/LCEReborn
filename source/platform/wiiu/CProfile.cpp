@@ -752,7 +752,21 @@ void CProfile::LoadAllMiiData()
         if (mLoadedMiiData->mSysUserMiis[index].mUuid == mAccountUuid)
             accountMii = &mLoadedMiiData->mSysUserMiis[index];
     }
-    mAccountCreateId = *reinterpret_cast<const FFLCreateID*>(accountMii->mCreatorId);
+    if (accountMii == NULL)
+    {
+        // The current account can exist even if its Mii graphics are unavailable.
+        mAccountMiiFallback = MiiDataEntry{};
+        mAccountMiiFallback.mIsAccountMii = true;
+        mAccountMiiFallback.mUuid = mAccountUuid;
+        int16_t name[nn::act::MiiNameSize] = {};
+        nn::act::GetMiiName(name);
+        if (name[0] != 0)
+            std::memcpy(mAccountMiiFallback.mName, name, sizeof(mAccountMiiFallback.mName) - sizeof(name[0]));
+        else
+            std::memcpy(mAccountMiiFallback.mName, L"Player", sizeof(L"Player"));
+        accountMii = &mAccountMiiFallback;
+    }
+    std::memcpy(&mAccountCreateId, accountMii->mCreatorId, sizeof(mAccountCreateId));
     SignInUser(accountMii, -1);
 }
 

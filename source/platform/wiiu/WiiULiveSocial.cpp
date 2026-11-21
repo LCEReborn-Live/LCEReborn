@@ -184,7 +184,13 @@ bool Connected()
     return WiiULiveSignIn::IsSignedIn() && haveSnapshot && System::processTimeInMilliSecs() - lastRefresh < 30000;
 }
 
-const std::string& Snapshot() { return snapshot; }
+bool ReadSnapshot(std::string& value)
+{
+    if (!haveSnapshot)
+        return false;
+    value = snapshot;
+    return true;
+}
 const std::string& ActionResult() { return actionResult; }
 const std::string& ProfileResult() { return profileResult; }
 

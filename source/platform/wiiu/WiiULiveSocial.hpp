@@ -7,7 +7,7 @@ namespace WiiULiveSocial
 {
 void Tick();
 bool Connected();
-const std::string& Snapshot();
+bool ReadSnapshot(std::string& value);
 bool TakeNotification(std::wstring& title, std::wstring& message);
 bool SendAction(const std::string& request, char action, const std::string& target);
 const std::string& ActionResult();

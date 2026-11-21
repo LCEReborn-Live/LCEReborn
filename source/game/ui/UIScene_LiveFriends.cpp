@@ -632,8 +632,8 @@ void UIScene_LiveFriends::handleReload()
 bool UIScene_LiveFriends::ReadSocial()
 {
 #if LCE_PLATFORM_WIIU
-    const std::string snapshot = WiiULiveSocial::Snapshot();
-    const bool valid = true;
+    std::string snapshot;
+    const bool valid = WiiULiveSocial::ReadSnapshot(snapshot);
 #else
     FILE* file = PcLiveBridge::Open(L"social.tsv", L"rb");
     if (file == NULL) return false;

@@ -71,6 +71,9 @@ private:
             return false;
         mPosition += static_cast<size_t>(end - start);
         value.type = JsonValue::Number;
+#if LCE_PLATFORM_WIIU
+        value.text.assign(start, static_cast<const char*>(end));
+#endif
         return true;
     }
 

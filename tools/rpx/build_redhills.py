@@ -375,6 +375,8 @@ def run_lld(build, inputs, script, elf, log, allow_undefined):
                '@%s' % response]
     if allow_undefined:
         command.append('--unresolved-symbols=ignore-all')
+    else:
+        command.append('--error-limit=0')
     result = run(command)
     log.write_text(' '.join(str(part) for part in command) + '\n\n' + result.stdout + result.stderr,
                    encoding='utf-8')
@@ -391,6 +393,7 @@ def link(build, objects, archives, out):
     result = run_lld(build, objects + seed + archives, script, probe, out / 'link-pass1.log', True)
     if result.returncode or not probe.is_file():
         print('pass 1 failed; see %s' % (out / 'link-pass1.log'))
+        print(result.stderr, file=sys.stderr, end='')
         return None
     undefined = strong_undefined(build, probe) | set(preferred)
     stubs, chosen, unresolved, aliases = imports.generate(undefined, out / 'imports')
@@ -404,6 +407,9 @@ def link(build, objects, archives, out):
     if result.returncode or not elf.is_file():
         print('pass 2 failed: %d unresolved (%s); see %s'
               % (len(missing), out / 'unresolved.txt', out / 'link-pass2.log'))
+        if missing:
+            print('Unresolved symbols:\n' + '\n'.join(missing), file=sys.stderr)
+        print(result.stderr, file=sys.stderr, end='')
         return None
     print('imports %d from %d RPLs' % (len(chosen), len(set(chosen.values()))))
     return elf

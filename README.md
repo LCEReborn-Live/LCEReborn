@@ -3,7 +3,7 @@
 ![LCEReborn Live banner](docs/assets/lcereborn-live-banner.png)
 
 
-**Minecraft: Wii U Edition, rebuilt for PC and connected with friends.**
+**Legacy Console Edition with Live accounts and online play. Available on PC, with experimental Wii U support in development.**
 
 [English](#en) · [Русский](#ru) · [Website](https://lcereborn.xyz) · [Downloads](https://github.com/LCEReborn-Live/LCEReborn/releases/latest) · [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI)
 
@@ -15,7 +15,11 @@
    
 **LCEReborn Live** is the PC version of LCEReborn with Live accounts and online features. The game is based on the reconstructed Minecraft: Wii U Edition source, corresponding to the Aquatic Update 1.13.
 
-### Features
+### Wii U (Experimental)
+
+The Wii U version is in active development. This experimental work focuses on signing into **LCE Live** with a code entered on your phone or PC and showing **Playing on Wii U** to friends. Setup for Cemu and Wii U with Aroma requires your own decrypted base game and Update 688 dumps. [Wii U build and setup guide](docs/building.md)
+
+### PC features
 
 - Browser-based Live sign-in with a persistent launcher session.
 - In-game **LCE Live** menu for friends, friend requests, invitations, presence, and available worlds.
@@ -73,7 +77,11 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 
 **LCEReborn Live** — PC-версия проекта LCEReborn с учётными записями и сетевыми функциями Live. Основа игры — восстановленный исходный код Minecraft: Wii U Edition на версии Aquatic Update 1.13.
 
-### Возможности
+### Wii U (Experimental)
+
+Версия для Wii U активно разрабатывается. На экспериментальном этапе работаем над входом в **LCE Live** по коду через телефон или ПК и статусом **Playing on Wii U** для друзей. Для запуска в Cemu или на Wii U с Aroma нужны собственные расшифрованные дампы базовой игры и Update 688. [Сборка и запуск на Wii U](docs/building.md)
+
+### Возможности на ПК
 
 - Вход в Live через браузер с сохранением сессии в лаунчере.
 - Меню **LCE Live** в игре: друзья, заявки, приглашения, статусы и доступные миры.

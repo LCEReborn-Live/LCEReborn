@@ -2,6 +2,10 @@ name: Wii U build
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to receive the experimental Wii U RPX (optional)
+        type: string
 
 permissions:
   contents: read
@@ -12,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, x64, wiiu]
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
       - name: Check out source and FFL
@@ -21,17 +25,13 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Generate Wii U build inputs
-        shell: bash
-        env:
-          WIIU_UPDATE_DUMP: ${{ vars.WIIU_UPDATE_DUMP }}
+      - name: Make room for the cross-compiler
         run: |
-          if [[ -z "$WIIU_UPDATE_DUMP" || ! -d "$WIIU_UPDATE_DUMP" ]]; then
-            echo '::error::Set WIIU_UPDATE_DUMP to the extracted Update 688 directory on the runner.'
-            exit 1
-          fi
-          docker info --format '{{.ServerVersion}}'
-          python3 tools/prepare.py --shaders-only --update "$WIIU_UPDATE_DUMP"
+          sudo rm -rf -- /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
+          df -h "$RUNNER_TEMP"
+
+      - name: Generate Wii U build inputs
+        run: python3 tools/prepare_wiiu_ci.py
 
       - name: Build the Wii U RPX
         run: python3 tools/build.py
@@ -44,3 +44,60 @@ jobs:
           path: |
             build/Minecraft.Client.rpx
             build/Minecraft.Client.map
+
+  publish:
+    if: inputs.release_tag != ''
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download the Wii U build
+        uses: actions/download-artifact@v7
+        with:
+          name: wiiu-rpx
+          path: wiiu-rpx
+
+      - name: Attach the experimental build to the existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9][a-zA-Z0-9._-]*$ ]]; then
+            echo '::error::Expected an existing version tag such as v1.2.6.'
+            exit 1
+          fi
+          gh release view "$RELEASE_TAG" --json body > release.json
+          asset="LCEReborn-Live-WiiU-Experimental-$RELEASE_TAG.rpx"
+          cp wiiu-rpx/Minecraft.Client.rpx "$asset"
+          test -s "$asset"
+          gh release upload "$RELEASE_TAG" "$asset#Experimental Wii U RPX" --clobber
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+
+          start = '<!-- wiiu-experimental:start -->'
+          end = '<!-- wiiu-experimental:end -->'
+          old = json.loads(Path('release.json').read_text(encoding='utf-8'))['body'] or ''
+          old = re.sub(re.escape(start) + r'.*?' + re.escape(end), '', old, flags=re.S).rstrip()
+          repo = os.environ['GH_REPO']
+          revision = os.environ['GITHUB_SHA']
+          tag = os.environ['RELEASE_TAG']
+          notes = f'''{start}
+          ## Experimental Wii U build
+
+          Download `LCEReborn-Live-WiiU-Experimental-{tag}.rpx` from Assets. This build includes LCE Live account sign-in and Wii U presence. It requires your own decrypted base game and Update 688 dumps.
+
+          1. In a [checkout of this build's source](https://github.com/{repo}/tree/{revision}), run `python tools/prepare.py --base "<base dump>" --update "<Update 688 dump>"`.
+          2. Save the downloaded RPX as `build/Minecraft.Client.rpx` and run `python tools/package.py --update "<Update 688 dump>"`.
+          3. Open `build/LCEReborn.wuhb` in Cemu, or copy it to `wiiu/apps/` on your Wii U's SD card and launch it with Aroma.
+          4. In the game, select **LCE Live**. Enter the code at [lcereborn.xyz/authorize](https://lcereborn.xyz/authorize) on a phone or PC, then confirm the sign-in.
+
+          See the [Wii U setup guide](https://github.com/{repo}/blob/{revision}/docs/building.md) for details.
+          {end}'''
+          Path('release-notes.md').write_text((old + '\n\n' if old else '') + notes + '\n', encoding='utf-8')
+          PY
+          gh release edit "$RELEASE_TAG" --notes-file release-notes.md

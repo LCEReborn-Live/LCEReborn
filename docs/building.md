@@ -29,6 +29,8 @@ The bundle is a title of its own (`0005000F5C4F365C`) with its own saves, so it 
 
 The **Wii U build** workflow runs on manual dispatch on a GitHub-hosted Linux runner. It verifies the Update 688 archive against the game download manifest, generates the build inputs, and uses the Docker build above.
 
+GitHub Actions caches the compiled RedHills toolchain by Dockerfile before compiling the game. A cache miss requires a full compiler build.
+
 The `wiiu-rpx` artifact contains `Minecraft.Client.rpx` and its link map. To make a `.wuhb` locally, run the preparation step above with your base and update dumps, place the downloaded RPX at `build/Minecraft.Client.rpx`, and run the packaging step above.
 
 Supply an existing `release_tag` to attach the experimental RPX to that release and add the usage instructions to its notes.

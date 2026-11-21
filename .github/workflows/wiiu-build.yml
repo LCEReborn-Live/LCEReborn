@@ -33,8 +33,35 @@ jobs:
       - name: Generate Wii U build inputs
         run: python3 tools/prepare_wiiu_ci.py
 
+      - name: Restore the RedHills toolchain cache
+        id: redhills-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/wiiu-redhills.tar.zst
+          key: wiiu-redhills-linux-x64-v1-${{ hashFiles('tools/build/Dockerfile') }}
+
+      - name: Load the cached RedHills toolchain
+        if: steps.redhills-cache.outputs.cache-hit == 'true'
+        run: zstd -dc "$RUNNER_TEMP/wiiu-redhills.tar.zst" | docker image load
+
+      - name: Build the RedHills toolchain
+        if: steps.redhills-cache.outputs.cache-hit != 'true'
+        run: |
+          image=$(python3 -c 'import sys; sys.path.insert(0, "tools"); import build; print(build.image_tag())')
+          python3 -c 'import sys; sys.path.insert(0, "tools"); import build; build.ensure_image(0)'
+          docker image save "$image" | zstd -T0 -o "$RUNNER_TEMP/wiiu-redhills.tar.zst"
+
+      - name: Save the RedHills toolchain before building the game
+        if: steps.redhills-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/wiiu-redhills.tar.zst
+          key: ${{ steps.redhills-cache.outputs.cache-primary-key }}
+
       - name: Build the Wii U RPX
-        run: python3 tools/build.py
+        run: |
+          rm -f -- "$RUNNER_TEMP/wiiu-redhills.tar.zst"
+          python3 tools/build.py
 
       - name: Upload the RPX and link map
         uses: actions/upload-artifact@v7

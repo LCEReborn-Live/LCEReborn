@@ -241,7 +241,11 @@ int UIComponent_PressStartToPlay::AvatarReturned(void* context, unsigned char* d
         std::wstring text = L10N::GetString(0x4523129e);
         std::wstring description = gApp.FormatHTMLString(
             player, replaceAll(text, L"{*CONTROLLER_VK_X*}", L"{*CONTROLLER_VK_Y*}"), -1);
-        Toast toast = {title, description, texture, info->icon};
+        Toast toast;
+        toast.title = title;
+        toast.description = description;
+        toast.gamerPic = texture;
+        toast.achievementIcon = info->icon;
         toast.player = player;
         toast.achievement = achievement;
         if (!scene->m_achievementToastShowing)

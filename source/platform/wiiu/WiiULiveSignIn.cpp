@@ -45,7 +45,7 @@ size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
     return length;
 }
 
-int SendRequest(int, void*)
+int SendRequest(int, const char**)
 {
     // nlibcurl owns the TLS connection. Keep a single HTTP header list for this client.
     static curl_slist* headers = NULL;

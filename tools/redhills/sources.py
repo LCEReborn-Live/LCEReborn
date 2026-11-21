@@ -11,6 +11,7 @@ prints the prepared trees (all three by default).
 """
 import argparse
 import hashlib
+from http.client import HTTPException
 import shutil
 import subprocess
 import sys
@@ -25,8 +26,14 @@ BUILDSCRIPTS = 'https://raw.githubusercontent.com/devkitPro/buildscripts/9b57a02
 ARCHIVES = {
     'newlib': ('https://sourceware.org/pub/newlib/newlib-4.6.0.20260123.tar.gz',
                '6ff27e3bf022666f43f7802255be680eeff722ac181b1725d21e2e8318604ee3'),
-    'gcc': ('https://ftp.gnu.org/gnu/gcc/gcc-16.1.0/gcc-16.1.0.tar.xz',
+    'gcc': ('https://gcc.gnu.org/pub/gcc/releases/gcc-16.1.0/gcc-16.1.0.tar.xz',
             '50efb4d94c3397aff3b0d61a5abd748b4dd31d9d3f2ab7be05b171d36a510f79'),
+}
+MIRRORS = {
+    'gcc-16.1.0.tar.xz': (
+        'https://ftp.gnu.org/gnu/gcc/gcc-16.1.0/gcc-16.1.0.tar.xz',
+        'https://ftpmirror.gnu.org/gcc/gcc-16.1.0/gcc-16.1.0.tar.xz',
+    ),
 }
 PATCHES = {
     'newlib': (BUILDSCRIPTS + '/patches/newlib-4.6.0.20260123-4.patch',
@@ -44,13 +51,21 @@ def download(url, sha256, cache):
     if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == sha256:
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
-    print('downloading %s' % url, flush=True)
-    request = urllib.request.Request(url, headers={'User-Agent': 'mcwiiu-reconstructed-build'})
-    with urllib.request.urlopen(request, timeout=600) as response:
-        data = response.read()
+    for source in (url,) + MIRRORS.get(path.name, ()):
+        print('downloading %s' % source, flush=True)
+        request = urllib.request.Request(source, headers={'User-Agent': 'mcwiiu-reconstructed-build'})
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                data = response.read()
+        except (OSError, HTTPException) as error:
+            print('%s: %s' % (source, error), file=sys.stderr, flush=True)
+        else:
+            break
+    else:
+        raise SystemExit('could not download %s from any configured source' % path.name)
     actual = hashlib.sha256(data).hexdigest()
     if actual != sha256:
-        raise SystemExit('%s: SHA-256 %s, expected %s' % (url, actual, sha256))
+        raise SystemExit('%s: SHA-256 %s, expected %s' % (source, actual, sha256))
     partial = path.with_name(path.name + '.partial')
     partial.write_bytes(data)
     partial.replace(path)

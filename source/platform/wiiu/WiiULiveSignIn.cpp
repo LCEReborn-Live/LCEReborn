@@ -2,6 +2,7 @@
 #include "game/core/System.hpp"
 #include <coreinit/thread.h>
 #include <curl/curl.h>
+#include <cwchar>
 
 namespace WiiULiveSignIn
 {
@@ -28,6 +29,9 @@ std::string username;
 std::string sessionToken;
 std::string response;
 long responseStatus = 0;
+CURLcode curlResult = CURLE_OK;
+int failedOption = -1;
+bool workerFailed = false;
 long long expiresAt = 0;
 long long pollAfter = 0;
 long long pollInterval = 0;
@@ -46,12 +50,23 @@ size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
     return length;
 }
 
+template <typename T>
+bool SetOption(CURL* curl, CURLoption option, T value)
+{
+    curlResult = curl_easy_setopt(curl, option, value);
+    if (curlResult == CURLE_OK)
+        return true;
+    failedOption = static_cast<int>(option);
+    return false;
+}
+
 int SendRequest(int, const char**)
 {
     static bool curlReady = false;
     if (!curlReady)
     {
-        if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK)
+        curlResult = curl_global_init(CURL_GLOBAL_DEFAULT);
+        if (curlResult != CURLE_OK)
             return 0;
         curlReady = true;
     }
@@ -62,7 +77,10 @@ int SendRequest(int, const char**)
     if (curl == NULL)
         curl = curl_easy_init();
     if (curl == NULL)
+    {
+        curlResult = CURLE_FAILED_INIT;
         return 0;
+    }
     const char* url = kStartUrl;
     static std::string body;
     static std::string authorization;
@@ -92,18 +110,21 @@ int SendRequest(int, const char**)
         authorization.clear();
         bearer.data = NULL;
     }
-    if (curl_easy_setopt(curl, CURLOPT_URL, url) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_HTTPHEADER, &headers) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_POST, 1L) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str()) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L) == CURLE_OK
-        && curl_easy_setopt(curl, kNsslVerifyOptions, kVerifyPeerHostnameAndDate) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteResponse) == CURLE_OK
-        && curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response) == CURLE_OK
-        && curl_easy_perform(curl) == CURLE_OK)
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseStatus);
+    if (SetOption(curl, CURLOPT_URL, url)
+        && SetOption(curl, CURLOPT_HTTPHEADER, &headers)
+        && SetOption(curl, CURLOPT_POST, 1L)
+        && SetOption(curl, CURLOPT_POSTFIELDS, body.c_str())
+        && SetOption(curl, CURLOPT_TIMEOUT, 10L)
+        && SetOption(curl, CURLOPT_CONNECTTIMEOUT, 5L)
+        && SetOption(curl, CURLOPT_FOLLOWLOCATION, 0L)
+        && SetOption(curl, kNsslVerifyOptions, kVerifyPeerHostnameAndDate)
+        && SetOption(curl, CURLOPT_WRITEFUNCTION, WriteResponse)
+        && SetOption(curl, CURLOPT_WRITEDATA, &response))
+    {
+        curlResult = curl_easy_perform(curl);
+        if (curlResult == CURLE_OK)
+            curlResult = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseStatus);
+    }
     return 0;
 }
 
@@ -111,9 +132,13 @@ bool Send(Request next)
 {
     response.clear();
     responseStatus = 0;
+    curlResult = CURLE_OK;
+    failedOption = -1;
+    workerFailed = false;
     request = next;
     if (!OSCreateThread(&thread, SendRequest, 0, NULL, stack + sizeof(stack), sizeof(stack), 16, 0))
     {
+        workerFailed = true;
         request = Request::None;
         return false;
     }
@@ -290,4 +315,20 @@ void TickPresence(bool playing)
 
 const std::string& UserCode() { return userCode; }
 const std::string& Username() { return username; }
+
+std::wstring ErrorDetail()
+{
+    if (workerFailed)
+        return L"Could not start the network worker.";
+    wchar_t detail[80];
+    if (failedOption >= 0)
+        std::swprintf(detail, 80, L"Network error %d (option %d).", static_cast<int>(curlResult), failedOption);
+    else if (curlResult != CURLE_OK)
+        std::swprintf(detail, 80, L"Network error %d.", static_cast<int>(curlResult));
+    else if (responseStatus == 201)
+        return L"The server returned an invalid sign-in response.";
+    else
+        std::swprintf(detail, 80, L"Server response HTTP %ld.", responseStatus);
+    return detail;
+}
 }

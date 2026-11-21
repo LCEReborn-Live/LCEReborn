@@ -388,6 +388,10 @@ void UIScene_MainMenu::updateLiveSignIn()
     case Status::Expired:
         text = L"Your code expired. Select LCE Live for a new code.";
         break;
+    case Status::Failed:
+        text = WiiULiveSignIn::ErrorDetail();
+        text += L"\nSelect LCE Live to try again.";
+        break;
     default:
         text = L"Could not connect to LCE Live. Select LCE Live to try again.";
         break;

@@ -13,6 +13,7 @@ Status Update();
 void TickPresence(bool playing);
 const std::string& UserCode();
 const std::string& Username();
+std::wstring ErrorDetail();
 }
 
 #endif

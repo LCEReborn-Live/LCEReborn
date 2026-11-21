@@ -8,9 +8,11 @@
 
 #include <wchar.h>
 #include <cmath>
+#if LCE_PLATFORM_PC
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#endif
 #include <string>
 
 #include "game/client/audio/ConsoleSoundEngine.hpp"
@@ -276,6 +278,7 @@ bool gFancyGraphics = true;
 static File sWorkingDirectory;
 static C4JCriticalSection sTextureRequestLock;
 
+#if LCE_PLATFORM_PC
 namespace
 {
 void WriteLiveGameActivity()
@@ -306,6 +309,7 @@ void WriteLiveGameActivity()
     if (file) file << "{\"activity\":\"" << activity << "\"}";
 }
 }
+#endif
 
 struct ScoreboardMenuData
 {
@@ -1487,7 +1491,9 @@ void Minecraft::tickAllConnections()
 
 void Minecraft::tick(bool handleInput, bool lastTickOfFrame)
 {
+#if LCE_PLATFORM_PC
     WriteLiveGameActivity();
+#endif
     int playerIdx = mPlayer->mUserIndex;
 
     mStats[playerIdx]->tick(playerIdx);

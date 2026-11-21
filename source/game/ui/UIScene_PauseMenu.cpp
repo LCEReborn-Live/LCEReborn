@@ -45,7 +45,6 @@
 #include "platform/C4JThreadImpl.hpp"
 #include "platform/Runtime.hpp"
 #include "game/ui/UIScene_OnlineSettingsMenu.hpp"
-#include "game/ui/UIScene_LiveFriends.hpp"
 
 extern ConsoleUIController gConsoleUIController;
 
@@ -141,9 +140,11 @@ void UIScene_PauseMenu::Init()
                                       9);
     }
 
+#if LCE_PLATFORM_PC
     if (getenv("LCE_LIVE_DIR") && primaryPlayer && CGameNetworkManager::sInstance.IsHost()
         && !CGameNetworkManager::sInstance.IsLocalGame())
         m_buttonList.AddNewMenuButton(L10N::GetString(IDS_TOOLTIPS_INVITE_FRIENDS), 10);
+#endif
     m_buttonList.AddNewMenuButton(L10N::GetString(IDS_EXIT_GAME), 6);
     if (gApp.GetGameHostOption(eGameHostOption_MiniGame) == 0
         || !CGameNetworkManager::sInstance.IsInPublicJoinableGame() || gProfile->GetPrimaryPad() != m_playerId
@@ -335,10 +336,12 @@ void UIScene_PauseMenu::handlePress(int, int childId)
                                                          ? UIScene_OnlineSettingsMenu::eMode_OpenToLan
                                                          : UIScene_OnlineSettingsMenu::eMode_LanWorld);
         return;
+#if LCE_PLATFORM_PC
     case 10:
         gConsoleUIController.NavigateToScene(m_playerId, EUIScene_LiveFriends,
             reinterpret_cast<void*>(static_cast<uintptr_t>(1)), EUILayer_Scene, EUIGroup_PlayerDefault);
         return;
+#endif
     case 3:
         break;
     }

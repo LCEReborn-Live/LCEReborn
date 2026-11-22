@@ -71,8 +71,11 @@ set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
 if(NINTENDO_SWITCH)
   # The devkitPro fork has libnx backends for video, gamepad, audio and input.
   set(switch_portlibs_include "${DEVKITPRO}/portlibs/switch/include")
-  set(OPENGL_INCLUDE_DIR "${switch_portlibs_include}")
-  set(OPENGL_EGL_INCLUDE_DIRS "${switch_portlibs_include}")
+  find_package(OpenGL CONFIG REQUIRED PATHS "${DEVKITPRO}/portlibs/switch/lib/cmake/OpenGL" NO_DEFAULT_PATH)
+  # SDL calls the desktop FindOpenGL module, which expects GLX on this target.
+  # Keep Mesa's include path available to SDL's actual desktop GL header probe.
+  set(OPENGL_INCLUDE_DIR "${OPENGL_INCLUDE_DIR}" CACHE PATH "devkitPro Mesa OpenGL headers" FORCE)
+  unset(HAVE_OPENGL CACHE)
   set(SDL_OPENGL ON CACHE BOOL "" FORCE)
   set(SDL_OPENGLES ON CACHE BOOL "" FORCE)
   set(SDL_PTHREADS ON CACHE BOOL "" FORCE)
@@ -93,6 +96,9 @@ endif()
 FetchContent_MakeAvailable(SDL3)
 if(NINTENDO_SWITCH)
   target_include_directories(SDL3-static SYSTEM PRIVATE "${switch_portlibs_include}")
+  if(NOT HAVE_OPENGL OR NOT HAVE_OPENGL_EGL)
+    message(FATAL_ERROR "The Nintendo Switch client requires SDL with desktop OpenGL and EGL from switch-mesa.")
+  endif()
 endif()
 
 # Opus keeps game voice traffic small enough for relay sessions while keeping end-to-end latency low.

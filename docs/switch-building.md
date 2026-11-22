@@ -9,6 +9,8 @@ The `nintendo-switch-port` branch targets a homebrew build of LCEReborn for the 
 3. Run `python tools/prepare.py --base "<base dump>" --update "<Update 688 dump>"` with your own game dumps. Copy the resulting `assets/` into `switch/LCEReborn/` so the game finds `switch/LCEReborn/assets/Common/Media/MediaWiiU.arc`.
 4. Open `LCEReborn.nro` in the homebrew menu or load it in Eden. Game saves and startup logs are written to `switch/LCEReborn/saves/` and `switch/LCEReborn/logs/`.
 
+Keep the artifact's `packs/` folder next to `LCEReborn.nro`. Modern Textures loads automatically as the default pack.
+
 On hardware, run homebrew in application mode so the game has enough memory. For this first milestone, create a small offline world and use a new save. The Switch port currently uses the Wii U save buffer limit.
 
 ## Compile using devkitPro
@@ -24,4 +26,4 @@ cmake -S . -B build/switch -G Ninja \
 cmake --build build/switch --target LCEReborn_nro
 ```
 
-Copy `build/switch/LCEReborn.nro` to the game directory and put the contents of `resources/pc/` in its `resources/` subdirectory.
+Copy `build/switch/LCEReborn.nro` to the game directory. Copy the contents of `resources/pc/` into its `resources/` subdirectory and the repository's `packs/` directory alongside it for Modern Textures.

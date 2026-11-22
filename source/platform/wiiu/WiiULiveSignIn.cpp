@@ -86,7 +86,7 @@ void ReadSavedSession()
     if (!saveClientReady)
         return;
     // One fixed-size record with a hex token and a zero-padded optional UUID.
-    alignas(64) char buffer[kTokenLength + kUuidLength + 1];
+    alignas(64) uint8_t buffer[kTokenLength + kUuidLength + 1];
     FSFileHandle handle;
     gProfileInstance->EnterInitSaveDirCS();
     int count = SAVEOpenFile(&saveClient, &saveCommand, saveSlot, kSessionFile, "r",
@@ -99,8 +99,9 @@ void ReadSavedSession()
     gProfileInstance->LeaveInitSaveDirCS();
     if (count != static_cast<int>(kTokenLength + kUuidLength))
         return;
-    const std::string token(buffer, kTokenLength);
-    const std::string uuid(buffer + kTokenLength, kUuidLength);
+    const char* bytes = reinterpret_cast<const char*>(buffer);
+    const std::string token(bytes, kTokenLength);
+    const std::string uuid(bytes + kTokenLength, kUuidLength);
     if (token.find_first_not_of(kLowerHex) != std::string::npos)
         return;
     sessionToken = token;
@@ -112,7 +113,7 @@ bool WriteSavedSession()
 {
     if (!saveClientReady)
         return false;
-    alignas(64) char buffer[kTokenLength + kUuidLength] = {};
+    alignas(64) uint8_t buffer[kTokenLength + kUuidLength] = {};
     std::memcpy(buffer, sessionToken.data(), kTokenLength);
     std::memcpy(buffer + kTokenLength, savedUuid.data(), savedUuid.size());
     FSFileHandle handle;

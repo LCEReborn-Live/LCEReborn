@@ -212,6 +212,10 @@ int main(int argc, char** argv)
     ShaderPackManager::Get().Initialise();
 
     float timingColour = 0.0f;
+#if LCE_PLATFORM_SWITCH
+    bool firstFrame = true;
+    SwitchLogStartupStage("Entering the game loop");
+#endif
     while (!PcExitRequested())
     {
 #if LCE_PLATFORM_SWITCH
@@ -267,6 +271,13 @@ int main(int argc, char** argv)
         InfoBarManager::EndTimingCategory(InfoBarManager::eTimingCagegory_Frame);
         PIXBeginNamedEvent(timingColour, "Frame present");
         gRenderer->Present();
+#if LCE_PLATFORM_SWITCH
+        if (firstFrame)
+        {
+            firstFrame = false;
+            SwitchLogStartupStage("Presented the first frame");
+        }
+#endif
         PIXEndNamedEvent();
         gRenderer->Set_matrixDirty();
         gConsoleUIController.CheckMenuDisplayed();

@@ -86,10 +86,10 @@ def open_download(source, offset=0, allow_test_http=False):
         file_id = found.group(1) if found else fields.get('id', [None])[0]
         if not file_id:
             raise DownloadError('Invalid Google Drive file link.')
-        query = {'export': 'download', 'id': file_id}
+        query = {'export': 'download', 'id': file_id, 'confirm': 't'}
         if fields.get('resourcekey'):
             query['resourcekey'] = fields['resourcekey'][0]
-        url = 'https://drive.google.com/uc?' + urllib.parse.urlencode(query)
+        url = 'https://drive.usercontent.google.com/download?' + urllib.parse.urlencode(query)
     if parsed.scheme != 'https' and not (allow_test_http and parsed.scheme == 'http' and parsed.hostname == '127.0.0.1'):
         raise DownloadError('An HTTPS download URL is required.')
     opener = urllib.request.build_opener(SecureRedirect)

@@ -47,6 +47,9 @@
 #include "platform/pc/PcFrameCapture.hpp"
 #include "platform/pc/PcStartWorld.hpp"
 #include "platform/pc/PcWindow.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/switch/SwitchRuntime.hpp"
+#endif
 
 extern CConsoleMinecraftApp gApp;
 
@@ -58,6 +61,13 @@ static const Logger sLog("Main");
 
 int main(int argc, char** argv)
 {
+#if LCE_PLATFORM_SWITCH
+    if (!SwitchEnterGameDirectory())
+    {
+        SwitchShowStartupError("Place LCEReborn in /switch/LCEReborn on the SD card.");
+        return 1;
+    }
+#endif
     int exitCode;
     if (!PcParseLaunchOptions(argc, argv, exitCode, PcProgram::Game))
         return exitCode;
@@ -72,7 +82,11 @@ int main(int argc, char** argv)
     {
         sLog.WriteText(LogLevel::Fatal, folderError);
         Log::Stop();
+#if LCE_PLATFORM_SWITCH
+        SwitchShowStartupError(folderError);
+#else
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "LCEReborn", folderError.c_str(), NULL);
+#endif
         return 1;
     }
     LOG_INFO(sLog, "Content: %s", PcContentRoot().c_str());

@@ -12,7 +12,7 @@ public:
 
     static int SaveSaveDataCallback(void* context, bool success);
 
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     static const unsigned int SAVE_DATA_RESERVE = 0x40000000;
 #else
     static const unsigned int SAVE_DATA_RESERVE = 0x4000000;

@@ -10,7 +10,7 @@
 #include <fstream>
 #include <system_error>
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !LCE_PLATFORM_SWITCH
 #include <pwd.h>
 #include <unistd.h>
 #endif
@@ -174,6 +174,8 @@ static std::wstring OperatingSystemUserName()
 {
 #if defined(_WIN32)
     return EnvironmentString("USERNAME");
+#elif LCE_PLATFORM_SWITCH
+    return L"Player";
 #else
     std::wstring name = EnvironmentString("USER");
     if (name.empty())

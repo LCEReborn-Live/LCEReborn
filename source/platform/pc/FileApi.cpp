@@ -351,6 +351,10 @@ static fs::path ResolvePath(const char* fileName)
         return UnderRoot(PcPacksRoot(), rest);
 
     const fs::path nativePath = GamePath(path);
+#if LCE_PLATFORM_SWITCH
+    if (path.compare(0, sizeof("sdmc:/") - 1, "sdmc:/") == 0)
+        return nativePath;
+#endif
     if ((!path.empty() && path[0] == '/') || nativePath.is_absolute())
         return nativePath;
     return ContentPath(UnderRoot(PcContentRoot(), path));

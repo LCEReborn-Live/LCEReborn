@@ -1,0 +1,47 @@
+name: Nintendo Switch build
+
+on:
+  push:
+    branches: [nintendo-switch-port]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: switch-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: devkitpro/devkita64:20251231
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates cmake git ninja-build python3
+      - name: Prepare build dependencies
+        run: |
+          python3 tools/build/deps.py build/deps
+          python3 tools/build/layout.py build/deps build/third_party
+      - name: Build the LCEReborn game client
+        run: |
+          cmake -S . -B build/switch -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake \
+            -DCMAKE_BUILD_TYPE=Release -DLCE_BUILD_LAUNCHER=OFF
+          cmake --build build/switch --target LCEReborn_nro --parallel 4
+      - name: Stage the Switch SD card files
+        run: |
+          mkdir -p build/switch-package/LCEReborn
+          cp build/switch/LCEReborn.nro build/switch-package/LCEReborn/
+          cp -r resources/pc build/switch-package/LCEReborn/resources
+      - name: Upload the experimental Switch client
+        uses: actions/upload-artifact@v7
+        with:
+          name: nintendo-switch-nro
+          path: build/switch-package/
+          if-no-files-found: error

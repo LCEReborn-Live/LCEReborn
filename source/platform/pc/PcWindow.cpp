@@ -147,7 +147,11 @@ bool PcWindowCreate(int width, int height)
     }
     SetWindowIcon();
 
+#if LCE_PLATFORM_SWITCH
+    static const int kVersions[][2] = {{4, 3}, {3, 3}};
+#else
     static const int kVersions[][2] = {{4, 6}, {4, 5}, {4, 3}, {4, 2}, {4, 1}, {4, 0}, {3, 3}};
+#endif
     for (const int* version : kVersions)
     {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, version[0]);

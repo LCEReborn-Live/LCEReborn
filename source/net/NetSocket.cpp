@@ -19,8 +19,12 @@
 #else
 #include <arpa/inet.h>
 #include <fcntl.h>
+#if LCE_PLATFORM_SWITCH
+#include <switch.h>
+#else
 #include <ifaddrs.h>
 #include <net/if.h>
+#endif
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -467,6 +471,9 @@ void Startup()
     WSADATA data;
     gStarted = WSAStartup(MAKEWORD(2, 2), &data) == 0;
     gConnected = gStarted;
+#elif LCE_PLATFORM_SWITCH
+    gStarted = R_SUCCEEDED(socketInitializeDefault());
+    gConnected = gStarted;
 #else
     gStarted = true;
     gConnected = true;
@@ -573,7 +580,7 @@ std::vector<uint32_t> BroadcastAddresses()
         }
         closesocket(probe);
     }
-#else
+#elif !LCE_PLATFORM_SWITCH
     ifaddrs* list = 0;
     if (getifaddrs(&list) == 0)
     {
@@ -662,6 +669,8 @@ uint32_t FirstPrivateInterface()
     }
     closesocket(probe);
     return found;
+#elif LCE_PLATFORM_SWITCH
+    return 0;
 #else
     uint32_t found = 0;
     ifaddrs* list = 0;

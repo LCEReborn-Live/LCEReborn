@@ -8,9 +8,14 @@
 
 static std::string RootFromOption(const std::string& option, const char* fallback)
 {
+#if LCE_PLATFORM_SWITCH
+    // devoptab handles paths relative to the SD working directory and sdmc:/ device paths.
+    return option.empty() ? fallback : option;
+#else
     if (!option.empty())
         return std::filesystem::absolute(std::filesystem::u8path(option)).generic_string();
     return (std::filesystem::current_path() / fallback).generic_string();
+#endif
 }
 
 static std::string ResourceRootFromOption(const std::string& option)

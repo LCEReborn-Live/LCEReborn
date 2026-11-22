@@ -40,6 +40,10 @@ target_compile_definitions(lce_common INTERFACE
   BOOST_NO_EXCEPTIONS
   $<$<CONFIG:Debug,RelWithDebInfo>:LCE_DEBUG_BUILD=1>)
 
+if(NINTENDO_SWITCH)
+  target_compile_definitions(lce_common INTERFACE LCE_PLATFORM_SWITCH=1)
+endif()
+
 if(MSVC)
   target_compile_definitions(lce_common INTERFACE
     _HAS_EXCEPTIONS=0
@@ -64,11 +68,32 @@ set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
 set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(SDL3
-  URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.16/SDL3-3.4.16.tar.gz
-  URL_HASH SHA256=7322236cd12090c3eb40b9728be4d49c76f66ad17d04369584d4ecad5cf77c68
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+if(NINTENDO_SWITCH)
+  # The devkitPro fork has libnx backends for video, gamepad, audio and input.
+  set(switch_portlibs_include "${DEVKITPRO}/portlibs/switch/include")
+  set(OPENGL_INCLUDE_DIR "${switch_portlibs_include}")
+  set(OPENGL_EGL_INCLUDE_DIRS "${switch_portlibs_include}")
+  set(SDL_OPENGL ON CACHE BOOL "" FORCE)
+  set(SDL_OPENGLES ON CACHE BOOL "" FORCE)
+  set(SDL_PTHREADS ON CACHE BOOL "" FORCE)
+  set(SDL_PTHREADS_PRIVATE ON)
+  set(SDL_VULKAN OFF CACHE BOOL "" FORCE)
+  set(SDL_HIDAPI OFF CACHE BOOL "" FORCE)
+  set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(SDL3
+    URL https://codeload.github.com/devkitPro/SDL/tar.gz/c329016c0e338ab4397ad930f83330c9fe058348
+    URL_HASH SHA256=6047e4787f105ab4a0c6293ee3090ce5d1ebad112fcbe2a3e5a8874b0cc6f709
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+else()
+  FetchContent_Declare(SDL3
+    URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.16/SDL3-3.4.16.tar.gz
+    URL_HASH SHA256=7322236cd12090c3eb40b9728be4d49c76f66ad17d04369584d4ecad5cf77c68
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+endif()
 FetchContent_MakeAvailable(SDL3)
+if(NINTENDO_SWITCH)
+  target_include_directories(SDL3-static SYSTEM PRIVATE "${switch_portlibs_include}")
+endif()
 
 # Opus keeps game voice traffic small enough for relay sessions while keeping end-to-end latency low.
 set(OPUS_BUILD_SHARED_LIBRARY OFF CACHE BOOL "" FORCE)
@@ -150,6 +175,12 @@ file(GLOB_RECURSE LCE_PLATFORM_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/platform
 list(FILTER LCE_PLATFORM_SOURCES EXCLUDE REGEX "/platform/pc/audio/")
 # Each program's entry point: the game's Main.cpp and the dedicated server's ServerMain.cpp.
 list(FILTER LCE_PLATFORM_SOURCES EXCLUDE REGEX "/platform/pc/(Server)?Main\\.cpp$")
+if(NINTENDO_SWITCH)
+  list(FILTER LCE_PLATFORM_SOURCES EXCLUDE REGEX "/platform/pc/(PcCrashReport|PcDiscord|PcServer|PcStopSignals)\\.cpp$")
+  list(APPEND LCE_PLATFORM_SOURCES
+    "${LCE_SOURCE}/platform/switch/SwitchRuntime.cpp"
+    "${LCE_SOURCE}/platform/switch/SwitchDesktopServices.cpp")
+endif()
 # The LAN and internet play shared with the Wii U build.
 file(GLOB LCE_NET_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/net/*.cpp")
 list(APPEND LCE_PLATFORM_SOURCES ${LCE_NET_SOURCES})
@@ -208,7 +239,7 @@ function(lce_add_program target main)
     target_link_libraries(${target} PRIVATE shell32 ws2_32 dbghelp)
     # The executable's icon (tools/pcart/make_icon.py).
     target_sources(${target} PRIVATE "${CMAKE_BINARY_DIR}/LCEReborn.rc")
-  else()
+  elseif(NOT NINTENDO_SWITCH)
     find_package(Threads REQUIRED)
     target_link_libraries(${target} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
     # Function names in crash report stacks.
@@ -227,6 +258,12 @@ if(WIN32)
 endif()
 
 lce_add_program(LCEReborn Main.cpp)
+if(NINTENDO_SWITCH)
+  nx_generate_nacp(OUTPUT LCEReborn.nacp NAME "LCEReborn" AUTHOR "LCEReborn" VERSION "0.1.0")
+  nx_create_nro(LCEReborn_nro TARGET LCEReborn OUTPUT LCEReborn.nro NACP LCEReborn.nacp)
+  return()
+endif()
+
 lce_add_program(LCERebornServer ServerMain.cpp)
 # The PC interface art (tools/pcart) is read from resources/ in the working folder unless --resource-dir is given.
 add_custom_command(TARGET LCEReborn POST_BUILD

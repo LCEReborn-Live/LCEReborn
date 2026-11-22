@@ -23,7 +23,7 @@ jobs:
       - name: Install build tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates ccache cmake git ninja-build python3
+          apt-get install -y --no-install-recommends ca-certificates ccache cmake curl git ninja-build python3
           dkp-pacman -S --needed --noconfirm switch-curl
       - name: Restore third-party dependencies
         id: dependencies
@@ -81,9 +81,50 @@ jobs:
           test -s build/switch-package/LCEReborn/resources/experimental/shield_base_1_14.png
           test -s build/switch-package/LCEReborn/resources/experimental/shield_icon.png
           cp tools/build/third_party/bearssl-LICENSE.txt build/switch-package/LCEReborn/
-      - name: Upload the experimental Switch client
+      - name: Upload the Switch client with resources
         uses: actions/upload-artifact@v7
         with:
           name: nintendo-switch-nro
           path: build/switch-package/
+          if-no-files-found: error
+      - name: Upload the standalone NRO
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/switch-package/LCEReborn/LCEReborn.nro
+          archive: false
+          if-no-files-found: error
+      - name: Build the complete Switch SD-card ZIP
+        id: full-package
+        shell: bash
+        env:
+          SWITCH_ASSETS_URL: ${{ secrets.SWITCH_ASSETS_URL }}
+          SWITCH_ASSETS_SHA256: ${{ vars.SWITCH_ASSETS_SHA256 }}
+        run: |
+          if [[ -z "$SWITCH_ASSETS_URL" && -z "$SWITCH_ASSETS_SHA256" ]]; then
+            echo "::notice::Complete SD-card ZIP skipped. No prepared game assets source is configured."
+            exit 0
+          fi
+          if [[ "$SWITCH_ASSETS_URL" != https://* || ! "$SWITCH_ASSETS_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+            echo "::error::Configure an HTTPS SWITCH_ASSETS_URL and a valid SWITCH_ASSETS_SHA256."
+            exit 1
+          fi
+          staging="$(mktemp -d)"
+          trap 'rm -rf -- "$staging"' EXIT
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            --retry 3 --max-time 900 --output "$staging/assets.zip" -- "$SWITCH_ASSETS_URL"
+          printf '%s  %s\n' "$SWITCH_ASSETS_SHA256" "$staging/assets.zip" | sha256sum --check
+          python3 -m zipfile -e "$staging/assets.zip" "$staging/input"
+          (
+            cd build/switch-package
+            python3 -m zipfile -c "$staging/client.zip" LCEReborn
+          )
+          python3 tools/package_switch.py --client "$staging/client.zip" --assets "$staging/input/assets" \
+            --output build/LCEReborn-Switch-SD.zip
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Upload the complete Switch SD-card ZIP
+        if: steps.full-package.outputs.ready == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/LCEReborn-Switch-SD.zip
+          archive: false
           if-no-files-found: error

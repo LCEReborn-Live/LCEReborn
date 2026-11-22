@@ -15,6 +15,18 @@ Open **LCE Live** on the main menu and enter the displayed code at [lcereborn.xy
 
 On hardware, run homebrew in application mode so the game has enough memory. For this first milestone, create a small offline world and use a new save. The Switch port currently uses the Wii U save buffer limit.
 
+## Prepare a complete SD-card ZIP
+
+Use the prepared `assets/` folder from the PC launcher or from step 3 above.
+
+```sh
+python tools/package_switch.py --client nintendo-switch-nro.zip --assets assets --output build/LCEReborn-Switch-SD.zip
+```
+
+Extract the resulting ZIP at the root of the SD card or emulator SD card. It contains `switch/LCEReborn/` with the client, the Modern Textures pack and the prepared base game and Update 688 files. Keep your personal archive alongside your other game backups.
+
+GitHub Actions always uploads a standalone `LCEReborn.nro` and the `nintendo-switch-nro` artifact with the client resources. To also generate `LCEReborn-Switch-SD.zip` on each branch build, set the repository secret `SWITCH_ASSETS_URL` to an HTTPS download URL for a ZIP you are authorized to distribute. Set the repository variable `SWITCH_ASSETS_SHA256` to that ZIP's SHA-256. The source ZIP must contain a top-level `assets/` folder prepared from the base game and Update 688.
+
 ## Compile using devkitPro
 
 Install devkitA64, libnx, switch-cmake, switch-tools, switch-mesa, switch-curl and the host tools CMake 3.24+, Ninja and Python 3. Then run:

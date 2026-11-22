@@ -470,9 +470,19 @@ void ItemRenderer::setupGuiItem(float x, float y, float scaleX, float scaleY, bo
         GlStateManager::disableLighting();
 }
 
-bool ItemRenderer::isGui3d(not_null_ptr<ItemInstance>)
+bool ItemRenderer::isGui3d(not_null_ptr<ItemInstance> item)
 {
+#if LCE_PLATFORM_SWITCH
+    // Flat atlas sprites use their original colors in the inventory.
+    // Blocks and items drawn as models still need the GUI lighting.
+    if (item->isEmpty())
+        return false;
+    Item* type = item->getItem();
+    return type->getIconType() == 0 || type == Items::skull || type == Items::banner || Item::getId(type) == 442;
+#else
+    (void)item;
     return true;
+#endif
 }
 
 void ItemRenderer::renderStatic(const not_null_ptr<ItemInstance>& item, boost::shared_ptr<LivingEntity> entity,

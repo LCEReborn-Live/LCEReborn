@@ -15,9 +15,11 @@
    
 **LCEReborn Live** is the PC version of LCEReborn with Live accounts and online features. The game is based on the reconstructed Minecraft: Wii U Edition source, corresponding to the Aquatic Update 1.13.
 
-### Wii U (Experimental)
+### Nintendo Wii U (beta)
 
 The Wii U version is in active development. This experimental work focuses on signing into **LCE Live** with a code entered on your phone or PC and showing **Playing on Wii U** to friends. Setup for Cemu and Wii U with Aroma requires your own decrypted base game and Update 688 dumps. [Wii U build and setup guide](docs/building.md)
+
+## Nintendo Switch (in a few days)
 
 ### PC features
 

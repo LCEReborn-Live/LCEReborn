@@ -9,7 +9,7 @@ permissions:
 
 concurrency:
   group: switch-build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -23,17 +23,52 @@ jobs:
       - name: Install build tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates cmake git ninja-build python3
+          apt-get install -y --no-install-recommends ca-certificates ccache cmake git ninja-build python3
+      - name: Restore third-party dependencies
+        id: dependencies
+        uses: actions/cache/restore@v5
+        with:
+          path: build/deps
+          key: switch-deps-v1-${{ hashFiles('tools/build/deps.json') }}
       - name: Prepare build dependencies
         run: |
           python3 tools/build/deps.py build/deps
           python3 tools/build/layout.py build/deps build/third_party
+      - name: Save third-party dependencies
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: build/deps
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
+      - name: Restore the compiler cache
+        id: compiler-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/switch-ccache
+          key: switch-ccache-v1-${{ runner.arch }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            switch-ccache-v1-${{ runner.arch }}-${{ github.sha }}-
+            switch-ccache-v1-${{ runner.arch }}-
       - name: Build the LCEReborn game client
+        id: compile
         run: |
+          export CCACHE_DIR="$PWD/build/switch-ccache"
+          export CCACHE_COMPILERCHECK=content
+          ccache --max-size=1G
+          ccache --zero-stats
+          trap 'ccache --show-stats' EXIT
           cmake -S . -B build/switch -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release -DLCE_BUILD_LAUNCHER=OFF
           cmake --build build/switch --target LCEReborn_nro --parallel 4
+      - name: Save the compiler cache
+        if: ${{ !cancelled() && (steps.compile.outcome == 'success' || steps.compile.outcome == 'failure') && steps.compiler-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: build/switch-ccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
       - name: Stage the Switch SD card files
         run: |
           mkdir -p build/switch-package/LCEReborn

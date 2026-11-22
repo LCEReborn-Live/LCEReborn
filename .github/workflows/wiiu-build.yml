@@ -31,7 +31,7 @@ jobs:
           df -h "$RUNNER_TEMP"
 
       - name: Generate Wii U build inputs
-        run: python3 tools/prepare_wiiu_ci.py
+        run: python3 tools/prepare_wiiu_ci.py --dumps-dir "$RUNNER_TEMP/wiiu-dumps"
 
       - name: Restore the RedHills toolchain cache
         id: redhills-cache
@@ -85,6 +85,23 @@ jobs:
           if-no-files-found: error
           path: |
             build/LCEReborn.wuhb
+            build/BearSSL-LICENSE.txt
+
+      - name: Package the complete Wii U bundle
+        run: |
+          dumps="$RUNNER_TEMP/wiiu-dumps/dumps.json"
+          base=$(jq -er '.base' "$dumps")
+          update=$(jq -er '.update' "$dumps")
+          python3 tools/package.py --base "$base" --update "$update" --output build/LCEReborn-complete.wuhb
+
+      - name: Upload the complete WUHB
+        uses: actions/upload-artifact@v7
+        with:
+          name: wiiu-wuhb-complete
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            build/LCEReborn-complete.wuhb
             build/BearSSL-LICENSE.txt
 
   publish:

@@ -31,13 +31,21 @@ On a Wii U with the native NSSL service, the game adds the same root certificate
 
 ## GitHub Actions
 
-The **Wii U build** workflow runs on manual dispatch on a GitHub-hosted Linux runner. It verifies the Update 688 archive against the game download manifest, generates the build inputs, and uses the Docker build above.
+The **Wii U build** workflow runs on manual dispatch on a GitHub-hosted Linux runner. It verifies the base game and Update 688 archives against the game download manifest, generates the build inputs, and uses the Docker build above.
 
 GitHub Actions caches the compiled RedHills toolchain by Dockerfile before compiling the game. A cache miss requires a full compiler build.
 
-The `wiiu-wuhb` artifact contains `LCEReborn.wuhb`. Prepare `assets/` from your own base game and Update 688 dumps once, then copy its contents into `wiiu/LCEReborn/content/` on the Wii U SD card. In Cemu, use the `sdcard/` folder under its user data directory. Open the downloaded bundle with `python tools/launch_cemu.py "<path to Cemu>" --bundle "<downloaded WUHB>"`, or put it in `wiiu/apps/` on the Wii U SD card.
+The `wiiu-wuhb-complete` artifact contains `LCEReborn-complete.wuhb` with the base game and Update 688 content built in. Extract the WUHB to `wiiu/apps/` on a Wii U SD card for Aroma, or launch it on a PC with `python tools/launch_cemu.py "<path to Cemu>" --bundle "<downloaded WUHB>"`.
 
-The `wiiu-rpx` artifact contains `Minecraft.Client.rpx` and its link map. To make a bundle with your local content included, place the downloaded RPX at `build/Minecraft.Client.rpx` and run the packaging step above.
+The smaller `wiiu-wuhb` artifact contains `LCEReborn.wuhb` for an existing SD card layout. It uses prepared game files in `wiiu/LCEReborn/content/` on the Wii U SD card, or in the `sdcard/` folder under Cemu's user data directory.
+
+The `wiiu-rpx` artifact contains `Minecraft.Client.rpx` and its link map. To combine the downloaded RPX and both of your dumps into a single WUHB, run:
+
+```
+python tools/package.py --base "<base dump>" --update "<Update 688 dump>" --rpx "<downloaded Minecraft.Client.rpx>" --output "build/LCEReborn-complete-local.wuhb"
+```
+
+Open that WUHB in Cemu with `tools/launch_cemu.py --bundle "build/LCEReborn-complete-local.wuhb"`, or copy it to `wiiu/apps/` on an Aroma SD card. The game content is already inside the bundle.
 
 Supply an existing `release_tag` to attach the experimental WUHB and RPX to that release and add the usage instructions to its notes.
 

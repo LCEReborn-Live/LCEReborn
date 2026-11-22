@@ -15,6 +15,7 @@ namespace WiiULiveCosmetics
 namespace
 {
 const size_t kMaxSkinBytes = 512 * 1024;
+const unsigned int kClassic64x64SkinModel = 0x40000u;
 const size_t kMaxAvatars = 192;
 const size_t kMaxAvatarBytes = 4 * 1024 * 1024;
 
@@ -83,6 +84,10 @@ void DownloadOwnSkin(unsigned int user)
             std::memcpy(owned, response.data(), response.size());
             gApp.AddMemoryTextureFile(texture, owned, static_cast<unsigned int>(response.size()));
         }
+        // The texture and geometry reply carries this flag to the other players.
+        _SkinAdjustments adjustments;
+        adjustments.mAnimFlags = kClassic64x64SkinModel;
+        gApp.SetSkinAdjustments(id, adjustments);
         ownSkin = id;
         GameSettings::SetPlayerSkin(0, id, false);
     });

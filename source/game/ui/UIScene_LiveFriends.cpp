@@ -916,7 +916,8 @@ bool UIScene_LiveFriends::JoinEntry(const Entry& entry)
         m_message = L"No joinable world right now.";
         return false;
     }
-    navigateBack();
+    // The network state change opens ConnectingProgress. Returning to the main menu
+    // here would clear the profile that JoinServerAddress locked for the connection.
     return true;
 #else
     if (!entry.joinable) { m_message = L"No joinable world right now."; return false; }

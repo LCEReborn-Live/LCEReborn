@@ -12,6 +12,7 @@
 #include <nn/ac/ac_cpp.h>
 
 #include "platform/wiiu/C4JThreadImpl.hpp"
+#include "platform/wiiu/WiiURelayTls.hpp"
 #elif defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -701,6 +702,9 @@ bool LocalAddress(uint32_t& ip)
 }
 
 TcpSocket::TcpSocket() : m_handle(kInvalid)
+#if LCE_PLATFORM_WIIU
+    , m_tls(0)
+#endif
 {
 }
 
@@ -714,7 +718,28 @@ void TcpSocket::Swap(TcpSocket& other)
     intptr_t handle = m_handle;
     m_handle = other.m_handle;
     other.m_handle = handle;
+#if LCE_PLATFORM_WIIU
+    WiiURelayTls* tls = m_tls;
+    m_tls = other.m_tls;
+    other.m_tls = tls;
+#endif
 }
+
+#if LCE_PLATFORM_WIIU
+bool TcpSocket::EnableRelayTls(const std::string& hostname, const std::string& seed, int timeoutMs, const CancelFlag& cancel)
+{
+    if (m_tls != 0 || m_handle == kInvalid)
+        return false;
+    WiiURelayTls* tls = new WiiURelayTls;
+    if (!tls->Connect(*this, hostname, seed, timeoutMs, cancel))
+    {
+        delete tls;
+        return false;
+    }
+    m_tls = tls;
+    return true;
+}
+#endif
 
 bool TcpSocket::Connect(const Address& address, int timeoutMs, const CancelFlag& cancel, std::string& error)
 {
@@ -851,6 +876,10 @@ bool TcpSocket::Accept(int timeoutMs, TcpSocket& accepted, Address& peer)
 
 bool TcpSocket::SendAll(const void* data, size_t size)
 {
+#if LCE_PLATFORM_WIIU
+    if (m_tls != 0)
+        return m_tls->SendAll(data, size);
+#endif
     const char* bytes = static_cast<const char*>(data);
     while (size > 0)
     {
@@ -868,6 +897,10 @@ bool TcpSocket::SendAll(const void* data, size_t size)
 
 int TcpSocket::Receive(void* data, size_t size, int timeoutMs)
 {
+#if LCE_PLATFORM_WIIU
+    if (m_tls != 0)
+        return m_tls->Receive(data, size, timeoutMs);
+#endif
     if (!IsOpen())
         return -1;
     if (!WaitFor((NativeSocket)m_handle, false, timeoutMs))
@@ -879,12 +912,23 @@ int TcpSocket::Receive(void* data, size_t size, int timeoutMs)
 
 void TcpSocket::Shutdown()
 {
+#if LCE_PLATFORM_WIIU
+    if (m_tls != 0)
+    {
+        m_tls->Shutdown();
+        return;
+    }
+#endif
     if (IsOpen())
         ShutdownNative((NativeSocket)m_handle);
 }
 
 void TcpSocket::Close()
 {
+#if LCE_PLATFORM_WIIU
+    delete m_tls;
+    m_tls = 0;
+#endif
     if (!IsOpen())
         return;
     CloseNative((NativeSocket)m_handle);

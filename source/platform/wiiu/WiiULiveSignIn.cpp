@@ -2,6 +2,7 @@
 #include "game/core/CriticalSection.hpp"
 #include "game/core/System.hpp"
 #include "platform/wiiu/CProfile.hpp"
+#include "platform/wiiu/WiiURelayTls.hpp"
 #include <coreinit/dynload.h>
 #include <coreinit/ios.h>
 #include <coreinit/thread.h>
@@ -33,6 +34,7 @@ const CURLoption kNsslContext = static_cast<CURLoption>(210);
 const CURLoption kNsslVerifyOptions = static_cast<CURLoption>(211);
 const long kVerifyPeerHostnameAndDate = 7;
 const size_t kMaxResponse = 256 * 1024;
+const size_t kMaxSkinResponse = 512 * 1024;
 
 enum class Request { None, Start, Poll, Restore, Presence, Api };
 
@@ -149,7 +151,11 @@ void ClearSession()
 size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
 {
     std::string& output = *static_cast<std::string*>(destination);
-    if (size == 0 || count > (kMaxResponse - output.size()) / size)
+    const bool skin = request == Request::Api && !activeApi.post
+        && activeApi.url.compare(0, sizeof(kApiUrl) - 1, kApiUrl) == 0
+        && activeApi.url.size() >= 5 && activeApi.url.compare(activeApi.url.size() - 5, 5, "/skin") == 0;
+    const size_t limit = skin ? kMaxSkinResponse : kMaxResponse;
+    if (size == 0 || count > (limit - output.size()) / size)
         return 0;
     const size_t length = size * count;
     output.append(bytes, length);
@@ -604,6 +610,11 @@ bool RequestApi(const char* path, const char* body,
     entry.complete = complete;
     pendingApi.push_back(std::move(entry));
     return true;
+}
+
+std::string RelaySeed(const std::string& nonce)
+{
+    return sessionToken.empty() || nonce.empty() ? std::string() : lcenet::RelayTlsSeed(sessionToken, nonce);
 }
 
 const std::string& UserCode() { return userCode; }

@@ -33,6 +33,20 @@ unsigned int Number(const JsonValue& value)
     return value64 <= 0xffffffffULL ? static_cast<unsigned int>(value64) : 0;
 }
 
+std::string TcpEndpoint(const JsonValue& endpoint, bool allowTls)
+{
+    const JsonValue& tls = Field(endpoint, L"tls");
+    if (endpoint.type != JsonValue::Object
+        || (tls.type != JsonValue::Null && (tls.type != JsonValue::Boolean || (!allowTls && tls.text == L"true"))))
+        return std::string();
+    const JsonValue& host = Field(endpoint, L"address");
+    const unsigned int port = Number(Field(endpoint, L"port"));
+    if (port == 0 || port > 65535 || host.type != JsonValue::String || host.text.empty() || host.text.size() > 253
+        || host.text.find_first_not_of(L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-") != std::wstring::npos)
+        return std::string();
+    return std::string(host.text.begin(), host.text.end()) + ':' + std::to_string(port);
+}
+
 void ReadDirectory(long status, const std::string& body)
 {
     refreshing = false;
@@ -47,26 +61,30 @@ void ReadDirectory(long status, const std::string& body)
     std::vector<Listing> fresh;
     for (const JsonValue& row : listings.items)
     {
-        const JsonValue& direct = Field(row, L"direct");
-        const JsonValue& ticketed = Field(row, L"direct_ticketed");
-        if (direct.type != JsonValue::Object || ticketed.type != JsonValue::Number
-            || (ticketed.text != L"0" && ticketed.text != L"1")
-            || Field(direct, L"tls").type != JsonValue::Null)
-            continue;
-        const auto& host = Field(direct, L"address").text;
-        const unsigned int port = Number(Field(direct, L"port"));
         const unsigned int owner = Number(Field(row, L"owner_id"));
         const std::string& username = WiiULiveSignIn::Username();
-        if (Field(row, L"owner").text == std::wstring(username.begin(), username.end()))
+        if (!owner || Field(row, L"owner").text == std::wstring(username.begin(), username.end()))
             continue;
-        if (!owner || port == 0 || port > 65535 || host.empty() || host.size() > 253
-            || host.find_first_not_of(L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-") != std::wstring::npos)
-            continue;
+
         Listing listing = {};
         listing.owner = owner;
-        listing.address = std::string(host.begin(), host.end()) + ':' + std::to_string(port);
-        if (ticketed.text == L"1")
-            listing.address = "live-direct:" + std::to_string(owner) + '@' + listing.address;
+        const JsonValue& relayEndpoint = Field(row, L"relay");
+        const std::string relay = TcpEndpoint(relayEndpoint, true);
+        if (!relay.empty())
+        {
+            const char* prefix = Field(relayEndpoint, L"tls").text == L"true" ? "live-relay-tls:" : "live-relay:";
+            listing.address = prefix + std::to_string(owner) + '@' + relay;
+        }
+        else
+        {
+            const JsonValue& ticketed = Field(row, L"direct_ticketed");
+            listing.address = TcpEndpoint(Field(row, L"direct"), false);
+            if (listing.address.empty() || ticketed.type != JsonValue::Number
+                || (ticketed.text != L"0" && ticketed.text != L"1"))
+                continue;
+            if (ticketed.text == L"1")
+                listing.address = "live-direct:" + std::to_string(owner) + '@' + listing.address;
+        }
         listing.name = Field(row, L"name").text.substr(0, 31);
         const JsonValue& match = Field(row, L"matchmaking");
         listing.miniGame = Number(Field(match, L"mini_game_id"));

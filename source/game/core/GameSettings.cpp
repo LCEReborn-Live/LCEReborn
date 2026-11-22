@@ -29,6 +29,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#elif LCE_PLATFORM_WIIU
+#include "platform/wiiu/WiiULiveCosmetics.hpp"
 #endif
 #include <vector>
 extern C4JStorage* gStorage;
@@ -1284,6 +1286,9 @@ uint32_t GameSettings::GetPlayerSkinId(int profile)
     const uint32_t liveId = LiveCosmeticId();
     if (liveId != 0 && gApp.IsFileInMemoryTextures(CMinecraftApp::getSkinPathFromId(liveId)))
         return liveId;
+#elif LCE_PLATFORM_WIIU
+    if (profile == 0 && WiiULiveCosmetics::PlayerSkinId() != 0)
+        return WiiULiveCosmetics::PlayerSkinId();
 #endif
     unsigned int id = 0;
     if (IsAllowedSkin(profile))

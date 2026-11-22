@@ -19,6 +19,8 @@ const std::string& Username();
 std::wstring ErrorDetail();
 bool IsSignedIn();
 std::string PlayerUuid();
+// Derive TLS entropy from the private session token and a freshly issued ticket or room secret.
+std::string RelaySeed(const std::string& nonce);
 // The callback runs on the game thread. A null body selects GET.
 bool RequestApi(const char* path, const char* body,
                 const std::function<void(long, const std::string&)>& complete);

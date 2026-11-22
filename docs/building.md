@@ -35,9 +35,11 @@ The **Wii U build** workflow runs on manual dispatch on a GitHub-hosted Linux ru
 
 GitHub Actions caches the compiled RedHills toolchain by Dockerfile before compiling the game. A cache miss requires a full compiler build.
 
-The `wiiu-rpx` artifact contains `Minecraft.Client.rpx` and its link map. To make a `.wuhb` locally, run the preparation step above with your base and update dumps, place the downloaded RPX at `build/Minecraft.Client.rpx`, and run the packaging step above.
+The `wiiu-wuhb` artifact contains `LCEReborn.wuhb`. Prepare `assets/` from your own base game and Update 688 dumps once, then copy its contents into `wiiu/LCEReborn/content/` on the Wii U SD card. In Cemu, use the `sdcard/` folder under its user data directory. Open the downloaded bundle with `python tools/launch_cemu.py "<path to Cemu>" --bundle "<downloaded WUHB>"`, or put it in `wiiu/apps/` on the Wii U SD card.
 
-Supply an existing `release_tag` to attach the experimental RPX to that release and add the usage instructions to its notes.
+The `wiiu-rpx` artifact contains `Minecraft.Client.rpx` and its link map. To make a bundle with your local content included, place the downloaded RPX at `build/Minecraft.Client.rpx` and run the packaging step above.
+
+Supply an existing `release_tag` to attach the experimental WUHB and RPX to that release and add the usage instructions to its notes.
 
 ## Options for `build.py`
 

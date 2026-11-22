@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing release tag to receive the experimental Wii U RPX (optional)
+        description: Existing release tag to receive the experimental Wii U builds (optional)
         type: string
 
 permissions:
@@ -63,6 +63,11 @@ jobs:
           rm -f -- "$RUNNER_TEMP/wiiu-redhills.tar.zst"
           python3 tools/build.py
 
+      - name: Package the Wii U homebrew bundle
+        run: |
+          python3 tools/package.py --code-only
+          cp tools/build/third_party/bearssl-LICENSE.txt build/BearSSL-LICENSE.txt
+
       - name: Upload the RPX and link map
         uses: actions/upload-artifact@v7
         with:
@@ -71,6 +76,16 @@ jobs:
           path: |
             build/Minecraft.Client.rpx
             build/Minecraft.Client.map
+            build/BearSSL-LICENSE.txt
+
+      - name: Upload the WUHB
+        uses: actions/upload-artifact@v7
+        with:
+          name: wiiu-wuhb
+          if-no-files-found: error
+          path: |
+            build/LCEReborn.wuhb
+            build/BearSSL-LICENSE.txt
 
   publish:
     if: inputs.release_tag != ''
@@ -85,6 +100,12 @@ jobs:
           name: wiiu-rpx
           path: wiiu-rpx
 
+      - name: Download the Wii U homebrew bundle
+        uses: actions/download-artifact@v7
+        with:
+          name: wiiu-wuhb
+          path: wiiu-wuhb
+
       - name: Attach the experimental build to the existing release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -97,9 +118,13 @@ jobs:
           fi
           gh release view "$RELEASE_TAG" --json body > release.json
           asset="LCEReborn-Live-WiiU-Experimental-$RELEASE_TAG.rpx"
+          bundle="LCEReborn-Live-WiiU-Experimental-$RELEASE_TAG.wuhb"
           cp wiiu-rpx/Minecraft.Client.rpx "$asset"
+          cp wiiu-wuhb/LCEReborn.wuhb "$bundle"
           test -s "$asset"
-          gh release upload "$RELEASE_TAG" "$asset#Experimental Wii U RPX" --clobber
+          test -s "$bundle"
+          gh release upload "$RELEASE_TAG" "$asset#Experimental Wii U RPX" \
+            "$bundle#Experimental Wii U WUHB" wiiu-wuhb/BearSSL-LICENSE.txt --clobber
           python3 - <<'PY'
           import json
           import os
@@ -116,11 +141,11 @@ jobs:
           notes = f'''{start}
           ## Experimental Wii U build
 
-          Download `LCEReborn-Live-WiiU-Experimental-{tag}.rpx` from Assets. This build includes LCE Live account sign-in and Wii U presence. It requires your own decrypted base game and Update 688 dumps.
+          Download `LCEReborn-Live-WiiU-Experimental-{tag}.wuhb` from Assets. Prepare game content from your own decrypted base game and Update 688 dumps.
 
           1. In a [checkout of this build's source](https://github.com/{repo}/tree/{revision}), run `python tools/prepare.py --base "<base dump>" --update "<Update 688 dump>"`.
-          2. Save the downloaded RPX as `build/Minecraft.Client.rpx` and run `python tools/package.py --update "<Update 688 dump>"`.
-          3. Run `python tools/launch_cemu.py "<path to Cemu>"` to open the bundle with the Live API's root certificate, or copy `build/LCEReborn.wuhb` to `wiiu/apps/` on your Wii U's SD card and launch it with Aroma.
+          2. Copy the prepared `assets/` contents into `wiiu/LCEReborn/content/` on the Wii U SD card or in the `sdcard/` directory under Cemu's user data.
+          3. Run `python tools/launch_cemu.py "<path to Cemu>" --bundle "<downloaded WUHB>"` or put the WUHB in `wiiu/apps/` on the Wii U SD card and launch it with Aroma.
           4. In the game, select **LCE Live**. Enter the code at [lcereborn.xyz/authorize](https://lcereborn.xyz/authorize) on a phone or PC, then confirm the sign-in.
 
           See the [Wii U setup guide](https://github.com/{repo}/blob/{revision}/docs/building.md) for details.

@@ -16,6 +16,8 @@
 FSClient* gFileSystemClient = 0;
 FSClient* gFileCacheClient = 0;
 static char s_packsFolder[160];
+static char s_contentFolder[160] = "/vol/content";
+static bool s_hasGameContent;
 
 void stateChangeCallback(FSClient*, FSVolumeState, void*);
 
@@ -26,10 +28,17 @@ unsigned int FileTimeToSystemTime(const FILETIME* fileTime, SYSTEMTIME* systemTi
     return 0;
 }
 
-static void MountPacksFolder()
+static bool HasGameContent(FSCmdBlock& commandBlock, const char* folder)
 {
-    FSCmdBlock commandBlock;
-    FSInitCmdBlock(&commandBlock);
+    char path[256];
+    std::snprintf(path, sizeof(path), "%s/Common/Media/MediaWiiU.arc", folder);
+    FSStat stat;
+    return FSGetStat(gFileSystemClient, &commandBlock, path, &stat, FS_ERROR_FLAG_ALL) == FS_STATUS_OK
+        && (stat.flags & FS_STAT_DIRECTORY) == 0;
+}
+
+static void MountSdCard(FSCmdBlock& commandBlock)
+{
     FSMountSource source;
     char mountPath[128];
     if (FSGetMountSource(gFileSystemClient, &commandBlock, FS_MOUNT_SOURCE_SD, &source, FS_ERROR_FLAG_ALL) != FS_STATUS_OK
@@ -48,7 +57,19 @@ static void MountPacksFolder()
     if (FSGetStat(gFileSystemClient, &commandBlock, path, &stat, FS_ERROR_FLAG_ALL) == FS_STATUS_OK
         && (stat.flags & FS_STAT_DIRECTORY) != 0)
         std::strcpy(s_packsFolder, path);
+    if (!s_hasGameContent)
+    {
+        std::snprintf(path, sizeof(path), "%s/wiiu/LCEReborn/content", mountPath);
+        if (HasGameContent(commandBlock, path))
+        {
+            std::strcpy(s_contentFolder, path);
+            s_hasGameContent = true;
+        }
+    }
 }
+
+const char* WiiUGameContentFolder() { return s_contentFolder; }
+bool WiiUHasGameContent() { return s_hasGameContent; }
 
 const char* WiiUPacksFolder()
 {
@@ -169,7 +190,10 @@ void WiiUInitialise()
     FSInit();
     gFileSystemClient = static_cast<FSClient*>(std::malloc(0x1700));
     FSAddClient(gFileSystemClient, FS_ERROR_FLAG_NONE);
-    MountPacksFolder();
+    FSCmdBlock commandBlock;
+    FSInitCmdBlock(&commandBlock);
+    s_hasGameContent = HasGameContent(commandBlock, s_contentFolder);
+    MountSdCard(commandBlock);
     gFileCacheClient = gFileSystemClient;
     FSStateChangeParams notification = {stateChangeCallback, 0, 0};
     FSSetStateChangeNotification(gFileSystemClient, &notification);

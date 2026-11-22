@@ -92,6 +92,8 @@ unsigned int FileTimeToSystemTime(const FILETIME* fileTime, SYSTEMTIME* systemTi
 extern FSClient* gFileSystemClient;
 extern FSClient* gFileCacheClient;
 void WiiUInitialise();
+const char* WiiUGameContentFolder();
+bool WiiUHasGameContent();
 const char* WiiUPacksFolder();
 bool WiiUListFiles(const char* root, std::vector<std::string>& paths, std::vector<unsigned long long>& sizes);
 bool WiiURemoveAll(const char* path);

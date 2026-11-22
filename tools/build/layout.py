@@ -53,6 +53,10 @@ def lay_out(deps, destination):
         if not os.path.isdir(source):
             raise SystemExit("%s is missing from %s; run tools/build/deps.py first" % (name, deps))
         link_or_copy(source, os.path.join(staging, name))
+    # Only the Wii U build needs BearSSL. Older desktop dependency caches still work.
+    bearssl = os.path.join(deps, "bearssl")
+    if os.path.isdir(bearssl):
+        link_or_copy(bearssl, os.path.join(staging, "bearssl"))
     curl = os.path.join(staging, "curl", "include", "curl")
     shutil.copytree(os.path.join(deps, "curl", "include", "curl"), curl)
     copy_files([os.path.join(OVERRIDES, "curl", "curl", "curlbuild.h")], curl)

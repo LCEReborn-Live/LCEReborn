@@ -107,6 +107,9 @@ private:
     std::vector<int> m_unlocked;
     std::map<int, int> m_achievementTextures;
     std::vector<FaceTexture> m_faceTextures;
+#if LCE_PLATFORM_WIIU
+    unsigned int m_avatarGeneration = 0;
+#endif
 };
 
 #endif

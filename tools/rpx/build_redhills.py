@@ -94,26 +94,28 @@ CRT0_RENAMES = {'__call_dtors__Fv': '_Z12__call_dtorsv'}
 class ThirdParty:
     """Where the third-party sources and headers are."""
 
-    def __init__(self, zlib, libpng, libpng_wiiu, curl_include, boost, stb, rapidxml):
+    def __init__(self, zlib, libpng, libpng_wiiu, curl_include, boost, stb, rapidxml, bearssl):
         self.zlib, self.libpng, self.libpng_wiiu = zlib, libpng, libpng_wiiu
         self.curl_include, self.boost, self.stb, self.rapidxml = curl_include, boost, stb, rapidxml
+        self.bearssl = bearssl
 
     @classmethod
     def from_directory(cls, root):
         return cls(root / 'zlib', root / 'libpng', root / 'libpng-wiiu', root / 'curl/include', root / 'boost',
-                   root / 'stb', root / 'rapidxml')
+                   root / 'stb', root / 'rapidxml', root / 'bearssl')
 
     @classmethod
     def reconstruction_tree(cls):
         return cls(ROOT / 'evidence/upstream/zlib', ROOT / 'evidence/upstream/libpng',
                    ROOT / 'work/providers/libpng-wiiu', ROOT / 'third_party/curl-headers-7.38.0/include',
-                   ROOT / 'scripts/syntax-shim', ROOT / 'evidence/upstream', ROOT / 'evidence/upstream/rapidxml')
+                   ROOT / 'scripts/syntax-shim', ROOT / 'evidence/upstream', ROOT / 'evidence/upstream/rapidxml',
+                   ROOT / 'evidence/upstream/bearssl')
 
     def missing(self):
         required = [self.zlib / 'zlib.h', self.libpng / 'png.c', self.libpng_wiiu / 'png.h',
                     self.libpng_wiiu / 'pngwrite.c', self.libpng_wiiu / 'pnglibconf.h',
                     self.curl_include / 'curl/curlbuild.h', self.boost / 'boost/shared_ptr.hpp',
-                    self.stb / 'stb_image.h', self.rapidxml / 'rapidxml.hpp']
+                    self.stb / 'stb_image.h', self.rapidxml / 'rapidxml.hpp', self.bearssl / 'inc/bearssl.h']
         return [path for path in required if not path.is_file()]
 
 
@@ -132,7 +134,7 @@ class Build:
         game_includes = ['-I' + str(SOURCE), '-I' + str(wut / 'include'), '-I' + str(third_party.curl_include),
                          '-I' + str(third_party.stb), '-I' + str(third_party.zlib),
                          '-I' + str(third_party.libpng_wiiu), '-I' + str(third_party.libpng),
-                         '-I' + str(third_party.rapidxml)]
+                         '-I' + str(third_party.rapidxml), '-I' + str(third_party.bearssl / 'inc')]
         # The semantic flags of the original game build plus the wut toolchain macros.
         self.game_flags = TARGET + [
             '-std=gnu++11', '-fshort-wchar', '-fsigned-char', '-frtti', '-fno-exceptions', '-fno-threadsafe-statics',
@@ -273,6 +275,13 @@ def live_root_certificate(out):
     lines = [', '.join('0x%02x' % byte for byte in certificate[offset:offset + 12]) + ',\n'
              for offset in range(0, len(certificate), 12)]
     write_if_changed(out / 'wiiu_live_root_ca.inc', ''.join(lines))
+    pem = ROOT / 'tools/gamedata/isrg-root-x2.pem'
+    certificate = ssl.PEM_cert_to_DER_cert(pem.read_text(encoding='ascii'))
+    if hashlib.sha256(certificate).hexdigest() != '69729b8e15a86efc177a57afb7171dfc64add28c2fca8cf1507e34453ccb1470':
+        raise SystemExit('ISRG Root X2 certificate fingerprint does not match')
+    lines = [', '.join('0x%02x' % byte for byte in certificate[offset:offset + 12]) + ',\n'
+             for offset in range(0, len(certificate), 12)]
+    write_if_changed(out / 'wiiu_live_root_x2_ca.inc', ''.join(lines))
 
 
 def build_providers(build, out, jobs):
@@ -296,7 +305,16 @@ def build_providers(build, out, jobs):
                      'quazal zlib'):
         raise SystemExit('provider compile failed')
     archive(build, out / 'libquazal_zlib.a', [obj for _, obj in quazal_units])
-    return [out / 'liblegacy_png.a', out / 'libquazal_zlib.a']
+    bearssl = third_party.bearssl
+    ssl_sources = sorted((bearssl / 'src').rglob('*.c'))
+    ssl_units = [(source, out / 'bearssl' / source.relative_to(bearssl / 'src').with_suffix('.o'))
+                 for source in ssl_sources]
+    ssl_flags = build.runtime_flags + ['-I' + str(bearssl / 'inc'), '-I' + str(bearssl / 'src'),
+                                       '-DBR_USE_URANDOM=0', '-DBR_USE_UNIX_TIME=0']
+    if compile_units(build.clang, ssl_units, ssl_flags, jobs, 'BearSSL'):
+        raise SystemExit('BearSSL compile failed')
+    archive(build, out / 'libbearssl.a', [obj for _, obj in ssl_units])
+    return [out / 'liblegacy_png.a', out / 'libquazal_zlib.a', out / 'libbearssl.a']
 
 
 def crt0_source():

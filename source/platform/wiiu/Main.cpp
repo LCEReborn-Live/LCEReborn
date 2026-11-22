@@ -34,6 +34,7 @@
 #include "platform/wiiu/WiiULiveSignIn.hpp"
 #include "platform/wiiu/WiiULiveSocial.hpp"
 #include "platform/wiiu/WiiULiveGames.hpp"
+#include "platform/wiiu/WiiULiveCosmetics.hpp"
 #include "platform/wiiu/FJ_WiiUDRC.hpp"
 #include "game/client/render/Renderer.hpp"
 #include "game/core/CriticalSection.hpp"
@@ -156,6 +157,11 @@ int main()
     nn::ac::Initialize();
     WiiUInitialise();
 
+    if (!WiiUHasGameContent())
+    {
+        OSReport("LCEReborn: copy the prepared game content to wiiu/LCEReborn/content on the SD card.\n");
+        gApp.FatalLoadError(L"Missing game content");
+    }
     gApp.loadMediaArchive();
     if (gApp.ReadProductCodes() == 0)
         gApp.FatalLoadError(L"ReadProductCodes");
@@ -325,6 +331,7 @@ int main()
         WiiULiveSignIn::TickPresence(gApp.GetGameStarted() != 0);
         WiiULiveSocial::Tick();
         WiiULiveGames::Tick();
+        WiiULiveCosmetics::Tick();
         InfoBarManager::StartTimingCategory(InfoBarManager::eTimingCagegory_UITick);
         gConsoleUIController.tick();
         InfoBarManager::EndTimingCategory(InfoBarManager::eTimingCagegory_UITick);

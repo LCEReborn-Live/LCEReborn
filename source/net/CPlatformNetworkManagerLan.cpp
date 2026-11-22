@@ -28,6 +28,7 @@
 #include "platform/pc/PcLiveBridge.hpp"
 #elif LCE_PLATFORM_WIIU
 #include "platform/wiiu/WiiULiveGames.hpp"
+#include "platform/wiiu/WiiULiveRelay.hpp"
 #endif
 
 namespace
@@ -335,6 +336,17 @@ void CPlatformNetworkManagerLan::DoWork()
     FinishJoining();
     ProcessStateChanges();
     UpdateBeacon();
+#if LCE_PLATFORM_WIIU
+    EnterCriticalSection(&m_lock);
+    const bool relayHost = m_host && m_listening && !m_localGame && m_internalState == eState_Playing
+        && m_sessionData.m_bGameStarted;
+    const bool privateGame = m_privateGame;
+    const unsigned int miniGame = m_matchmaking ? (unsigned int)m_sessionData.m_miniGameId : 0;
+    const unsigned int firstFilter = m_matchmakingAttributes[0];
+    const unsigned int secondFilter = m_matchmakingAttributes[1];
+    LeaveCriticalSection(&m_lock);
+    WiiULiveRelay::TickHost(relayHost, privateGame, miniGame, firstFilter, secondFilter);
+#endif
     const int64_t liveNow = lcenet::NowMs();
     if (liveNow - g_liveUpdated >= 1000)
     {
@@ -1852,6 +1864,9 @@ void CPlatformNetworkManagerLan::StartListening()
 
 void CPlatformNetworkManagerLan::StopListening()
 {
+#if LCE_PLATFORM_WIIU
+    WiiULiveRelay::StopHosting();
+#endif
     if (!m_listening)
         return;
     EnterCriticalSection(&m_acceptLock);
@@ -1911,6 +1926,18 @@ void CPlatformNetworkManagerLan::AdoptAcceptedSockets()
     EnterCriticalSection(&m_acceptLock);
     accepted.swap(m_acceptedSockets);
     LeaveCriticalSection(&m_acceptLock);
+#if LCE_PLATFORM_WIIU
+    for (;;)
+    {
+        lcenet::TcpSocket socket;
+        AcceptedSocket guest;
+        if (!WiiULiveRelay::TakeGuest(socket, guest.peer))
+            break;
+        guest.socket = new lcenet::TcpSocket;
+        guest.socket->Swap(socket);
+        accepted.push_back(guest);
+    }
+#endif
     if (accepted.empty())
         return;
     EnterCriticalSection(&m_lock);

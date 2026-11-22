@@ -57,6 +57,9 @@ private:
         if (Match("true") || Match("false"))
         {
             value.type = JsonValue::Boolean;
+#if LCE_PLATFORM_WIIU
+            value.text = lead == 't' ? L"true" : L"false";
+#endif
             return true;
         }
         if (Match("null"))

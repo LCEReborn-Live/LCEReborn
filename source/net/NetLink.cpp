@@ -32,7 +32,9 @@ struct Link::LiveJoinTicket
 {
     C4JCriticalSection lock;
     bool finished = false;
+    bool tls = false;
     std::string ticket;
+    std::string tlsSeed;
     LiveJoinTicket() { InitializeCriticalSection(&lock); }
     ~LiveJoinTicket() { DeleteCriticalSection(&lock); }
 };
@@ -94,12 +96,15 @@ void Link::Connect(const std::string& address)
 {
     m_targetText = address;
 #if LCE_PLATFORM_WIIU
-    const std::string prefix = "live-direct:";
-    if (address.compare(0, prefix.size(), prefix) == 0)
+    const bool relay = address.compare(0, sizeof("live-relay:") - 1, "live-relay:") == 0;
+    const bool tls = address.compare(0, sizeof("live-relay-tls:") - 1, "live-relay-tls:") == 0;
+    const bool direct = address.compare(0, sizeof("live-direct:") - 1, "live-direct:") == 0;
+    if (relay || tls || direct)
     {
         m_liveJoinTicket = std::make_shared<LiveJoinTicket>();
         const auto state = m_liveJoinTicket;
-        const size_t separator = address.find('@', prefix.size());
+        state->tls = tls;
+        const size_t separator = address.find('@');
         const unsigned int owner = WiiULiveGames::TicketOwner(address);
         if (separator == std::string::npos || owner == 0)
         {
@@ -122,7 +127,9 @@ void Link::Connect(const std::string& address)
                             ticket.assign(text.begin(), text.end());
                     }
                 }
+                const std::string seed = state->tls ? WiiULiveSignIn::RelaySeed(ticket) : std::string();
                 EnterCriticalSection(&state->lock);
+                state->tlsSeed = seed;
                 state->ticket.swap(ticket);
                 state->finished = true;
                 LeaveCriticalSection(&state->lock);
@@ -314,6 +321,7 @@ void Link::ReadLoop()
         std::string error;
 #if LCE_PLATFORM_WIIU
         std::string ticket;
+        std::string tlsSeed;
         if (m_liveJoinTicket)
         {
             const int64_t deadline = NowMs() + kConnectTimeoutMs;
@@ -322,7 +330,10 @@ void Link::ReadLoop()
                 EnterCriticalSection(&m_liveJoinTicket->lock);
                 const bool finished = m_liveJoinTicket->finished;
                 if (finished)
+                {
                     ticket.swap(m_liveJoinTicket->ticket);
+                    tlsSeed.swap(m_liveJoinTicket->tlsSeed);
+                }
                 LeaveCriticalSection(&m_liveJoinTicket->lock);
                 if (finished)
                     break;
@@ -355,6 +366,12 @@ void Link::ReadLoop()
             return;
         }
 #if LCE_PLATFORM_WIIU
+        if (m_liveJoinTicket && m_liveJoinTicket->tls
+            && !socket.EnableRelayTls(m_targetText.substr(0, m_targetText.rfind(':')), tlsSeed, kConnectTimeoutMs, *this))
+        {
+            Fail("Could not establish a secure connection to the Live relay.");
+            return;
+        }
         if (!ticket.empty())
         {
             const std::string line = "{\"ticket\":\"" + ticket + "\"}\n";

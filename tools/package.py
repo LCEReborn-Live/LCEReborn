@@ -13,6 +13,9 @@ Run tools/prepare.py and tools/build.py first. This writes build/LCEReborn.wuhb:
 The bundle is its own title with its own saves; it needs no Wii U game installed.
 Open it in Cemu with tools/launch_cemu.py, or copy it to
 wiiu/apps/ on the SD card for Aroma.
+
+Use --code-only to package the RPX for use with prepared content in
+wiiu/LCEReborn/content on an SD card or Cemu's virtual SD card.
 """
 import argparse
 import gzip
@@ -83,11 +86,12 @@ def build_bundle(update):
 
     meta = root.add(wuhb.Dir("meta"))
     meta.add(wuhb.file_bytes("meta.ini", wuhb.meta_ini(LONG_NAME, SHORT_NAME, AUTHOR)))
-    for name in META_IMAGES:
-        image = read_file(os.path.join(update, "meta", name + ".tga"))
-        meta.add(wuhb.file_bytes(name + ".tga.gz", gzip.compress(image, 9, mtime=0)))
-
-    add_content(root.add(wuhb.Dir("content")))
+    content = root.add(wuhb.Dir("content"))
+    if update is not None:
+        for name in META_IMAGES:
+            image = read_file(os.path.join(update, "meta", name + ".tga"))
+            meta.add(wuhb.file_bytes(name + ".tga.gz", gzip.compress(image, 9, mtime=0)))
+        add_content(content)
     return root
 
 
@@ -111,15 +115,21 @@ def package(update):
 
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--update", required=True, help="extracted update v688 dump (folder with code/, content/, meta/)")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--update", help="extracted update v688 dump (folder with code/, content/, meta/)")
+    mode.add_argument("--code-only", action="store_true",
+                      help="use game content from wiiu/LCEReborn/content on the SD card at runtime")
     args = parser.parse_args(argv)
     try:
-        check_inputs(args.update)
+        if not args.code_only:
+            check_inputs(args.update)
         package(args.update)
     except (PackageError, wuhb.WuhbError, OSError) as error:
         print("error: %s" % error, file=sys.stderr)
         return 1
     print("packaged %s (title %016X)" % (os.path.relpath(BUNDLE, ROOT), wuhb.title_id(LONG_NAME, SHORT_NAME, AUTHOR)))
+    if args.code_only:
+        print("game files go in wiiu/LCEReborn/content on the SD card or Cemu's virtual SD card")
     print('run it with: python tools/launch_cemu.py "<path to Cemu>"')
     return 0
 

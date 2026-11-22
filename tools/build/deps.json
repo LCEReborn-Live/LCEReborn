@@ -1,4 +1,12 @@
 {
+  "bearssl": {
+    "url": "https://www.bearssl.org/bearssl-0.6.tar.gz",
+    "strip": "bearssl-0.6",
+    "dest": "bearssl",
+    "version": "0.6",
+    "license": "MIT",
+    "tree_sha256": "b9103ffd47eb443f245e2dcdfc4decf13d1ea297707209a0fe5e6626913f03fd"
+  },
   "zlib": {
     "url": "https://zlib.net/fossils/zlib-1.2.5.tar.gz",
     "strip": "zlib-1.2.5",

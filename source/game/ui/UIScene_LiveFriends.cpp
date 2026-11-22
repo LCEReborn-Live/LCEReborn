@@ -13,6 +13,7 @@
 #include "platform/CProfile.hpp"
 #include "platform/wiiu/WiiULiveSocial.hpp"
 #include "platform/wiiu/WiiULiveGames.hpp"
+#include "platform/wiiu/WiiULiveCosmetics.hpp"
 #endif
 #include "game/ui/UILiveAvatar.hpp"
 #include "game/core/System.hpp"
@@ -328,13 +329,22 @@ bool UIScene_LiveFriends::HandleMouseInput()
 
 int UIScene_LiveFriends::GetFaceTexture(const Entry& entry)
 {
+    std::string revision = entry.revision;
+    std::vector<unsigned char> bytes;
+#if LCE_PLATFORM_WIIU
+    const std::string* png = WiiULiveCosmetics::AvatarSkin(entry.id, revision);
+    if (png == NULL) return -1;
+#endif
     for (size_t index = 0; index < m_faceTextures.size(); ++index)
-        if (m_faceTextures[index].userId == entry.id && m_faceTextures[index].revision == entry.revision) return m_faceTextures[index].texture;
+        if (m_faceTextures[index].userId == entry.id && m_faceTextures[index].revision == revision) return m_faceTextures[index].texture;
 
+#if LCE_PLATFORM_WIIU
+    bytes.assign(png->begin(), png->end());
+#else
     wchar_t fileName[64];
     std::swprintf(fileName, 64, L"friend-%u.skin.png", entry.id);
-    std::vector<unsigned char> bytes;
     if (!ReadSkin(fileName, bytes)) return -1;
+#endif
 
     BufferedImage skin(&bytes[0], static_cast<unsigned int>(bytes.size()));
     if (skin.getData() == NULL || skin.getWidth() < 64 || skin.getHeight() < 16) return -1;
@@ -362,7 +372,7 @@ int UIScene_LiveFriends::GetFaceTexture(const Entry& entry)
     Minecraft* minecraft = Minecraft::GetInstance();
     if (minecraft == NULL || minecraft->getTextureManager() == NULL) return -1;
     const int texture = minecraft->getTextureManager()->getTexture(&face, C4JRender::eTextureFormat_RGBA8, false);
-    m_faceTextures.push_back(FaceTexture(entry.id, texture, entry.revision));
+    m_faceTextures.push_back(FaceTexture(entry.id, texture, revision));
     GlStateManager::bindTexture(texture);
     GlStateManager::texParameteri(0, 1, 1);
     return texture;
@@ -526,7 +536,7 @@ int UIScene_LiveFriends::GetAchievementTexture(int id)
 
 std::wstring UIScene_LiveFriends::RegisterFaceIcon(const Entry& entry)
 {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
     return RegisterLiveFaceIcon(*this, entry.id, entry.revision);
 #else
     (void)entry;
@@ -645,7 +655,17 @@ bool UIScene_LiveFriends::ReadSocial()
     const bool valid = !std::ferror(file) && snapshot.size() < 65536;
     std::fclose(file);
 #endif
-    if (!valid || (m_haveSnapshot && snapshot == m_snapshot)) return false;
+    if (!valid) return false;
+#if LCE_PLATFORM_WIIU
+    const unsigned int generation = WiiULiveCosmetics::AvatarGeneration();
+    const bool avatarsChanged = generation != m_avatarGeneration;
+    m_avatarGeneration = generation;
+    if (avatarsChanged)
+        ReleaseFaceTextures();
+#else
+    const bool avatarsChanged = false;
+#endif
+    if (!avatarsChanged && m_haveSnapshot && snapshot == m_snapshot) return false;
     for (int tab = 0; tab < eTab_Count; ++tab)
     {
         const unsigned int selected = m_lists[tab].getCurrentSelection();
@@ -752,7 +772,7 @@ void UIScene_LiveFriends::PollLive()
         FILE* file = PcLiveBridge::Open(L"social-profile.tmp", L"wb");
         if (file) { std::fprintf(file, "%u", id); std::fclose(file); PcLiveBridge::Rename(L"social-profile.tmp", L"social-profile.txt"); }
 #elif LCE_PLATFORM_WIIU
-        WiiULiveSocial::SelectProfile(m_tab == eTab_Friends ? id : 0);
+        WiiULiveSocial::SelectProfile(m_tab == eTab_Friends || m_tab == eTab_Invites ? id : 0);
 #endif
     }
 #if LCE_PLATFORM_PC
@@ -893,7 +913,7 @@ bool UIScene_LiveFriends::JoinEntry(const Entry& entry)
 #if LCE_PLATFORM_WIIU
     if (!gProfile->AllowedToPlayMultiplayer(m_playerId) || !WiiULiveGames::Join(entry.id))
     {
-        m_message = L"No supported direct connection for this world.";
+        m_message = L"No joinable world right now.";
         return false;
     }
     navigateBack();

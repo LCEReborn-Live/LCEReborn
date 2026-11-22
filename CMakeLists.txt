@@ -40,6 +40,10 @@ target_compile_definitions(lce_common INTERFACE
   BOOST_NO_EXCEPTIONS
   $<$<CONFIG:Debug,RelWithDebInfo>:LCE_DEBUG_BUILD=1>)
 
+if(NINTENDO_SWITCH)
+  target_compile_definitions(lce_common INTERFACE LCE_PLATFORM_SWITCH=1)
+endif()
+
 if(MSVC)
   target_compile_definitions(lce_common INTERFACE
     _HAS_EXCEPTIONS=0
@@ -64,11 +68,38 @@ set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
 set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(SDL3
-  URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.16/SDL3-3.4.16.tar.gz
-  URL_HASH SHA256=7322236cd12090c3eb40b9728be4d49c76f66ad17d04369584d4ecad5cf77c68
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+if(NINTENDO_SWITCH)
+  # The devkitPro fork has libnx backends for video, gamepad, audio and input.
+  set(switch_portlibs_include "${DEVKITPRO}/portlibs/switch/include")
+  find_package(OpenGL CONFIG REQUIRED PATHS "${DEVKITPRO}/portlibs/switch/lib/cmake/OpenGL" NO_DEFAULT_PATH)
+  # SDL calls the desktop FindOpenGL module, which expects GLX on this target.
+  # Keep Mesa's include path available to SDL's actual desktop GL header probe.
+  set(OPENGL_INCLUDE_DIR "${OPENGL_INCLUDE_DIR}" CACHE PATH "devkitPro Mesa OpenGL headers" FORCE)
+  unset(HAVE_OPENGL CACHE)
+  set(SDL_OPENGL ON CACHE BOOL "" FORCE)
+  set(SDL_OPENGLES ON CACHE BOOL "" FORCE)
+  set(SDL_PTHREADS ON CACHE BOOL "" FORCE)
+  set(SDL_PTHREADS_PRIVATE ON)
+  set(SDL_VULKAN OFF CACHE BOOL "" FORCE)
+  set(SDL_HIDAPI OFF CACHE BOOL "" FORCE)
+  set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(SDL3
+    URL https://codeload.github.com/devkitPro/SDL/tar.gz/c329016c0e338ab4397ad930f83330c9fe058348
+    URL_HASH SHA256=6047e4787f105ab4a0c6293ee3090ce5d1ebad112fcbe2a3e5a8874b0cc6f709
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+else()
+  FetchContent_Declare(SDL3
+    URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.16/SDL3-3.4.16.tar.gz
+    URL_HASH SHA256=7322236cd12090c3eb40b9728be4d49c76f66ad17d04369584d4ecad5cf77c68
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+endif()
 FetchContent_MakeAvailable(SDL3)
+if(NINTENDO_SWITCH)
+  target_include_directories(SDL3-static SYSTEM PRIVATE "${switch_portlibs_include}")
+  if(NOT HAVE_OPENGL OR NOT HAVE_OPENGL_EGL)
+    message(FATAL_ERROR "The Nintendo Switch client requires SDL with desktop OpenGL and EGL from switch-mesa.")
+  endif()
+endif()
 
 # Opus keeps game voice traffic small enough for relay sessions while keeping end-to-end latency low.
 set(OPUS_BUILD_SHARED_LIBRARY OFF CACHE BOOL "" FORCE)
@@ -150,6 +181,18 @@ file(GLOB_RECURSE LCE_PLATFORM_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/platform
 list(FILTER LCE_PLATFORM_SOURCES EXCLUDE REGEX "/platform/pc/audio/")
 # Each program's entry point: the game's Main.cpp and the dedicated server's ServerMain.cpp.
 list(FILTER LCE_PLATFORM_SOURCES EXCLUDE REGEX "/platform/pc/(Server)?Main\\.cpp$")
+if(NINTENDO_SWITCH)
+  list(FILTER LCE_PLATFORM_SOURCES EXCLUDE REGEX "/platform/pc/(PcCrashReport|PcDiscord|PcServer|PcStopSignals)\\.cpp$")
+  list(APPEND LCE_PLATFORM_SOURCES
+    "${LCE_SOURCE}/platform/switch/SwitchRuntime.cpp"
+    "${LCE_SOURCE}/platform/switch/SwitchDesktopServices.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveSignIn.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveSocial.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveGames.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveCosmetics.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveRelay.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiURelayTls.cpp")
+endif()
 # The LAN and internet play shared with the Wii U build.
 file(GLOB LCE_NET_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/net/*.cpp")
 list(APPEND LCE_PLATFORM_SOURCES ${LCE_NET_SOURCES})
@@ -159,6 +202,27 @@ list(APPEND LCE_PLATFORM_SOURCES
   "${LCE_SOURCE}/platform/wiiu/System.cpp")
 add_library(lce_platform OBJECT ${LCE_PLATFORM_SOURCES})
 target_link_libraries(lce_platform PRIVATE lce_common lce_zlib SDL3::SDL3-static)
+if(NINTENDO_SWITCH)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  set(live_certs "${CMAKE_BINARY_DIR}/live-certs")
+  execute_process(
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/gamedata/live_roots.py" "${live_certs}"
+    COMMAND_ERROR_IS_FATAL ANY)
+  set(bearssl "${CMAKE_SOURCE_DIR}/build/third_party/bearssl")
+  file(GLOB_RECURSE bearssl_sources CONFIGURE_DEPENDS "${bearssl}/src/*.c")
+  if(NOT bearssl_sources)
+    message(FATAL_ERROR "Run tools/build/layout.py to stage BearSSL before building the Switch client.")
+  endif()
+  add_library(lce_switch_bearssl STATIC ${bearssl_sources})
+  target_include_directories(lce_switch_bearssl PUBLIC "${bearssl}/inc" PRIVATE "${bearssl}/src")
+  target_compile_definitions(lce_switch_bearssl PRIVATE BR_USE_URANDOM=0 BR_USE_GETENTROPY=0)
+  find_library(switch_curl NAMES curl PATHS "${DEVKITPRO}/portlibs/switch/lib" NO_DEFAULT_PATH REQUIRED)
+  find_library(switch_curl_zlib NAMES z PATHS "${DEVKITPRO}/portlibs/switch/lib" NO_DEFAULT_PATH REQUIRED)
+  target_include_directories(lce_platform PRIVATE "${live_certs}")
+  set_property(SOURCE "${LCE_SOURCE}/platform/wiiu/WiiULiveSignIn.cpp" APPEND
+    PROPERTY INCLUDE_DIRECTORIES "${switch_portlibs_include}")
+  target_link_libraries(lce_platform PRIVATE lce_switch_bearssl)
+endif()
 set_target_properties(lce_platform PROPERTIES CXX_STANDARD 17)
 add_custom_target(lce_build_info
   COMMAND "${CMAKE_COMMAND}" -DSOURCE_DIR="${CMAKE_SOURCE_DIR}" -DOUTPUT="${CMAKE_BINARY_DIR}/generated/BuildInfo.hpp"
@@ -202,13 +266,16 @@ function(lce_add_program target main)
   add_executable(${target} "${LCE_SOURCE}/platform/pc/${main}" $<TARGET_OBJECTS:lce_game>
                  $<TARGET_OBJECTS:lce_platform> $<TARGET_OBJECTS:lce_audio>)
   target_link_libraries(${target} PRIVATE lce_common lce_png lce_zlib SDL3::SDL3-static opus lce_rnnoise)
+  if(NINTENDO_SWITCH)
+    target_link_libraries(${target} PRIVATE lce_switch_bearssl "${switch_curl}" "${switch_curl_zlib}")
+  endif()
   set_target_properties(${target} PROPERTIES CXX_STANDARD 17)
   target_compile_definitions(${target} PRIVATE LCE_DISCORD_APP_ID="${LCE_DISCORD_APP_ID}")
   if(WIN32)
     target_link_libraries(${target} PRIVATE shell32 ws2_32 dbghelp)
     # The executable's icon (tools/pcart/make_icon.py).
     target_sources(${target} PRIVATE "${CMAKE_BINARY_DIR}/LCEReborn.rc")
-  else()
+  elseif(NOT NINTENDO_SWITCH)
     find_package(Threads REQUIRED)
     target_link_libraries(${target} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
     # Function names in crash report stacks.
@@ -227,6 +294,22 @@ if(WIN32)
 endif()
 
 lce_add_program(LCEReborn Main.cpp)
+if(NINTENDO_SWITCH)
+  set(LCE_SWITCH_ASSETS_DIR "" CACHE PATH "Prepared base game and Update 688 assets for the full Switch NRO")
+  include(tools/build/switch-romfs.cmake)
+
+  nx_generate_nacp(OUTPUT LCEReborn.nacp NAME "LCEReborn" AUTHOR "LCEReborn" VERSION "0.1.0")
+  lce_switch_romfs(switch_client_romfs)
+  nx_create_nro(LCEReborn_nro TARGET LCEReborn OUTPUT LCEReborn.nro NACP LCEReborn.nacp ROMFS switch_client_romfs)
+
+  if(LCE_SWITCH_ASSETS_DIR)
+    lce_switch_romfs(switch_full_romfs "${LCE_SWITCH_ASSETS_DIR}")
+    nx_create_nro(LCEReborn_full_nro TARGET LCEReborn OUTPUT LCEReborn-Full.nro
+                  NACP LCEReborn.nacp ROMFS switch_full_romfs)
+  endif()
+  return()
+endif()
+
 lce_add_program(LCERebornServer ServerMain.cpp)
 # The PC interface art (tools/pcart) is read from resources/ in the working folder unless --resource-dir is given.
 add_custom_command(TARGET LCEReborn POST_BUILD

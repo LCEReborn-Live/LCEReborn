@@ -18,7 +18,7 @@
 #include "game/world/generation/GlideRingGenerator.hpp"
 #include "game/client/render/TextureUtil.hpp"
 #include "game/core/BufferedImage.hpp"
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
 #include "platform/pc/PcPaths.hpp"
 #endif
 
@@ -1034,6 +1034,8 @@ void TextureAtlas::stitch()
     {
 #if LCE_PLATFORM_WIIU
         const std::string iconPath = "/vol/content/resources/experimental/shield_icon.png";
+#elif LCE_PLATFORM_SWITCH
+        const std::string iconPath = "/vol/resources/experimental/shield_icon.png";
 #else
         const std::string iconPath = PcResourceRoot() + "/experimental/shield_icon.png";
 #endif

@@ -4,6 +4,10 @@
 #include "platform/pc/PcPaths.hpp"
 #include "platform/pc/PcPromptArt.hpp"
 #include "platform/pc/Renderer.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/switch/SwitchRuntime.hpp"
+#include <switch.h>
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -357,6 +361,11 @@ void CInput::Initialise(int count, unsigned char gameMapCount, unsigned char men
 
     int gamepadCount = 0;
     SDL_JoystickID* gamepads = SDL_GetGamepads(&gamepadCount);
+#if LCE_PLATFORM_SWITCH
+    char inputStatus[80];
+    std::snprintf(inputStatus, sizeof(inputStatus), "SDL detected %d gamepad(s)", gamepadCount);
+    SwitchLogStartupStage(inputStatus);
+#endif
     if (gamepads != 0)
     {
         for (int index = 0; index < gamepadCount; ++index)
@@ -401,6 +410,9 @@ void CInput::AddGamepad(unsigned int gamepadId)
     joypads[freeSlot].gamepad = gamepad;
     joypads[freeSlot].gamepadId = gamepadId;
     ResolveFaceButtons(joypads[freeSlot]);
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Opened a Switch gamepad");
+#endif
 }
 
 void CInput::ResolveFaceButtons(Joypad& joypad)
@@ -883,6 +895,14 @@ void CInput::ReadGamepad(Joypad& joypad)
             joypad.padButtons |= joypad.padFaceButtons[face];
         }
     }
+#if LCE_PLATFORM_SWITCH
+    static bool reportedGamepadInput = false;
+    if (joypad.padButtons != 0 && !reportedGamepadInput)
+    {
+        reportedGamepadInput = true;
+        SwitchLogStartupStage("Received the first Switch gamepad button press");
+    }
+#endif
     joypad.padLeftX = ClampStick(SDL_GetGamepadAxis(joypad.gamepad, SDL_GAMEPAD_AXIS_LEFTX));
     joypad.padLeftY = ClampStick(-static_cast<int>(SDL_GetGamepadAxis(joypad.gamepad, SDL_GAMEPAD_AXIS_LEFTY)));
     joypad.padRightX = ClampStick(SDL_GetGamepadAxis(joypad.gamepad, SDL_GAMEPAD_AXIS_RIGHTX));
@@ -2213,6 +2233,26 @@ void CInput::TickKeyboard()
 {
     if (keyboardState == EKeyboardState_Requested)
     {
+#if LCE_PLATFORM_SWITCH
+        SwkbdConfig config;
+        if (R_SUCCEEDED(swkbdCreate(&config, 0)))
+        {
+            swkbdConfigMakePresetDefault(&config);
+            const std::string title = WideToUtf8(keyboardTitle);
+            const std::string initial = WideToUtf8(keyboardText);
+            swkbdConfigSetHeaderText(&config, title.c_str());
+            swkbdConfigSetInitialText(&config, initial.c_str());
+            swkbdConfigSetStringLenMax(&config, keyboardMaximumLength);
+            char text[kKeyboardTextLimit * 4 + 1] = {};
+            const Result result = swkbdShow(&config, text, sizeof(text));
+            swkbdClose(&config);
+            keyboardEditText.clear();
+            if (R_SUCCEEDED(result))
+                HandleKeyboardTextInput(text);
+            FinishKeyboard(R_SUCCEEDED(result));
+            return;
+        }
+#endif
         keyboardEditText.assign(keyboardText, keyboardText + std::wcslen(keyboardText));
         keyboardAccepted = false;
         keyboardCancelled = false;

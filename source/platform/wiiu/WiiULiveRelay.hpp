@@ -11,6 +11,9 @@ namespace WiiULiveRelay
 {
 void TickHost(bool hosting, bool privateGame, unsigned int miniGame, unsigned int firstFilter, unsigned int secondFilter);
 void StopHosting();
+#if LCE_PLATFORM_SWITCH
+void Shutdown();
+#endif
 bool TakeGuest(lcenet::TcpSocket& socket, lcenet::Address& peer);
 }
 

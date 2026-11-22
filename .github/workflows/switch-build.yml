@@ -1,0 +1,148 @@
+name: Nintendo Switch build
+
+on:
+  push:
+    branches: [nintendo-switch-port]
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/switch-build.yml
+      - CMakeLists.txt
+      - source/platform/switch/**
+      - tools/build/switch-romfs.cmake
+
+permissions:
+  contents: read
+
+concurrency:
+  group: switch-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: devkitpro/devkita64:20251231
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates ccache cmake git ninja-build python3
+          dkp-pacman -S --needed --noconfirm switch-curl
+      - name: Restore third-party dependencies
+        id: dependencies
+        uses: actions/cache/restore@v5
+        with:
+          path: build/deps
+          key: switch-deps-v1-${{ hashFiles('tools/build/deps.json') }}
+      - name: Prepare build dependencies
+        run: |
+          python3 tools/build/deps.py build/deps
+          python3 tools/build/layout.py build/deps build/third_party
+      - name: Save third-party dependencies
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: build/deps
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
+      - name: Restore the compiler cache
+        id: compiler-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/switch-ccache
+          key: switch-ccache-v1-${{ runner.arch }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            switch-ccache-v1-${{ runner.arch }}-${{ github.sha }}-
+            switch-ccache-v1-${{ runner.arch }}-
+      - name: Build the LCEReborn game client
+        id: compile
+        run: |
+          export CCACHE_DIR="$PWD/build/switch-ccache"
+          export CCACHE_COMPILERCHECK=content
+          ccache --max-size=1G
+          ccache --zero-stats
+          trap 'ccache --show-stats' EXIT
+          cmake -S . -B build/switch -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_BUILD_TYPE=Release -DLCE_BUILD_LAUNCHER=OFF
+          cmake --build build/switch --target LCEReborn_nro --parallel 4
+      - name: Save the compiler cache
+        if: ${{ !cancelled() && (steps.compile.outcome == 'success' || steps.compile.outcome == 'failure') && steps.compiler-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: build/switch-ccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+      - name: Stage the Switch SD card files
+        run: |
+          mkdir -p build/switch-package/LCEReborn
+          cp build/switch/LCEReborn.nro build/switch-package/LCEReborn/
+          cp -r resources/pc build/switch-package/LCEReborn/resources
+          cp -r packs build/switch-package/LCEReborn/packs
+          test -s "build/switch-package/LCEReborn/packs/1.14 Texture Pack/TexturePack.pck"
+          test -s "build/switch-package/LCEReborn/packs/1.14 Texture Pack/Data/x16Data.pck"
+          test -s build/switch-package/LCEReborn/resources/experimental/shield_base_1_14.png
+          test -s build/switch-package/LCEReborn/resources/experimental/shield_icon.png
+          cp tools/build/third_party/bearssl-LICENSE.txt build/switch-package/LCEReborn/
+      - name: Upload the Switch client with resources
+        uses: actions/upload-artifact@v7
+        with:
+          name: nintendo-switch-nro
+          path: build/switch-package/
+          if-no-files-found: error
+      - name: Upload the standalone NRO
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/switch-package/LCEReborn/LCEReborn.nro
+          archive: false
+          if-no-files-found: error
+      - name: Build the complete single-file Switch client
+        id: full-nro
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          SWITCH_ASSETS_URL: ${{ secrets.SWITCH_ASSETS_URL }}
+          SWITCH_ASSETS_SHA256: ${{ vars.SWITCH_ASSETS_SHA256 }}
+        run: |
+          if [[ -z "$SWITCH_ASSETS_URL" && -z "$SWITCH_ASSETS_SHA256" ]]; then
+            echo "::notice::Full NRO skipped. No prepared game assets source is configured."
+            exit 0
+          fi
+          if [[ "$SWITCH_ASSETS_URL" != https://* || ! "$SWITCH_ASSETS_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+            echo "::error::Configure an HTTPS SWITCH_ASSETS_URL and a valid SWITCH_ASSETS_SHA256."
+            exit 1
+          fi
+          staging="$(mktemp -d)"
+          trap 'rm -rf -- "$staging"' EXIT
+          PYTHONPATH=tools timeout 900s python3 - "$staging/assets.zip" <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+          import sys
+
+          from server_download import DownloadError, open_download
+
+          try:
+              with open_download({"url": os.environ["SWITCH_ASSETS_URL"]}) as response:
+                  with Path(sys.argv[1]).open("xb") as output:
+                      shutil.copyfileobj(response, output, length=1024 * 1024)
+          except (DownloadError, OSError) as error:
+              raise SystemExit(f"Could not download prepared Switch assets: {error}") from None
+          PY
+          printf '%s  %s\n' "$SWITCH_ASSETS_SHA256" "$staging/assets.zip" | sha256sum --check
+          python3 -m zipfile -e "$staging/assets.zip" "$staging/input"
+          cmake -S . -B build/switch -DLCE_SWITCH_ASSETS_DIR="$staging/input/assets"
+          cmake --build build/switch --target LCEReborn_full_nro --parallel 4
+          test -s build/switch/LCEReborn-Full.nro
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Upload the complete single-file Switch client
+        if: steps.full-nro.outputs.ready == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/switch/LCEReborn-Full.nro
+          archive: false
+          if-no-files-found: error

@@ -9,7 +9,7 @@
 
 #include "game/core/CriticalSection.hpp"
 #include "net/NetSocket.hpp"
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include <memory>
 #endif
 
@@ -92,7 +92,7 @@ private:
     Address m_peer;
     Address m_target;
     std::string m_targetText;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     struct LiveJoinTicket;
     std::shared_ptr<LiveJoinTicket> m_liveJoinTicket;
 #endif

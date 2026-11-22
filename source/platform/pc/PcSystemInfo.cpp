@@ -7,6 +7,8 @@
 #include <windows.h>
 #include <psapi.h>
 #include <intrin.h>
+#elif LCE_PLATFORM_SWITCH
+#include "platform/switch/SwitchRuntime.hpp"
 #else
 #include <unistd.h>
 #include <cstdio>
@@ -72,6 +74,8 @@ bool PcMemoryUsage(unsigned long long* used, unsigned long long* total)
     *used = counters.WorkingSetSize;
     *total = status.ullTotalPhys;
     return true;
+#elif LCE_PLATFORM_SWITCH
+    return SwitchMemoryUsage(used, total);
 #else
     const long pageSize = sysconf(_SC_PAGESIZE);
     const long pages = sysconf(_SC_PHYS_PAGES);
@@ -94,6 +98,9 @@ bool PcMemoryUsage(unsigned long long* used, unsigned long long* total)
 
 std::string PcCpuName()
 {
+#if LCE_PLATFORM_SWITCH
+    return "Nintendo Switch (ARM64)";
+#else
 #if defined(_WIN32) || defined(__x86_64__) || defined(__i386__)
     std::string brand = CpuBrand();
     if (!brand.empty())
@@ -113,4 +120,5 @@ std::string PcCpuName()
     }
 #endif
     return std::string();
+#endif
 }

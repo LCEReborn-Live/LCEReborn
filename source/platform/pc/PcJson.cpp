@@ -57,7 +57,7 @@ private:
         if (Match("true") || Match("false"))
         {
             value.type = JsonValue::Boolean;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
             value.text = lead == 't' ? L"true" : L"false";
 #endif
             return true;
@@ -74,7 +74,7 @@ private:
             return false;
         mPosition += static_cast<size_t>(end - start);
         value.type = JsonValue::Number;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
         value.text.assign(start, static_cast<const char*>(end));
 #endif
         return true;

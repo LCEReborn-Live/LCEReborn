@@ -20,9 +20,9 @@
 #include "game/network/LeaderboardReadListener.hpp"
 #include "game/network/ServerboundCustomPayloadPacket.hpp"
 #include "platform/CProfile.hpp"
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
 #include "platform/pc/PcLiveBridge.hpp"
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/pc/PcJson.hpp"
 #include "platform/wiiu/WiiULiveSignIn.hpp"
 #endif
@@ -34,7 +34,7 @@ namespace
 const long long kServerTimeoutMs = 5000;
 const long long kLiveTimeoutMs = 15000;
 
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
 int LiveBoardIndex(LeaderboardManager::EStatsType type)
 {
     const int board = static_cast<int>(type);
@@ -86,7 +86,7 @@ std::wstring AsciiWide(const std::string& value)
     return std::wstring(value.begin(), value.end());
 }
 #endif
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 const char* LiveBoardName(int board)
 {
     static const char* const names[] = {"traveling", "mining", "farming", "kills"};
@@ -133,7 +133,7 @@ void LceLeaderboardManager::Tick()
 {
     if (m_pending == ePending_Live)
     {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
         if (ReadLiveResponse())
             return;
 #endif
@@ -171,7 +171,7 @@ void LceLeaderboardManager::DeleteSession()
 
 bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores)
 {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     if (!PcLiveBridge::Enabled() || scores == NULL || count == 0)
         return true;
     std::ostringstream contents;
@@ -195,7 +195,7 @@ bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores
             std::to_wstring(++submitId) + L".tsv";
         WriteLiveFile(name.c_str(), contents.str());
     }
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (scores != NULL && WiiULiveSignIn::IsSignedIn())
     {
         for (unsigned int index = 0; index < count; ++index)
@@ -283,9 +283,9 @@ bool LceLeaderboardManager::ReadStats_Friends(LeaderboardReadListener* pReadList
                                               unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     if (PcLiveBridge::Enabled())
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_pad == 0 && WiiULiveSignIn::IsSignedIn())
 #endif
 #if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
@@ -308,9 +308,9 @@ bool LceLeaderboardManager::ReadStats_MyScore(LeaderboardReadListener* pReadList
                                               EStatsType eStatsType, PlayerUID, unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     if (PcLiveBridge::Enabled())
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_pad == 0 && WiiULiveSignIn::IsSignedIn())
 #endif
 #if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
@@ -328,9 +328,9 @@ bool LceLeaderboardManager::ReadStats_TopRank(LeaderboardReadListener* pReadList
                                               EStatsType eStatsType, unsigned int uiStartRank, unsigned int uiNumRows)
 {
     Begin(pReadListener, iUserIndex, eStatsType);
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     if (PcLiveBridge::Enabled())
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_pad == 0 && WiiULiveSignIn::IsSignedIn())
 #endif
 #if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
@@ -345,7 +345,7 @@ bool LceLeaderboardManager::ReadStats_TopRank(LeaderboardReadListener* pReadList
 
 void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int startRank, unsigned int count)
 {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     const int board = LiveBoardIndex(static_cast<EStatsType>(m_board));
     if (board < 0 || filter == NULL || count == 0 || count > 50)
     {
@@ -365,7 +365,7 @@ void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int sta
     }
     m_sentAt = System::processTimeInMilliSecs();
     m_pending = ePending_Live;
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     const char* board = LiveBoardName(m_board);
     if (!board || !filter || count == 0 || count > 50)
     {
@@ -421,7 +421,7 @@ void LceLeaderboardManager::RequestFromLive(const char* filter, unsigned int sta
 
 bool LceLeaderboardManager::ReadLiveResponse()
 {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     FILE* file = PcLiveBridge::Open(L"leaderboard.response", L"rb");
     if (file == NULL)
         return false;

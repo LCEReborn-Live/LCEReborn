@@ -12,21 +12,29 @@
 #include <nn/ac/ac_cpp.h>
 
 #include "platform/wiiu/C4JThreadImpl.hpp"
-#include "platform/wiiu/WiiURelayTls.hpp"
 #elif defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
 #include <arpa/inet.h>
 #include <fcntl.h>
+#if LCE_PLATFORM_SWITCH
+#include <chrono>
+#include <switch.h>
+#else
 #include <ifaddrs.h>
 #include <net/if.h>
+#endif
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
+
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+#include "platform/wiiu/WiiURelayTls.hpp"
 #endif
 
 namespace lcenet
@@ -213,11 +221,23 @@ void CloseNative(NativeSocket socket)
     close(socket);
 }
 
+#if LCE_PLATFORM_SWITCH
+bool SetNonblocking(NativeSocket socket)
+{
+    return fcntl(socket, F_SETFL, O_NONBLOCK) == 0;
+}
+
+bool IsRetryableSocketError(int error)
+{
+    return error == EAGAIN || error == EWOULDBLOCK || error == EINTR;
+}
+#else
 void SetBlocking(NativeSocket socket, bool blocking)
 {
     int flags = fcntl(socket, F_GETFL, 0);
     fcntl(socket, F_SETFL, blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK));
 }
+#endif
 #endif
 
 #if !LCE_PLATFORM_WIIU
@@ -467,6 +487,9 @@ void Startup()
     WSADATA data;
     gStarted = WSAStartup(MAKEWORD(2, 2), &data) == 0;
     gConnected = gStarted;
+#elif LCE_PLATFORM_SWITCH
+    gStarted = R_SUCCEEDED(socketInitializeDefault());
+    gConnected = gStarted;
 #else
     gStarted = true;
     gConnected = true;
@@ -573,7 +596,7 @@ std::vector<uint32_t> BroadcastAddresses()
         }
         closesocket(probe);
     }
-#else
+#elif !LCE_PLATFORM_SWITCH
     ifaddrs* list = 0;
     if (getifaddrs(&list) == 0)
     {
@@ -662,6 +685,8 @@ uint32_t FirstPrivateInterface()
     }
     closesocket(probe);
     return found;
+#elif LCE_PLATFORM_SWITCH
+    return 0;
 #else
     uint32_t found = 0;
     ifaddrs* list = 0;
@@ -702,7 +727,7 @@ bool LocalAddress(uint32_t& ip)
 }
 
 TcpSocket::TcpSocket() : m_handle(kInvalid)
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     , m_tls(0)
 #endif
 {
@@ -718,14 +743,14 @@ void TcpSocket::Swap(TcpSocket& other)
     intptr_t handle = m_handle;
     m_handle = other.m_handle;
     other.m_handle = handle;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     WiiURelayTls* tls = m_tls;
     m_tls = other.m_tls;
     other.m_tls = tls;
 #endif
 }
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 bool TcpSocket::EnableRelayTls(const std::string& hostname, const std::string& seed, int timeoutMs, const CancelFlag& cancel)
 {
     if (m_tls != 0 || m_handle == kInvalid)
@@ -755,7 +780,16 @@ bool TcpSocket::Connect(const Address& address, int timeoutMs, const CancelFlag&
         error = ConnectError(LastError());
         return false;
     }
+#if LCE_PLATFORM_SWITCH
+    if (!SetNonblocking(socket))
+    {
+        CloseNative(socket);
+        error = "Couldn't configure the network socket.";
+        return false;
+    }
+#else
     SetBlocking(socket, false);
+#endif
     NativeAddress target = ToNative(address);
     if (ConnectNative(socket, target) != 0)
     {
@@ -791,7 +825,10 @@ bool TcpSocket::Connect(const Address& address, int timeoutMs, const CancelFlag&
             return false;
         }
     }
+    // Switch BSD emulation can stall blocking reads and writes between threads.
+#if !LCE_PLATFORM_SWITCH
     SetBlocking(socket, true);
+#endif
     SetOption(socket, kProtoTcp, kTcpNoDelay, 1);
     m_handle = (intptr_t)socket;
     return true;
@@ -839,6 +876,13 @@ bool TcpSocket::Listen(unsigned short port, std::string& error, bool loopbackOnl
     }
 #if LCE_PLATFORM_WIIU
     SetBlocking(socket, false);
+#elif LCE_PLATFORM_SWITCH
+    if (!SetNonblocking(socket))
+    {
+        CloseNative(socket);
+        error = "Couldn't configure the listening socket.";
+        return false;
+    }
 #endif
     m_handle = (intptr_t)socket;
     return true;
@@ -866,6 +910,13 @@ bool TcpSocket::Accept(int timeoutMs, TcpSocket& accepted, Address& peer)
     NativeSocket socket = AcceptNative((NativeSocket)m_handle, from);
     if (!IsValid(socket))
         return false;
+#if LCE_PLATFORM_SWITCH
+    if (!SetNonblocking(socket))
+    {
+        CloseNative(socket);
+        return false;
+    }
+#endif
 #endif
     SetOption(socket, kProtoTcp, kTcpNoDelay, 1);
     accepted.Close();
@@ -876,17 +927,33 @@ bool TcpSocket::Accept(int timeoutMs, TcpSocket& accepted, Address& peer)
 
 bool TcpSocket::SendAll(const void* data, size_t size)
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_tls != 0)
         return m_tls->SendAll(data, size);
 #endif
     const char* bytes = static_cast<const char*>(data);
+#if LCE_PLATFORM_SWITCH
+    using Clock = std::chrono::steady_clock;
+    const std::chrono::seconds stallTimeout(5);
+    auto deadline = Clock::now() + stallTimeout;
+#endif
     while (size > 0)
     {
         if (!IsOpen())
             return false;
         int chunk = size > 0x10000 ? 0x10000 : (int)size;
         int sent = SendNative((NativeSocket)m_handle, bytes, chunk);
+#if LCE_PLATFORM_SWITCH
+        if (sent < 0 && IsRetryableSocketError(LastError()))
+        {
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
+            if (remaining.count() <= 0 || !WaitFor((NativeSocket)m_handle, true, static_cast<int>(remaining.count())))
+                return false;
+            continue;
+        }
+        if (sent > 0)
+            deadline = Clock::now() + stallTimeout;
+#endif
         if (sent <= 0)
             return false;
         bytes += sent;
@@ -897,7 +964,7 @@ bool TcpSocket::SendAll(const void* data, size_t size)
 
 int TcpSocket::Receive(void* data, size_t size, int timeoutMs)
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_tls != 0)
         return m_tls->Receive(data, size, timeoutMs);
 #endif
@@ -907,12 +974,16 @@ int TcpSocket::Receive(void* data, size_t size, int timeoutMs)
         return 0;
     int chunk = size > 0x10000 ? 0x10000 : (int)size;
     int received = RecvNative((NativeSocket)m_handle, data, chunk);
+#if LCE_PLATFORM_SWITCH
+    if (received < 0 && IsRetryableSocketError(LastError()))
+        return 0;
+#endif
     return received > 0 ? received : -1;
 }
 
 void TcpSocket::Shutdown()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_tls != 0)
     {
         m_tls->Shutdown();
@@ -925,7 +996,7 @@ void TcpSocket::Shutdown()
 
 void TcpSocket::Close()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     delete m_tls;
     m_tls = 0;
 #endif

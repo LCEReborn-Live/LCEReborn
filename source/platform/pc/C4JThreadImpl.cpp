@@ -3,6 +3,10 @@
 #include <chrono>
 #include <cstdio>
 #include <thread>
+#if LCE_PLATFORM_SWITCH
+#include <list>
+#include <mutex>
+#endif
 
 #include "platform/Runtime.hpp"
 #include "platform/pc/PcCrashReport.hpp"
@@ -10,6 +14,48 @@
 static std::atomic<uint32_t> s_nextThreadId(1);
 static thread_local C4JThreadImpl* s_currentThread = nullptr;
 static C4JThreadImpl s_mainThread("Main thread");
+
+#if LCE_PLATFORM_SWITCH
+namespace
+{
+struct SwitchWorker
+{
+    std::thread thread;
+    std::atomic<bool> finished{false};
+};
+
+struct SwitchWorkers
+{
+    std::mutex mutex;
+    std::list<SwitchWorker> threads;
+};
+
+SwitchWorkers& GetSwitchWorkers()
+{
+    // Some workers run until the process exits. Their handles are reclaimed by Horizon.
+    static SwitchWorkers* const workers = new SwitchWorkers;
+    return *workers;
+}
+}
+
+void C4JThreadImpl::ReapFinishedThreads()
+{
+    SwitchWorkers& workers = GetSwitchWorkers();
+    std::lock_guard<std::mutex> lock(workers.mutex);
+    for (auto worker = workers.threads.begin(); worker != workers.threads.end();)
+    {
+        if (worker->finished)
+        {
+            worker->thread.join();
+            worker = workers.threads.erase(worker);
+        }
+        else
+        {
+            ++worker;
+        }
+    }
+}
+#endif
 
 void Sleep(unsigned int milliseconds)
 {
@@ -89,9 +135,23 @@ C4JThreadImpl::~C4JThreadImpl()
 
 void C4JThreadImpl::Run()
 {
+#if LCE_PLATFORM_SWITCH
+    // libnx supports joining pthreads but does not implement detaching them.
+    ReapFinishedThreads();
+    SwitchWorkers& workers = GetSwitchWorkers();
+    std::lock_guard<std::mutex> lock(workers.mutex);
+    const auto worker = workers.threads.emplace(workers.threads.end());
+    m_running = true;
+    m_started = true;
+    worker->thread = std::thread([this, worker] {
+        entryPoint(this);
+        worker->finished = true;
+    });
+#else
     m_running = true;
     m_started = true;
     std::thread(entryPoint, this).detach();
+#endif
 }
 
 bool C4JThreadImpl::isRunning()

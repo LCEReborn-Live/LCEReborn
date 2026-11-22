@@ -1,15 +1,21 @@
 #include "platform/wiiu/WiiULiveSignIn.hpp"
 #include "game/core/CriticalSection.hpp"
 #include "game/core/System.hpp"
-#include "platform/wiiu/CProfile.hpp"
 #include "platform/wiiu/WiiURelayTls.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/pc/PcPaths.hpp"
+#include "platform/switch/SwitchLiveWorker.hpp"
+#include <cstdio>
+#else
+#include "platform/wiiu/CProfile.hpp"
 #include <coreinit/dynload.h>
 #include <coreinit/ios.h>
 #include <coreinit/thread.h>
-#include <curl/curl.h>
 #include <nn/act/client_cpp.h>
 #include <nn/save/save.h>
 #include <nsysnet/nssl.h>
+#endif
+#include <curl/curl.h>
 #include <cstring>
 #include <cwchar>
 #include <deque>
@@ -29,10 +35,12 @@ const char kLowerHex[] = "0123456789abcdef";
 const char kUsernameChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
 const size_t kTokenLength = 64;
 const size_t kUuidLength = 32;
+#if !LCE_PLATFORM_SWITCH
 // Cafe nlibcurl uses an NSSL verification bitmask in place of standard curl's TLS options.
 const CURLoption kNsslContext = static_cast<CURLoption>(210);
 const CURLoption kNsslVerifyOptions = static_cast<CURLoption>(211);
 const long kVerifyPeerHostnameAndDate = 7;
+#endif
 const size_t kMaxResponse = 256 * 1024;
 const size_t kMaxSkinResponse = 512 * 1024;
 
@@ -48,8 +56,12 @@ struct ApiRequest
 std::deque<ApiRequest> pendingApi;
 ApiRequest activeApi;
 
+#if LCE_PLATFORM_SWITCH
+SwitchLiveWorker thread;
+#else
 alignas(32) OSThread thread;
 alignas(32) unsigned char stack[128 * 1024];
+#endif
 Request request = Request::None;
 Status status = Status::Idle;
 bool restartAfterRequest = false;
@@ -62,9 +74,11 @@ C4JCriticalSection identityLock;
 bool apiSignedIn = false;
 std::string sessionToken;
 std::string savedUuid;
+#if !LCE_PLATFORM_SWITCH
 FSClient saveClient;
 FSCmdBlock saveCommand;
 unsigned char saveSlot;
+#endif
 bool saveClientReady = false;
 bool sessionNeedsSave = false;
 long long saveRetryAt = 0;
@@ -80,6 +94,15 @@ long long presenceAfter = 0;
 long long presenceRetryAt = 0;
 bool requestedPlaying = false;
 bool reportedPlaying = false;
+unsigned int requestedMiniGame = 0;
+unsigned int reportedMiniGame = 0;
+
+#if LCE_PLATFORM_SWITCH
+std::string SessionPath()
+{
+    return PcSaveRoot() + "/" + kSessionFile;
+}
+#endif
 
 void ReadSavedSession()
 {
@@ -87,6 +110,13 @@ void ReadSavedSession()
         return;
     // One fixed-size record with a hex token and a zero-padded optional UUID.
     alignas(64) uint8_t buffer[kTokenLength + kUuidLength + 1];
+#if LCE_PLATFORM_SWITCH
+    FILE* file = std::fopen(SessionPath().c_str(), "rb");
+    if (file == NULL)
+        return;
+    const int count = static_cast<int>(std::fread(buffer, 1, sizeof(buffer), file));
+    std::fclose(file);
+#else
     FSFileHandle handle;
     gProfileInstance->EnterInitSaveDirCS();
     int count = SAVEOpenFile(&saveClient, &saveCommand, saveSlot, kSessionFile, "r",
@@ -97,6 +127,7 @@ void ReadSavedSession()
         FSCloseFile(&saveClient, &saveCommand, handle, FS_ERROR_FLAG_ALL);
     }
     gProfileInstance->LeaveInitSaveDirCS();
+#endif
     if (count != static_cast<int>(kTokenLength + kUuidLength))
         return;
     const char* bytes = reinterpret_cast<const char*>(buffer);
@@ -116,6 +147,19 @@ bool WriteSavedSession()
     alignas(64) uint8_t buffer[kTokenLength + kUuidLength] = {};
     std::memcpy(buffer, sessionToken.data(), kTokenLength);
     std::memcpy(buffer + kTokenLength, savedUuid.data(), savedUuid.size());
+#if LCE_PLATFORM_SWITCH
+    const std::string path = SessionPath();
+    const std::string partial = path + ".tmp";
+    FILE* file = std::fopen(partial.c_str(), "wb");
+    if (file == NULL)
+        return false;
+    const bool written = std::fwrite(buffer, 1, sizeof(buffer), file) == sizeof(buffer);
+    const bool closed = std::fclose(file) == 0;
+    if (written && closed && std::rename(partial.c_str(), path.c_str()) == 0)
+        return true;
+    std::remove(partial.c_str());
+    return false;
+#else
     FSFileHandle handle;
     bool saved = false;
     gProfileInstance->EnterInitSaveDirCS();
@@ -130,6 +174,7 @@ bool WriteSavedSession()
     }
     gProfileInstance->LeaveInitSaveDirCS();
     return saved;
+#endif
 }
 
 void ClearSession()
@@ -137,25 +182,30 @@ void ClearSession()
     sessionNeedsSave = false;
     sessionToken.clear();
     savedUuid.clear();
-    username.clear();
     EnterCriticalSection(&identityLock);
+    username.clear();
     apiSignedIn = false;
     LeaveCriticalSection(&identityLock);
     if (!saveClientReady)
         return;
+#if LCE_PLATFORM_SWITCH
+    std::remove(SessionPath().c_str());
+#else
     gProfileInstance->EnterInitSaveDirCS();
     if (SAVERemove(&saveClient, &saveCommand, saveSlot, kSessionFile, FS_ERROR_FLAG_ALL) == FS_STATUS_OK)
         SAVEFlushQuota(&saveClient, &saveCommand, saveSlot, FS_ERROR_FLAG_ALL);
     gProfileInstance->LeaveInitSaveDirCS();
+#endif
 }
 
 size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
 {
     std::string& output = *static_cast<std::string*>(destination);
-    const bool skin = request == Request::Api && !activeApi.post
+    const bool cosmetic = request == Request::Api && !activeApi.post
         && activeApi.url.compare(0, sizeof(kApiUrl) - 1, kApiUrl) == 0
-        && activeApi.url.size() >= 5 && activeApi.url.compare(activeApi.url.size() - 5, 5, "/skin") == 0;
-    const size_t limit = skin ? kMaxSkinResponse : kMaxResponse;
+        && activeApi.url.size() >= 5 && (activeApi.url.compare(activeApi.url.size() - 5, 5, "/skin") == 0
+                                        || activeApi.url.compare(activeApi.url.size() - 5, 5, "/cape") == 0);
+    const size_t limit = cosmetic ? kMaxSkinResponse : kMaxResponse;
     if (size == 0 || count > (limit - output.size()) / size)
         return 0;
     const size_t length = size * count;
@@ -163,6 +213,21 @@ size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
     return length;
 }
 
+#if LCE_PLATFORM_SWITCH
+CURLcode SetNativeTrustRoots(CURL*, void* context, void*)
+{
+    static const unsigned char rootX1[] = {
+#include "wiiu_live_root_ca.inc"
+    };
+    static const unsigned char rootX2[] = {
+#include "wiiu_live_root_x2_ca.inc"
+    };
+    auto* ssl = static_cast<SslContext*>(context);
+    const Result x1 = sslContextImportServerPki(ssl, rootX1, sizeof(rootX1), SslCertificateFormat_Der, nullptr);
+    const Result x2 = sslContextImportServerPki(ssl, rootX2, sizeof(rootX2), SslCertificateFormat_Der, nullptr);
+    return R_SUCCEEDED(x1) && R_SUCCEEDED(x2) ? CURLE_OK : CURLE_SSL_CACERT_BADFILE;
+}
+#else
 NSSLContextHandle CreateNativeTrustContext()
 {
     OSDynLoad_Module module = NULL;
@@ -213,6 +278,8 @@ NSSLContextHandle CreateNativeTrustContext()
     return -1;
 }
 
+#endif
+
 template <typename T>
 bool SetOption(CURL* curl, CURLoption option, T value)
 {
@@ -244,7 +311,9 @@ int SendRequest(int, const char**)
         curlResult = CURLE_FAILED_INIT;
         return 0;
     }
+#if !LCE_PLATFORM_SWITCH
     static const NSSLContextHandle nativeTrust = CreateNativeTrustContext();
+#endif
     const char* url = kStartUrl;
     static std::string body;
     static std::string authorization;
@@ -275,8 +344,19 @@ int SendRequest(int, const char**)
     else if (request == Request::Presence)
     {
         url = kPresenceUrl;
+#if LCE_PLATFORM_SWITCH
+        static const char* const activities[] = {"world", "battle", "tumble", "glide", "build"};
+        if (!requestedPlaying)
+            body = "{\"status\":\"launcher\",\"platform\":\"switch\"}";
+        else if (requestedMiniGame == 0)
+            body = "{\"status\":\"game\",\"activity\":\"world\",\"platform\":\"switch\"}";
+        else
+            body = std::string("{\"status\":\"minigame\",\"platform\":\"switch\",\"activity\":\"")
+                + activities[requestedMiniGame] + "\"}";
+#else
         body = requestedPlaying ? "{\"status\":\"game\",\"activity\":\"world\",\"platform\":\"wiiu\"}"
                                 : "{\"status\":\"launcher\",\"platform\":\"wiiu\"}";
+#endif
     }
     if (request == Request::Api || request == Request::Presence || request == Request::Restore)
     {
@@ -296,8 +376,15 @@ int SendRequest(int, const char**)
         && SetOption(curl, CURLOPT_TIMEOUT, 10L)
         && SetOption(curl, CURLOPT_CONNECTTIMEOUT, 5L)
         && SetOption(curl, CURLOPT_FOLLOWLOCATION, 0L)
+#if LCE_PLATFORM_SWITCH
+        && SetOption(curl, CURLOPT_SSL_VERIFYPEER, 1L)
+        && SetOption(curl, CURLOPT_SSL_VERIFYHOST, 2L)
+        && SetOption(curl, CURLOPT_SSLVERSION, static_cast<long>(CURL_SSLVERSION_TLSv1_2))
+        && SetOption(curl, CURLOPT_SSL_CTX_FUNCTION, SetNativeTrustRoots)
+#else
         && SetOption(curl, kNsslVerifyOptions, kVerifyPeerHostnameAndDate)
         && (nativeTrust < 0 || SetOption(curl, kNsslContext, static_cast<long>(nativeTrust)))
+#endif
         && SetOption(curl, CURLOPT_WRITEFUNCTION, WriteResponse)
         && SetOption(curl, CURLOPT_WRITEDATA, &response))
     {
@@ -316,13 +403,19 @@ bool Send(Request next)
     failedOption = -1;
     workerFailed = false;
     request = next;
+#if LCE_PLATFORM_SWITCH
+    if (!thread.Start([] { SendRequest(0, nullptr); }))
+#else
     if (!OSCreateThread(&thread, SendRequest, 0, NULL, stack + sizeof(stack), sizeof(stack), 16, 0))
+#endif
     {
         workerFailed = true;
         request = Request::None;
         return false;
     }
+#if !LCE_PLATFORM_SWITCH
     OSResumeThread(&thread);
+#endif
     return true;
 }
 
@@ -366,8 +459,8 @@ int SecondsField(const char* name)
 
 Status SignedIn(const std::string& name)
 {
-    username = name;
     EnterCriticalSection(&identityLock);
+    username = name;
     playerUuid = savedUuid;
     apiSignedIn = true;
     LeaveCriticalSection(&identityLock);
@@ -441,9 +534,13 @@ void Init() { InitializeCriticalSection(&identityLock); }
 
 void RestoreSavedSession()
 {
+#if LCE_PLATFORM_SWITCH
+    saveClientReady = true;
+#else
     saveSlot = nn::act::GetSlotNo();
     FSInitCmdBlock(&saveCommand);
     saveClientReady = FSAddClient(&saveClient, FS_ERROR_FLAG_ALL) == FS_STATUS_OK;
+#endif
     ReadSavedSession();
     if (!sessionToken.empty())
         status = Send(Request::Restore) ? Status::Restoring : Status::Failed;
@@ -481,9 +578,15 @@ void Cancel()
 Status Update()
 {
     const long long now = System::processTimeInMilliSecs();
+#if LCE_PLATFORM_SWITCH
+    if (request != Request::None && thread.Finished())
+    {
+        thread.Join();
+#else
     if (request != Request::None && OSIsThreadTerminated(&thread))
     {
         OSJoinThread(&thread, NULL);
+#endif
         const Request finished = request;
         request = Request::None;
         if ((finished == Request::Presence || finished == Request::Api) && responseStatus == 401)
@@ -501,6 +604,7 @@ Status Update()
             if (responseStatus == 200)
             {
                 reportedPlaying = requestedPlaying;
+                reportedMiniGame = requestedMiniGame;
                 presenceAfter = now + 45000;
             }
             else
@@ -546,7 +650,7 @@ Status Update()
     return status;
 }
 
-void TickPresence(bool playing)
+void TickPresence(bool playing, unsigned int miniGame)
 {
     const Status current = Update();
     if (current != Status::SignedIn && !playing)
@@ -563,9 +667,11 @@ void TickPresence(bool playing)
         sessionNeedsSave = !WriteSavedSession();
         saveRetryAt = now + 10000;
     }
-    if (now >= presenceRetryAt && (playing != reportedPlaying || now >= presenceAfter))
+    const unsigned int activity = playing && miniGame <= 4 ? miniGame : 0;
+    if (now >= presenceRetryAt && (playing != reportedPlaying || activity != reportedMiniGame || now >= presenceAfter))
     {
         requestedPlaying = playing;
+        requestedMiniGame = activity;
         if (Send(Request::Presence))
             return;
         presenceRetryAt = now + 10000;
@@ -589,6 +695,21 @@ bool IsSignedIn()
     LeaveCriticalSection(&identityLock);
     return signedIn;
 }
+
+#if LCE_PLATFORM_SWITCH
+void Shutdown()
+{
+    thread.Join();
+}
+
+std::string AccountName()
+{
+    EnterCriticalSection(&identityLock);
+    const std::string name = username;
+    LeaveCriticalSection(&identityLock);
+    return name;
+}
+#endif
 
 std::string PlayerUuid()
 {

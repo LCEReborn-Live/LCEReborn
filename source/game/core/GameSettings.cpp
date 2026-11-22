@@ -29,7 +29,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
-#elif LCE_PLATFORM_WIIU
+#endif
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/wiiu/WiiULiveCosmetics.hpp"
 #endif
 #include <vector>
@@ -1246,6 +1247,10 @@ uint32_t GameSettings::IsAllowedSkin(int profile)
 }
 uint32_t GameSettings::GetPlayerCapeId(int profile)
 {
+#if LCE_PLATFORM_SWITCH
+    if (profile == 0 && WiiULiveCosmetics::PlayerCapeId() != 0)
+        return WiiULiveCosmetics::PlayerCapeId();
+#endif
 #if LCE_PLATFORM_PC
     const uint32_t liveId = LiveCosmeticId();
     if (liveId != 0 && gApp.IsFileInMemoryTextures(Player::getCapePathFromId(liveId)))
@@ -1286,7 +1291,8 @@ uint32_t GameSettings::GetPlayerSkinId(int profile)
     const uint32_t liveId = LiveCosmeticId();
     if (liveId != 0 && gApp.IsFileInMemoryTextures(CMinecraftApp::getSkinPathFromId(liveId)))
         return liveId;
-#elif LCE_PLATFORM_WIIU
+#endif
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (profile == 0 && WiiULiveCosmetics::PlayerSkinId() != 0)
         return WiiULiveCosmetics::PlayerSkinId();
 #endif

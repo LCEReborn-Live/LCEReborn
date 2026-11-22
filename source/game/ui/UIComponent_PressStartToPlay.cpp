@@ -10,7 +10,7 @@
 #include "platform/pc/PcLiveBridge.hpp"
 #include "game/ui/UILiveAvatar.hpp"
 #include <string>
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/wiiu/WiiULiveSocial.hpp"
 #endif
 #if LCE_PLATFORM_PC && defined(_WIN32)
@@ -399,9 +399,9 @@ void UIComponent_PressStartToPlay::ShowBetaWatermark()
 void UIComponent_PressStartToPlay::tick()
 {
     UIScene::tick();
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     if (hasMovie() && !gConsoleUIController.IsExpectingOrReloadingSkin()) PollLiveSocial();
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (hasMovie() && !gConsoleUIController.IsExpectingOrReloadingSkin() && !m_achievementToastShowing
         && !m_holdToShowAchievements && m_achievementToasts.empty())
     {

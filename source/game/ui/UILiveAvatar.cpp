@@ -2,7 +2,7 @@
 #include "game/ui/UIScene.hpp"
 #include "game/core/BufferedImage.hpp"
 #include "platform/pc/PcLiveBridge.hpp"
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/wiiu/WiiULiveCosmetics.hpp"
 #endif
 #include <cstdio>
@@ -11,7 +11,7 @@
 #include <vector>
 #include <png.h>
 namespace {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 struct FacePng
 {
     unsigned char bytes[512];
@@ -73,7 +73,7 @@ bool ReadSkin(const std::wstring& name, std::vector<unsigned char>& data)
 std::wstring RegisterLiveFaceIcon(UIScene& scene, unsigned int id, const std::string& revision)
 {
     std::vector<unsigned char> bytes;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     (void)revision;
     std::string skinRevision;
     const std::string* png = WiiULiveCosmetics::AvatarSkin(id, skinRevision);
@@ -87,7 +87,7 @@ std::wstring RegisterLiveFaceIcon(UIScene& scene, unsigned int id, const std::st
         std::wstring(skinRevision.begin(), skinRevision.end()).c_str());
     if (scene.hasRegisteredSubstitutionTexture(textureName)) return textureName;
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     bytes.assign(png->begin(), png->end());
 #else
     wchar_t fileName[64];
@@ -119,7 +119,7 @@ std::wstring RegisterLiveFaceIcon(UIScene& scene, unsigned int id, const std::st
         rgba[pixel * 4 + 3] = static_cast<unsigned char>(outAlpha);
     }
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     FacePng output = {};
     if (!EncodeFace(rgba.data(), output)) return std::wstring();
     unsigned char* textureBytes = new unsigned char[output.size];

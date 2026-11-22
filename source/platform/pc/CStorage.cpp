@@ -1913,12 +1913,19 @@ unsigned int CStorage::EnumerateLocalDLCPackages()
 
     std::error_code error;
     fs::create_directories(fs::u8path(PcPacksRoot()), error);
+#if LCE_PLATFORM_SWITCH
+    const bool bundledFirst = bundledPacksRoot.compare(0, sizeof("romfs:/") - 1, "romfs:/") == 0;
+#else
+    constexpr bool bundledFirst = false;
+#endif
     for (unsigned int rootIndex = 0; rootIndex < 2; ++rootIndex)
     {
-        if (rootIndex == 1 && normalizedBundledRoot == normalizedUserRoot)
+        // Prefer the copy shipped with the Switch NRO over a legacy SD-card copy.
+        const bool useBundled = bundledFirst ? rootIndex == 0 : rootIndex == 1;
+        if (useBundled && normalizedBundledRoot == normalizedUserRoot)
             continue;
 
-        const std::string& root = rootIndex == 0 ? userPacksRoot : bundledPacksRoot;
+        const std::string& root = useBundled ? bundledPacksRoot : userPacksRoot;
         std::vector<DirectoryEntry> entries;
         if (!ListDirectory(root, entries))
             continue;
@@ -1930,9 +1937,9 @@ unsigned int CStorage::EnumerateLocalDLCPackages()
                 continue;
             if (entry.isDirectory || IsPackFile(entry.name))
             {
-                const std::string path = rootIndex == 0
-                                             ? root + "/" + entry.name
-                                             : (fs::u8path(root) / fs::u8path(entry.name)).generic_string();
+                const std::string path = useBundled
+                                             ? (fs::u8path(root) / fs::u8path(entry.name)).generic_string()
+                                             : root + "/" + entry.name;
                 std::string normalizedPath = path;
                 std::transform(normalizedPath.begin(), normalizedPath.end(), normalizedPath.begin(),
                                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });

@@ -47,6 +47,15 @@
 #include "platform/pc/PcFrameCapture.hpp"
 #include "platform/pc/PcStartWorld.hpp"
 #include "platform/pc/PcWindow.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "game/minigame/MiniGameDef.hpp"
+#include "platform/switch/SwitchRuntime.hpp"
+#include "platform/wiiu/WiiULiveCosmetics.hpp"
+#include "platform/wiiu/WiiULiveGames.hpp"
+#include "platform/wiiu/WiiULiveRelay.hpp"
+#include "platform/wiiu/WiiULiveSignIn.hpp"
+#include "platform/wiiu/WiiULiveSocial.hpp"
+#endif
 
 extern CConsoleMinecraftApp gApp;
 
@@ -58,6 +67,13 @@ static const Logger sLog("Main");
 
 int main(int argc, char** argv)
 {
+#if LCE_PLATFORM_SWITCH
+    if (!SwitchEnterGameDirectory())
+    {
+        SwitchShowStartupError("Could not open /switch/LCEReborn on the SD card. Check that the card is writable.");
+        return 1;
+    }
+#endif
     int exitCode;
     if (!PcParseLaunchOptions(argc, argv, exitCode, PcProgram::Game))
         return exitCode;
@@ -72,7 +88,11 @@ int main(int argc, char** argv)
     {
         sLog.WriteText(LogLevel::Fatal, folderError);
         Log::Stop();
+#if LCE_PLATFORM_SWITCH
+        SwitchShowStartupError(folderError);
+#else
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "LCEReborn", folderError.c_str(), NULL);
+#endif
         return 1;
     }
     LOG_INFO(sLog, "Content: %s", PcContentRoot().c_str());
@@ -82,10 +102,22 @@ int main(int argc, char** argv)
     PcDiscordStart(discordApp.empty() ? std::string(LCE_DISCORD_APP_ID) : discordApp);
 
     ShutdownManager::Initialise();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Creating the player profile");
+#endif
     if (gProfile == 0)
         gProfile = new CProfile();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Allocating compression thread storage");
+#endif
     Compression::CreateNewThreadStorage();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Initialising the renderer");
+#endif
     gRenderer->Initialise();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Initialising input");
+#endif
     g_pInput->Initialise(1, EControllerActions_Count, 0x17);
     VideoSettings::Load(PcSaveRoot() + "/video.txt");
 
@@ -94,6 +126,9 @@ int main(int argc, char** argv)
     g_pInput->SetKeyRepeatRate(0.3f, 0.2f);
     g_pInput->SetDeadzoneAndMovementRange(0, 20000, 0x7fff);
 
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Loading the media archive");
+#endif
     gApp.loadMediaArchive();
     if (gApp.ReadProductCodes() == 0)
         gApp.FatalLoadError(L"ReadProductCodes");
@@ -180,11 +215,22 @@ int main(int argc, char** argv)
     g_pLeaderboardManager->OpenSession();
     CGameNetworkManager::sInstance.Initialise();
     CGameNetworkManager::sInstance.SetLocalGame(true);
+#if LCE_PLATFORM_SWITCH
+    WiiULiveSignIn::Init();
+    WiiULiveSignIn::RestoreSavedSession();
+#endif
     ShaderPackManager::Get().Initialise();
 
     float timingColour = 0.0f;
+#if LCE_PLATFORM_SWITCH
+    bool firstFrame = true;
+    SwitchLogStartupStage("Entering the game loop");
+#endif
     while (!PcExitRequested())
     {
+#if LCE_PLATFORM_SWITCH
+        C4JThreadImpl::ReapFinishedThreads();
+#endif
         PcPumpEvents();
         InfoBarManager::StartTimingCategory(InfoBarManager::eTimingCagegory_Frame);
         gRenderer->StartFrame();
@@ -194,6 +240,13 @@ int main(int argc, char** argv)
         PIXEndNamedEvent();
         PIXBeginNamedEvent(timingColour, "Profile manager tick");
         gProfile->Tick();
+#if LCE_PLATFORM_SWITCH
+        const bool playing = gApp.GetGameStarted() != 0;
+        WiiULiveSignIn::TickPresence(playing, playing ? minecraft->GetMiniGame()->GetId() : 0);
+        WiiULiveGames::Tick();
+        WiiULiveSocial::Tick();
+        WiiULiveCosmetics::Tick();
+#endif
         PIXEndNamedEvent();
         PIXBeginNamedEvent(timingColour, "Storage manager tick");
         gStorage->Tick();
@@ -235,6 +288,13 @@ int main(int argc, char** argv)
         InfoBarManager::EndTimingCategory(InfoBarManager::eTimingCagegory_Frame);
         PIXBeginNamedEvent(timingColour, "Frame present");
         gRenderer->Present();
+#if LCE_PLATFORM_SWITCH
+        if (firstFrame)
+        {
+            firstFrame = false;
+            SwitchLogStartupStage("Presented the first frame");
+        }
+#endif
         PIXEndNamedEvent();
         gRenderer->Set_matrixDirty();
         gConsoleUIController.CheckMenuDisplayed();
@@ -266,6 +326,10 @@ int main(int argc, char** argv)
         Vec3::resetPool();
     }
 
+#if LCE_PLATFORM_SWITCH
+    WiiULiveRelay::Shutdown();
+    WiiULiveSignIn::Shutdown();
+#endif
     ShutdownAndExit();
     return 0;
 }

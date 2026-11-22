@@ -9,11 +9,15 @@ namespace WiiULiveSignIn
 enum class Status { Idle, Starting, Waiting, SignedIn, Denied, Expired, Failed, Restoring };
 
 void Init();
+#if LCE_PLATFORM_SWITCH
+void Shutdown();
+std::string AccountName();
+#endif
 void RestoreSavedSession();
 void Start();
 void Cancel();
 Status Update();
-void TickPresence(bool playing);
+void TickPresence(bool playing, unsigned int miniGame = 0);
 const std::string& UserCode();
 const std::string& Username();
 std::wstring ErrorDetail();

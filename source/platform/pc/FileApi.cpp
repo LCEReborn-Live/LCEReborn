@@ -349,8 +349,17 @@ static fs::path ResolvePath(const char* fileName)
         return UnderRoot(PcSaveRoot(), rest);
     if (MatchMount(path, "/vol/packs", rest))
         return UnderRoot(PcPacksRoot(), rest);
+#if LCE_PLATFORM_SWITCH
+    if (MatchMount(path, "/vol/resources", rest))
+        return UnderRoot(PcResourceRoot(), rest);
+#endif
 
     const fs::path nativePath = GamePath(path);
+#if LCE_PLATFORM_SWITCH
+    if (path.compare(0, sizeof("sdmc:/") - 1, "sdmc:/") == 0
+        || path.compare(0, sizeof("romfs:/") - 1, "romfs:/") == 0)
+        return nativePath;
+#endif
     if ((!path.empty() && path[0] == '/') || nativePath.is_absolute())
         return nativePath;
     return ContentPath(UnderRoot(PcContentRoot(), path));
@@ -371,6 +380,9 @@ static bool SeekStream(std::FILE* stream, long long offset, int origin)
 {
 #if defined(_WIN32)
     return _fseeki64(stream, offset, origin) == 0;
+#elif LCE_PLATFORM_SWITCH
+    static_assert(sizeof(long) >= sizeof(long long), "Switch file offsets require a 64-bit long");
+    return std::fseek(stream, static_cast<long>(offset), origin) == 0;
 #else
     return fseeko(stream, static_cast<off_t>(offset), origin) == 0;
 #endif
@@ -380,6 +392,8 @@ static long long TellStream(std::FILE* stream)
 {
 #if defined(_WIN32)
     return _ftelli64(stream);
+#elif LCE_PLATFORM_SWITCH
+    return std::ftell(stream);
 #else
     return static_cast<long long>(ftello(stream));
 #endif

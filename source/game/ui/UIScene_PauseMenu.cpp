@@ -45,6 +45,9 @@
 #include "platform/C4JThreadImpl.hpp"
 #include "platform/Runtime.hpp"
 #include "game/ui/UIScene_OnlineSettingsMenu.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/wiiu/WiiULiveSignIn.hpp"
+#endif
 
 extern ConsoleUIController gConsoleUIController;
 
@@ -141,7 +144,12 @@ void UIScene_PauseMenu::Init()
     }
 
 #if LCE_PLATFORM_PC
-    if (getenv("LCE_LIVE_DIR") && primaryPlayer && CGameNetworkManager::sInstance.IsHost()
+#if LCE_PLATFORM_SWITCH
+    const bool liveAvailable = WiiULiveSignIn::IsSignedIn();
+#else
+    const bool liveAvailable = getenv("LCE_LIVE_DIR") != NULL;
+#endif
+    if (liveAvailable && primaryPlayer && CGameNetworkManager::sInstance.IsHost()
         && !CGameNetworkManager::sInstance.IsLocalGame())
         m_buttonList.AddNewMenuButton(L10N::GetString(IDS_TOOLTIPS_INVITE_FRIENDS), 10);
 #endif

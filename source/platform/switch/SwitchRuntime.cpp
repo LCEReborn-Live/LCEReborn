@@ -3,10 +3,18 @@
 
 #include <cstdio>
 #include <switch.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 bool SwitchEnterGameDirectory()
 {
+    // Mount before changing directories so libnx can resolve a relative NRO path.
+    if (R_FAILED(romfsInit()))
+        romfsMountFromCurrentProcess("romfs");
+
+    // A single-file install may be launched directly from /switch.
+    mkdir("sdmc:/switch", 0777);
+    mkdir("sdmc:/switch/LCEReborn", 0777);
     return chdir("sdmc:/switch/LCEReborn") == 0;
 }
 

@@ -22,6 +22,10 @@ static std::string ResourceRootFromOption(const std::string& option)
 {
     std::string root = RootFromOption(option, "resources");
     std::error_code error;
+#if LCE_PLATFORM_SWITCH
+    if (option.empty() && std::filesystem::is_directory("romfs:/resources/ui", error))
+        return "romfs:/resources";
+#endif
     if (std::filesystem::is_directory(std::filesystem::path(root) / "pc", error))
         root += "/pc";
     return root;
@@ -29,7 +33,17 @@ static std::string ResourceRootFromOption(const std::string& option)
 
 static std::string& ContentRoot()
 {
+#if LCE_PLATFORM_SWITCH
+    static std::string root = []() {
+        const std::string& option = PcGetLaunchOptions().contentDir;
+        std::error_code error;
+        if (option.empty() && std::filesystem::is_regular_file("romfs:/assets/Common/Media/MediaWiiU.arc", error))
+            return std::string("romfs:/assets");
+        return RootFromOption(option, "assets");
+    }();
+#else
     static std::string root = RootFromOption(PcGetLaunchOptions().contentDir, "assets");
+#endif
     return root;
 }
 
@@ -98,6 +112,14 @@ bool PcCheckGameFolders(std::string& message, bool needInterfaceArt)
     const std::filesystem::path content(PcContentRoot());
     if (!std::filesystem::is_directory(content, error))
     {
+#if LCE_PLATFORM_SWITCH
+        if (options.contentDir.empty())
+        {
+            message = "This NRO needs the prepared base game and Update 688. "
+                      "Copy assets/ to /switch/LCEReborn on the SD card, or use a full NRO.";
+            return false;
+        }
+#endif
         message = "The game content folder was not found:\n" + DisplayPath(PcContentRoot()) + "\n\n";
         if (options.contentDir.empty())
             message += "With no --content-dir, the game looks for assets in the working folder (" + workingFolder

@@ -93,15 +93,15 @@ jobs:
           path: build/switch-package/LCEReborn/LCEReborn.nro
           archive: false
           if-no-files-found: error
-      - name: Build the complete Switch SD-card ZIP
-        id: full-package
+      - name: Build the complete single-file Switch client
+        id: full-nro
         shell: bash
         env:
           SWITCH_ASSETS_URL: ${{ secrets.SWITCH_ASSETS_URL }}
           SWITCH_ASSETS_SHA256: ${{ vars.SWITCH_ASSETS_SHA256 }}
         run: |
           if [[ -z "$SWITCH_ASSETS_URL" && -z "$SWITCH_ASSETS_SHA256" ]]; then
-            echo "::notice::Complete SD-card ZIP skipped. No prepared game assets source is configured."
+            echo "::notice::Full NRO skipped. No prepared game assets source is configured."
             exit 0
           fi
           if [[ "$SWITCH_ASSETS_URL" != https://* || ! "$SWITCH_ASSETS_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
@@ -114,17 +114,14 @@ jobs:
             --retry 3 --max-time 900 --output "$staging/assets.zip" -- "$SWITCH_ASSETS_URL"
           printf '%s  %s\n' "$SWITCH_ASSETS_SHA256" "$staging/assets.zip" | sha256sum --check
           python3 -m zipfile -e "$staging/assets.zip" "$staging/input"
-          (
-            cd build/switch-package
-            python3 -m zipfile -c "$staging/client.zip" LCEReborn
-          )
-          python3 tools/package_switch.py --client "$staging/client.zip" --assets "$staging/input/assets" \
-            --output build/LCEReborn-Switch-SD.zip
+          cmake -S . -B build/switch -DLCE_SWITCH_ASSETS_DIR="$staging/input/assets"
+          cmake --build build/switch --target LCEReborn_full_nro --parallel 4
+          test -s build/switch/LCEReborn-Full.nro
           echo "ready=true" >> "$GITHUB_OUTPUT"
-      - name: Upload the complete Switch SD-card ZIP
-        if: steps.full-package.outputs.ready == 'true'
+      - name: Upload the complete single-file Switch client
+        if: steps.full-nro.outputs.ready == 'true'
         uses: actions/upload-artifact@v7
         with:
-          path: build/LCEReborn-Switch-SD.zip
+          path: build/switch/LCEReborn-Full.nro
           archive: false
           if-no-files-found: error

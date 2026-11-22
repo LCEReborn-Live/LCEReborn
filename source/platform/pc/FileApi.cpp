@@ -354,7 +354,8 @@ static fs::path ResolvePath(const char* fileName)
 
     const fs::path nativePath = GamePath(path);
 #if LCE_PLATFORM_SWITCH
-    if (path.compare(0, sizeof("sdmc:/") - 1, "sdmc:/") == 0)
+    if (path.compare(0, sizeof("sdmc:/") - 1, "sdmc:/") == 0
+        || path.compare(0, sizeof("romfs:/") - 1, "romfs:/") == 0)
         return nativePath;
 #endif
     if ((!path.empty() && path[0] == '/') || nativePath.is_absolute())

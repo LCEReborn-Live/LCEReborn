@@ -70,7 +70,7 @@ int main(int argc, char** argv)
 #if LCE_PLATFORM_SWITCH
     if (!SwitchEnterGameDirectory())
     {
-        SwitchShowStartupError("Place LCEReborn in /switch/LCEReborn on the SD card.");
+        SwitchShowStartupError("Could not open /switch/LCEReborn on the SD card. Check that the card is writable.");
         return 1;
     }
 #endif

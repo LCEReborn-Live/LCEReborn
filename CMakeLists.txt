@@ -295,8 +295,18 @@ endif()
 
 lce_add_program(LCEReborn Main.cpp)
 if(NINTENDO_SWITCH)
+  set(LCE_SWITCH_ASSETS_DIR "" CACHE PATH "Prepared base game and Update 688 assets for the full Switch NRO")
+  include(tools/build/switch-romfs.cmake)
+
   nx_generate_nacp(OUTPUT LCEReborn.nacp NAME "LCEReborn" AUTHOR "LCEReborn" VERSION "0.1.0")
-  nx_create_nro(LCEReborn_nro TARGET LCEReborn OUTPUT LCEReborn.nro NACP LCEReborn.nacp)
+  lce_switch_romfs(switch_client_romfs)
+  nx_create_nro(LCEReborn_nro TARGET LCEReborn OUTPUT LCEReborn.nro NACP LCEReborn.nacp ROMFS switch_client_romfs)
+
+  if(LCE_SWITCH_ASSETS_DIR)
+    lce_switch_romfs(switch_full_romfs "${LCE_SWITCH_ASSETS_DIR}")
+    nx_create_nro(LCEReborn_full_nro TARGET LCEReborn OUTPUT LCEReborn-Full.nro
+                  NACP LCEReborn.nacp ROMFS switch_full_romfs)
+  endif()
   return()
 endif()
 

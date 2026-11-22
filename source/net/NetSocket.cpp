@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #if LCE_PLATFORM_SWITCH
+#include <chrono>
 #include <switch.h>
 #else
 #include <ifaddrs.h>
@@ -220,11 +221,23 @@ void CloseNative(NativeSocket socket)
     close(socket);
 }
 
+#if LCE_PLATFORM_SWITCH
+bool SetNonblocking(NativeSocket socket)
+{
+    return fcntl(socket, F_SETFL, O_NONBLOCK) == 0;
+}
+
+bool IsRetryableSocketError(int error)
+{
+    return error == EAGAIN || error == EWOULDBLOCK || error == EINTR;
+}
+#else
 void SetBlocking(NativeSocket socket, bool blocking)
 {
     int flags = fcntl(socket, F_GETFL, 0);
     fcntl(socket, F_SETFL, blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK));
 }
+#endif
 #endif
 
 #if !LCE_PLATFORM_WIIU
@@ -767,7 +780,16 @@ bool TcpSocket::Connect(const Address& address, int timeoutMs, const CancelFlag&
         error = ConnectError(LastError());
         return false;
     }
+#if LCE_PLATFORM_SWITCH
+    if (!SetNonblocking(socket))
+    {
+        CloseNative(socket);
+        error = "Couldn't configure the network socket.";
+        return false;
+    }
+#else
     SetBlocking(socket, false);
+#endif
     NativeAddress target = ToNative(address);
     if (ConnectNative(socket, target) != 0)
     {
@@ -803,7 +825,10 @@ bool TcpSocket::Connect(const Address& address, int timeoutMs, const CancelFlag&
             return false;
         }
     }
+    // Switch BSD emulation can stall blocking reads and writes between threads.
+#if !LCE_PLATFORM_SWITCH
     SetBlocking(socket, true);
+#endif
     SetOption(socket, kProtoTcp, kTcpNoDelay, 1);
     m_handle = (intptr_t)socket;
     return true;
@@ -851,6 +876,13 @@ bool TcpSocket::Listen(unsigned short port, std::string& error, bool loopbackOnl
     }
 #if LCE_PLATFORM_WIIU
     SetBlocking(socket, false);
+#elif LCE_PLATFORM_SWITCH
+    if (!SetNonblocking(socket))
+    {
+        CloseNative(socket);
+        error = "Couldn't configure the listening socket.";
+        return false;
+    }
 #endif
     m_handle = (intptr_t)socket;
     return true;
@@ -878,6 +910,13 @@ bool TcpSocket::Accept(int timeoutMs, TcpSocket& accepted, Address& peer)
     NativeSocket socket = AcceptNative((NativeSocket)m_handle, from);
     if (!IsValid(socket))
         return false;
+#if LCE_PLATFORM_SWITCH
+    if (!SetNonblocking(socket))
+    {
+        CloseNative(socket);
+        return false;
+    }
+#endif
 #endif
     SetOption(socket, kProtoTcp, kTcpNoDelay, 1);
     accepted.Close();
@@ -893,12 +932,28 @@ bool TcpSocket::SendAll(const void* data, size_t size)
         return m_tls->SendAll(data, size);
 #endif
     const char* bytes = static_cast<const char*>(data);
+#if LCE_PLATFORM_SWITCH
+    using Clock = std::chrono::steady_clock;
+    const std::chrono::seconds stallTimeout(5);
+    auto deadline = Clock::now() + stallTimeout;
+#endif
     while (size > 0)
     {
         if (!IsOpen())
             return false;
         int chunk = size > 0x10000 ? 0x10000 : (int)size;
         int sent = SendNative((NativeSocket)m_handle, bytes, chunk);
+#if LCE_PLATFORM_SWITCH
+        if (sent < 0 && IsRetryableSocketError(LastError()))
+        {
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
+            if (remaining.count() <= 0 || !WaitFor((NativeSocket)m_handle, true, static_cast<int>(remaining.count())))
+                return false;
+            continue;
+        }
+        if (sent > 0)
+            deadline = Clock::now() + stallTimeout;
+#endif
         if (sent <= 0)
             return false;
         bytes += sent;
@@ -919,6 +974,10 @@ int TcpSocket::Receive(void* data, size_t size, int timeoutMs)
         return 0;
     int chunk = size > 0x10000 ? 0x10000 : (int)size;
     int received = RecvNative((NativeSocket)m_handle, data, chunk);
+#if LCE_PLATFORM_SWITCH
+    if (received < 0 && IsRetryableSocketError(LastError()))
+        return 0;
+#endif
     return received > 0 ? received : -1;
 }
 

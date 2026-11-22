@@ -17,6 +17,9 @@ permissions:
 jobs:
   windows:
     runs-on: windows-2022
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/build/windows-sccache
+      SCCACHE_CACHE_SIZE: 2G
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -59,6 +62,18 @@ jobs:
 
       - name: Set up MSVC build environment
         uses: ilammy/msvc-dev-cmd@v1
+      - name: Restore Windows compiler cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/windows-sccache
+          key: windows-clang-cl-v1-${{ runner.arch }}-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: windows-clang-cl-v1-${{ runner.arch }}-
+      - name: Set up sccache
+        id: windows-sccache
+        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+        with:
+          version: v0.19.0
+        continue-on-error: true
       - name: Check controller cursor timing
         shell: pwsh
         run: |
@@ -78,14 +93,29 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/build/qt.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake -S . -B build/pc -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release
+          $cacheArgs = @()
+          if (Get-Command sccache -ErrorAction SilentlyContinue) {
+            sccache --start-server
+            if ($LASTEXITCODE -eq 0) {
+              $cacheArgs = @('-DCMAKE_C_COMPILER_LAUNCHER=sccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=sccache')
+            }
+          }
+          cmake -S . -B build/pc -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release @cacheArgs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build build/pc --parallel 2
+          cmake --build build/pc --parallel ([Math]::Min(4, [Environment]::ProcessorCount))
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($cacheArgs.Count -ne 0) { sccache --show-stats }
           python tools/package_pc.py --build build/pc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/package_server.py --build build/pc
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Save Windows compiler cache
+        if: github.event_name == 'push' && steps.windows-sccache.outcome == 'success'
+        uses: actions/cache/save@v5
+        with:
+          path: build/windows-sccache
+          key: windows-clang-cl-v1-${{ runner.arch }}-${{ github.sha }}-${{ github.run_id }}
 
       - name: Name Windows dedicated server package
         shell: pwsh
@@ -154,6 +184,19 @@ jobs:
       - name: Install Docker
         uses: docker/setup-buildx-action@v3
 
+      - name: Cache Linux build dependencies
+        uses: actions/cache@v5
+        with:
+          path: build/deps
+          key: linux-build-deps-${{ hashFiles('tools/build/deps.json') }}
+
+      - name: Restore Linux compiler cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/linux-ccache
+          key: linux-clang-v1-${{ runner.arch }}-${{ hashFiles('tools/build/Dockerfile.linux') }}-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: linux-clang-v1-${{ runner.arch }}-${{ hashFiles('tools/build/Dockerfile.linux') }}-
+
       - name: Check game data downloader
         run: node --test tools/tests/game_download_test.mjs
 
@@ -166,12 +209,19 @@ jobs:
           set -euo pipefail
           python tools/build/deps.py build/deps
           python tools/build/layout.py build/deps build/third_party
-          python tools/build_linux.py
+          python tools/build_linux.py --compiler-cache
           version="${GITHUB_REF_NAME#v}"
           if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then version="0.1.0"; fi
           mv build/LCEReborn-linux-*.AppImage "build/LCEReborn-Live-Linux-$version.AppImage"
           mv build/LCEReborn-linux-*.tar.gz "build/LCEReborn-Live-Linux-Portable-$version.tar.gz"
           mv build/LCEReborn-server-linux-*.tar.gz "build/LCEReborn-Live-Server-Linux-$version.tar.gz"
+
+      - name: Save Linux compiler cache
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: build/linux-ccache
+          key: linux-clang-v1-${{ runner.arch }}-${{ hashFiles('tools/build/Dockerfile.linux') }}-${{ github.sha }}-${{ github.run_id }}
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7

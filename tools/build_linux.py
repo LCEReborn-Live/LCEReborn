@@ -18,6 +18,7 @@ Options:
   --clean         discard the cached build first (Qt and the image are kept)
   --allow-dirty   package a tree with uncommitted changes, for testing
   --no-package    build only
+  --compiler-cache persist compiler outputs in build/linux-ccache
 """
 import argparse
 import hashlib
@@ -75,6 +76,7 @@ def main():
     parser.add_argument("--clean", action="store_true", help="discard the cached build first")
     parser.add_argument("--allow-dirty", action="store_true", help="package a tree with uncommitted changes")
     parser.add_argument("--no-package", action="store_true", help="build only")
+    parser.add_argument("--compiler-cache", action="store_true", help="persist compiler outputs in build/linux-ccache")
     args = parser.parse_args()
 
     try:
@@ -92,10 +94,21 @@ def main():
         if args.clean:
             subprocess.run(["docker", "volume", "rm", "-f", BUILD_VOLUME], stdout=subprocess.DEVNULL)
 
+        configure = "cmake -S /src -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release"
+        cache_mount = []
+        if args.compiler_cache:
+            cache_dir = os.path.join(ROOT, "build", "linux-ccache")
+            os.makedirs(cache_dir, exist_ok=True)
+            cache_mount = ["-v", cache_dir + ":/ccache", "-e", "CCACHE_DIR=/ccache", "-e", "CCACHE_MAXSIZE=2G"]
+            configure += " -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+        else:
+            configure += " -DCMAKE_C_COMPILER_LAUNCHER= -DCMAKE_CXX_COMPILER_LAUNCHER="
+
         steps = ["git config --global --add safe.directory /src",
-                 "python3 /src/tools/build/qt.py",
-                 "cmake -S /src -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release",
+                 "python3 /src/tools/build/qt.py", configure,
                  "cmake --build /build"]
+        if args.compiler_cache:
+            steps.append("ccache --show-stats")
         if not args.no_package:
             steps.append("mkdir -p /build/live-runtime && cp /src/build/live-runtime/* /build/live-runtime/")
             steps.append("python3 /src/tools/package_pc.py --build /build" + (" --allow-dirty" if args.allow_dirty
@@ -103,7 +116,7 @@ def main():
             steps.append("python3 /src/tools/package_server.py --build /build" + (" --allow-dirty" if args.allow_dirty
                                                                                   else ""))
         command = ["docker", "run", "--rm", "-v", ROOT + ":/src", "-v", QT_VOLUME + ":/src/build/qt",
-                   "-v", BUILD_VOLUME + ":/build", image, "sh", "-c", " && ".join(steps)]
+                   "-v", BUILD_VOLUME + ":/build", *cache_mount, image, "sh", "-c", " && ".join(steps)]
         print("+ docker run %s %s" % (image, " && ".join(steps)), flush=True)
         if subprocess.run(command).returncode != 0:
             raise BuildError("the Linux build failed")

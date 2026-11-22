@@ -23,7 +23,7 @@ jobs:
       - name: Install build tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates ccache cmake curl git ninja-build python3
+          apt-get install -y --no-install-recommends ca-certificates ccache cmake git ninja-build python3
           dkp-pacman -S --needed --noconfirm switch-curl
       - name: Restore third-party dependencies
         id: dependencies
@@ -110,8 +110,21 @@ jobs:
           fi
           staging="$(mktemp -d)"
           trap 'rm -rf -- "$staging"' EXIT
-          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
-            --retry 3 --max-time 900 --output "$staging/assets.zip" -- "$SWITCH_ASSETS_URL"
+          PYTHONPATH=tools timeout 900s python3 - "$staging/assets.zip" <<'PY'
+          import os
+          from pathlib import Path
+          import shutil
+          import sys
+
+          from server_download import DownloadError, open_download
+
+          try:
+              with open_download({"url": os.environ["SWITCH_ASSETS_URL"]}) as response:
+                  with Path(sys.argv[1]).open("xb") as output:
+                      shutil.copyfileobj(response, output, length=1024 * 1024)
+          except (DownloadError, OSError) as error:
+              raise SystemExit(f"Could not download prepared Switch assets: {error}") from None
+          PY
           printf '%s  %s\n' "$SWITCH_ASSETS_SHA256" "$staging/assets.zip" | sha256sum --check
           python3 -m zipfile -e "$staging/assets.zip" "$staging/input"
           cmake -S . -B build/switch -DLCE_SWITCH_ASSETS_DIR="$staging/input/assets"

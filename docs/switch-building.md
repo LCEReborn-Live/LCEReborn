@@ -11,11 +11,13 @@ The `nintendo-switch-port` branch targets a homebrew build of LCEReborn for the 
 
 Keep the artifact's `packs/` folder next to `LCEReborn.nro`. Modern Textures loads automatically as the default pack.
 
+Open **LCE Live** on the main menu and enter the displayed code at [lcereborn.xyz/authorize](https://lcereborn.xyz/authorize). The session is restored on the next launch. Use **LCE Live** for friends and invitations, and **Invite Friends** in the pause menu of a hosted online world.
+
 On hardware, run homebrew in application mode so the game has enough memory. For this first milestone, create a small offline world and use a new save. The Switch port currently uses the Wii U save buffer limit.
 
 ## Compile using devkitPro
 
-Install devkitA64, libnx, switch-cmake, switch-tools, switch-mesa and the host tools CMake 3.24+, Ninja and Python 3. Then run:
+Install devkitA64, libnx, switch-cmake, switch-tools, switch-mesa, switch-curl and the host tools CMake 3.24+, Ninja and Python 3. Then run:
 
 ```sh
 python3 tools/build/deps.py build/deps

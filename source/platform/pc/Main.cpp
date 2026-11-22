@@ -48,7 +48,13 @@
 #include "platform/pc/PcStartWorld.hpp"
 #include "platform/pc/PcWindow.hpp"
 #if LCE_PLATFORM_SWITCH
+#include "game/minigame/MiniGameDef.hpp"
 #include "platform/switch/SwitchRuntime.hpp"
+#include "platform/wiiu/WiiULiveCosmetics.hpp"
+#include "platform/wiiu/WiiULiveGames.hpp"
+#include "platform/wiiu/WiiULiveRelay.hpp"
+#include "platform/wiiu/WiiULiveSignIn.hpp"
+#include "platform/wiiu/WiiULiveSocial.hpp"
 #endif
 
 extern CConsoleMinecraftApp gApp;
@@ -209,6 +215,10 @@ int main(int argc, char** argv)
     g_pLeaderboardManager->OpenSession();
     CGameNetworkManager::sInstance.Initialise();
     CGameNetworkManager::sInstance.SetLocalGame(true);
+#if LCE_PLATFORM_SWITCH
+    WiiULiveSignIn::Init();
+    WiiULiveSignIn::RestoreSavedSession();
+#endif
     ShaderPackManager::Get().Initialise();
 
     float timingColour = 0.0f;
@@ -230,6 +240,13 @@ int main(int argc, char** argv)
         PIXEndNamedEvent();
         PIXBeginNamedEvent(timingColour, "Profile manager tick");
         gProfile->Tick();
+#if LCE_PLATFORM_SWITCH
+        const bool playing = gApp.GetGameStarted() != 0;
+        WiiULiveSignIn::TickPresence(playing, playing ? minecraft->GetMiniGame()->GetId() : 0);
+        WiiULiveGames::Tick();
+        WiiULiveSocial::Tick();
+        WiiULiveCosmetics::Tick();
+#endif
         PIXEndNamedEvent();
         PIXBeginNamedEvent(timingColour, "Storage manager tick");
         gStorage->Tick();
@@ -309,6 +326,10 @@ int main(int argc, char** argv)
         Vec3::resetPool();
     }
 
+#if LCE_PLATFORM_SWITCH
+    WiiULiveRelay::Shutdown();
+    WiiULiveSignIn::Shutdown();
+#endif
     ShutdownAndExit();
     return 0;
 }

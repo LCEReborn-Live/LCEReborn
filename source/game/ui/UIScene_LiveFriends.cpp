@@ -7,9 +7,9 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
 #include <chrono>
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/CProfile.hpp"
 #include "platform/wiiu/WiiULiveSocial.hpp"
 #include "platform/wiiu/WiiULiveGames.hpp"
@@ -74,7 +74,7 @@ std::wstring Widen(const std::string& text)
 
 bool ReadSkin(const std::wstring& name, std::vector<unsigned char>& data)
 {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     FILE* file = PcLiveBridge::Open(name.c_str(), L"rb");
     if (file == NULL) return false;
     if (std::fseek(file, 0, SEEK_END) != 0)
@@ -331,14 +331,14 @@ int UIScene_LiveFriends::GetFaceTexture(const Entry& entry)
 {
     std::string revision = entry.revision;
     std::vector<unsigned char> bytes;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     const std::string* png = WiiULiveCosmetics::AvatarSkin(entry.id, revision);
     if (png == NULL) return -1;
 #endif
     for (size_t index = 0; index < m_faceTextures.size(); ++index)
         if (m_faceTextures[index].userId == entry.id && m_faceTextures[index].revision == revision) return m_faceTextures[index].texture;
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     bytes.assign(png->begin(), png->end());
 #else
     wchar_t fileName[64];
@@ -641,7 +641,7 @@ void UIScene_LiveFriends::handleReload()
 
 bool UIScene_LiveFriends::ReadSocial()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     std::string snapshot;
     const bool valid = WiiULiveSocial::ReadSnapshot(snapshot);
 #else
@@ -656,7 +656,7 @@ bool UIScene_LiveFriends::ReadSocial()
     std::fclose(file);
 #endif
     if (!valid) return false;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     const unsigned int generation = WiiULiveCosmetics::AvatarGeneration();
     const bool avatarsChanged = generation != m_avatarGeneration;
     m_avatarGeneration = generation;
@@ -706,7 +706,7 @@ bool UIScene_LiveFriends::ReadSocial()
 void UIScene_LiveFriends::PollLive()
 {
     const long long now = System::processTimeInMilliSecs();
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     m_liveConnected = WiiULiveSocial::Connected();
     m_connectionText = m_liveConnected ? L"" : L"Connecting to Live...";
 #else
@@ -730,7 +730,7 @@ void UIScene_LiveFriends::PollLive()
             m_message = L"Request timed out. Please try again.";
             if (timedOutInvite && !m_inviteQueue.empty()) m_nextQueuedInviteAt = now + 800;
         }
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
         const auto result = SplitTabs(WiiULiveSocial::ActionResult());
 #else
         const auto result = SplitTabs(ReadLiveText(L"social-result.tsv"));
@@ -750,7 +750,7 @@ void UIScene_LiveFriends::PollLive()
                     m_nextQueuedInviteAt = now + 1000;
                 }
             }
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
             PcLiveBridge::Remove(L"social-result.tsv");
 #endif
             if (joining) { navigateBack(); return; }
@@ -768,16 +768,16 @@ void UIScene_LiveFriends::PollLive()
         m_achievementsReady = false;
         m_unlocked.clear();
         if (!m_inviteMode) m_message.clear();
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
         FILE* file = PcLiveBridge::Open(L"social-profile.tmp", L"wb");
         if (file) { std::fprintf(file, "%u", id); std::fclose(file); PcLiveBridge::Rename(L"social-profile.tmp", L"social-profile.txt"); }
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
         WiiULiveSocial::SelectProfile(m_tab == eTab_Friends || m_tab == eTab_Invites ? id : 0);
 #endif
     }
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     const auto profile = SplitTabs(ReadLiveText(L"social-profile.tsv"));
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     const auto profile = SplitTabs(WiiULiveSocial::ProfileResult());
 #endif
 #if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
@@ -812,8 +812,13 @@ void UIScene_LiveFriends::PollLive()
 
 const wchar_t* UIScene_LiveFriends::Entry::WiiUStatus() const
 {
-    if (!online || platform != "wiiu") return NULL;
-    return presence == "game" || presence == "minigame" ? L"Playing on Wii U" : L"Online on Wii U";
+    if (!online) return NULL;
+    const bool playing = presence == "game" || presence == "minigame";
+    if (platform == "switch")
+        return playing ? L"Playing on Nintendo Switch" : L"Online on Nintendo Switch";
+    if (platform == "wiiu")
+        return playing ? L"Playing on Wii U" : L"Online on Wii U";
+    return NULL;
 }
 
 std::wstring UIScene_LiveFriends::EntryLabel(const Entry& entry) const
@@ -880,7 +885,7 @@ void UIScene_LiveFriends::SendAction(char action, unsigned int id)
     }
     if (!m_liveConnected) { m_message = L"Live is offline. Try again shortly."; return; }
     const std::string request = std::to_string(System::currentRealTimeMillis());
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     std::string target = std::to_string(id);
     if (action == 'V')
         for (const Entry& entry : m_entries[eTab_Friends])
@@ -910,13 +915,13 @@ void UIScene_LiveFriends::SendAction(char action, unsigned int id)
 
 bool UIScene_LiveFriends::JoinEntry(const Entry& entry)
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (!gProfile->AllowedToPlayMultiplayer(m_playerId) || !WiiULiveGames::Join(entry.id))
     {
         m_message = L"No joinable world right now.";
         return false;
     }
-    navigateBack();
+    // The networking state opens the connection screen and keeps the chosen pad locked.
     return true;
 #else
     if (!entry.joinable) { m_message = L"No joinable world right now."; return false; }
@@ -991,7 +996,7 @@ int UIScene_LiveFriends::AddFriendKeyboardReturned(void* context, bool accepted)
             else
             {
                 const std::string request = std::to_string(System::currentRealTimeMillis());
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
                 if (WiiULiveSocial::SendAction(request, 'N', username))
                 {
                     scene->m_pendingAction = request;

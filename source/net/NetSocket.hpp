@@ -35,7 +35,7 @@ bool Resolve(const std::string& text, Address& address, std::string& error);
 std::vector<uint32_t> BroadcastAddresses();
 bool LocalAddress(uint32_t& ip);
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 class WiiURelayTls;
 #endif
 class TcpSocket
@@ -46,7 +46,7 @@ public:
 
     bool Connect(const Address& address, int timeoutMs, const CancelFlag& cancel, std::string& error);
     bool Listen(unsigned short port, std::string& error, bool loopbackOnly = false);
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     bool EnableRelayTls(const std::string& hostname, const std::string& seed, int timeoutMs, const CancelFlag& cancel);
 #endif
     bool Accept(int timeoutMs, TcpSocket& accepted, Address& peer);
@@ -56,7 +56,7 @@ public:
     void Close();
     bool IsOpen() const
     {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
         if (m_tls != 0)
             return true;
 #endif
@@ -70,7 +70,7 @@ private:
 
     static const intptr_t kInvalid = -1;
     intptr_t m_handle;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     WiiURelayTls* m_tls;
 #endif
 };

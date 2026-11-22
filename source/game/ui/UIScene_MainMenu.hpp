@@ -9,7 +9,7 @@
 #include "game/ui/UIControl_Button.hpp"
 #include "game/ui/UILayer.hpp"
 #include "platform/C4JStorage.hpp"
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/wiiu/WiiULiveSignIn.hpp"
 #endif
 
@@ -56,7 +56,7 @@ public:
 
 private:
     void layoutLiveMenuButtons();
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     void updateLiveSignIn();
     static int closeLiveSignIn(void* context, int pad, C4JStorage::EMessageResult result);
     int m_liveSignInPad = -1;

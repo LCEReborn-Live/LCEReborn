@@ -5,7 +5,7 @@
 #include "game/core/System.hpp"
 #include "platform/C4JEventImpl.hpp"
 #include "platform/C4JThreadImpl.hpp"
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/C4JThread.hpp"
 #include "platform/pc/PcJson.hpp"
 #include "platform/wiiu/WiiULiveGames.hpp"
@@ -27,7 +27,7 @@ int64_t NowMs()
     return System::processTimeInMilliSecs();
 }
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 struct Link::LiveJoinTicket
 {
     C4JCriticalSection lock;
@@ -95,7 +95,7 @@ void Link::Connect(const Address& address)
 void Link::Connect(const std::string& address)
 {
     m_targetText = address;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     const bool relay = address.compare(0, sizeof("live-relay:") - 1, "live-relay:") == 0;
     const bool tls = address.compare(0, sizeof("live-relay-tls:") - 1, "live-relay-tls:") == 0;
     const bool direct = address.compare(0, sizeof("live-direct:") - 1, "live-direct:") == 0;
@@ -319,7 +319,7 @@ void Link::ReadLoop()
     if (m_connecting)
     {
         std::string error;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
         std::string ticket;
         std::string tlsSeed;
         if (m_liveJoinTicket)
@@ -365,7 +365,7 @@ void Link::ReadLoop()
             Fail(error);
             return;
         }
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
         if (m_liveJoinTicket && m_liveJoinTicket->tls
             && !socket.EnableRelayTls(m_targetText.substr(0, m_targetText.rfind(':')), tlsSeed, kConnectTimeoutMs, *this))
         {

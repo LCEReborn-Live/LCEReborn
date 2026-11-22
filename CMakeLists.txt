@@ -185,7 +185,13 @@ if(NINTENDO_SWITCH)
   list(FILTER LCE_PLATFORM_SOURCES EXCLUDE REGEX "/platform/pc/(PcCrashReport|PcDiscord|PcServer|PcStopSignals)\\.cpp$")
   list(APPEND LCE_PLATFORM_SOURCES
     "${LCE_SOURCE}/platform/switch/SwitchRuntime.cpp"
-    "${LCE_SOURCE}/platform/switch/SwitchDesktopServices.cpp")
+    "${LCE_SOURCE}/platform/switch/SwitchDesktopServices.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveSignIn.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveSocial.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveGames.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveCosmetics.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiULiveRelay.cpp"
+    "${LCE_SOURCE}/platform/wiiu/WiiURelayTls.cpp")
 endif()
 # The LAN and internet play shared with the Wii U build.
 file(GLOB LCE_NET_SOURCES CONFIGURE_DEPENDS "${LCE_SOURCE}/net/*.cpp")
@@ -196,6 +202,27 @@ list(APPEND LCE_PLATFORM_SOURCES
   "${LCE_SOURCE}/platform/wiiu/System.cpp")
 add_library(lce_platform OBJECT ${LCE_PLATFORM_SOURCES})
 target_link_libraries(lce_platform PRIVATE lce_common lce_zlib SDL3::SDL3-static)
+if(NINTENDO_SWITCH)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  set(live_certs "${CMAKE_BINARY_DIR}/live-certs")
+  execute_process(
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/gamedata/live_roots.py" "${live_certs}"
+    COMMAND_ERROR_IS_FATAL ANY)
+  set(bearssl "${CMAKE_SOURCE_DIR}/build/third_party/bearssl")
+  file(GLOB_RECURSE bearssl_sources CONFIGURE_DEPENDS "${bearssl}/src/*.c")
+  if(NOT bearssl_sources)
+    message(FATAL_ERROR "Run tools/build/layout.py to stage BearSSL before building the Switch client.")
+  endif()
+  add_library(lce_switch_bearssl STATIC ${bearssl_sources})
+  target_include_directories(lce_switch_bearssl PUBLIC "${bearssl}/inc" PRIVATE "${bearssl}/src")
+  target_compile_definitions(lce_switch_bearssl PRIVATE BR_USE_URANDOM=0 BR_USE_GETENTROPY=0)
+  find_library(switch_curl NAMES curl PATHS "${DEVKITPRO}/portlibs/switch/lib" NO_DEFAULT_PATH REQUIRED)
+  find_library(switch_curl_zlib NAMES z PATHS "${DEVKITPRO}/portlibs/switch/lib" NO_DEFAULT_PATH REQUIRED)
+  target_include_directories(lce_platform PRIVATE "${live_certs}")
+  set_property(SOURCE "${LCE_SOURCE}/platform/wiiu/WiiULiveSignIn.cpp" APPEND
+    PROPERTY INCLUDE_DIRECTORIES "${switch_portlibs_include}")
+  target_link_libraries(lce_platform PRIVATE lce_switch_bearssl)
+endif()
 set_target_properties(lce_platform PROPERTIES CXX_STANDARD 17)
 add_custom_target(lce_build_info
   COMMAND "${CMAKE_COMMAND}" -DSOURCE_DIR="${CMAKE_SOURCE_DIR}" -DOUTPUT="${CMAKE_BINARY_DIR}/generated/BuildInfo.hpp"
@@ -239,6 +266,9 @@ function(lce_add_program target main)
   add_executable(${target} "${LCE_SOURCE}/platform/pc/${main}" $<TARGET_OBJECTS:lce_game>
                  $<TARGET_OBJECTS:lce_platform> $<TARGET_OBJECTS:lce_audio>)
   target_link_libraries(${target} PRIVATE lce_common lce_png lce_zlib SDL3::SDL3-static opus lce_rnnoise)
+  if(NINTENDO_SWITCH)
+    target_link_libraries(${target} PRIVATE lce_switch_bearssl "${switch_curl}" "${switch_curl_zlib}")
+  endif()
   set_target_properties(${target} PROPERTIES CXX_STANDARD 17)
   target_compile_definitions(${target} PRIVATE LCE_DISCORD_APP_ID="${LCE_DISCORD_APP_ID}")
   if(WIN32)

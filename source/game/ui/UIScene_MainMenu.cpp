@@ -37,7 +37,7 @@
 #include "game/ui/FJ_Base.hpp"
 #include "game/ui/FJ_Factory.hpp"
 #include "game/ui/FJ_FuiNode.hpp"
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
 #include "platform/pc/PcLiveBridge.hpp"
 #endif
 #include "game/ui/ScreenSizeCalculator.hpp"
@@ -121,7 +121,7 @@ UIScene_MainMenu::UIScene_MainMenu(int sceneType, void*, UILayer* layer)
 
 UIScene_MainMenu::~UIScene_MainMenu()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_liveSignInPad >= 0)
         WiiULiveSignIn::Cancel();
 #endif
@@ -179,11 +179,11 @@ void UIScene_MainMenu::proceedToScene(int, EUIScene scene)
 
 void UIScene_MainMenu::handleReload()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     m_buttons[7].setLabel(UIString(L"LCE Live"), false, false);
     layoutLiveMenuButtons();
 #else
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     if (PcLiveBridge::Enabled())
     {
         m_buttons[7].setLabel(UIString(L"LCE Live"), false, false);
@@ -198,7 +198,7 @@ void UIScene_MainMenu::handleReload()
 void UIScene_MainMenu::layoutLiveMenuButtons()
 {
 #if LCE_PLATFORM_PC || LCE_PLATFORM_WIIU
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     if (!PcLiveBridge::Enabled())
         return;
 #endif
@@ -308,7 +308,7 @@ std::wstring UIScene_MainMenu::getMoviePath()
 void UIScene_MainMenu::tick()
 {
     UIScene::tick();
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     updateLiveSignIn();
 #endif
     if (hasFocus(m_playerId))
@@ -337,7 +337,7 @@ void UIScene_MainMenu::tick()
     }
 }
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 int UIScene_MainMenu::closeLiveSignIn(void* context, int, C4JStorage::EMessageResult)
 {
     UIScene_MainMenu* menu = static_cast<UIScene_MainMenu*>(context);
@@ -795,14 +795,14 @@ void UIScene_MainMenu::handlePress(int controlId, int)
         return;
     case 7:
     {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
         if (PcLiveBridge::Enabled())
         {
             gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
             gConsoleUIController.NavigateToScene(pad, EUIScene_LiveFriends, NULL, EUILayer_Scene,
                                                  EUIGroup_PlayerDefault);
         }
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
         gConsoleUIController.PlayUISFX(SoundEvents::UI_PRESS);
         if (WiiULiveSignIn::IsSignedIn())
         {
@@ -876,9 +876,9 @@ void UIScene_MainMenu::handleGainFocus(bool hadFocus)
     m_buttons[4].setVisible(true);
     m_buttons[5].setVisible(true);
     m_buttons[6].setVisible(true);
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     m_buttons[7].setVisible(PcLiveBridge::Enabled());
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     m_buttons[7].setVisible(true);
 #else
     m_buttons[7].setVisible(false);

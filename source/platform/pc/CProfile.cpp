@@ -1,5 +1,9 @@
 #include "platform/pc/CProfile.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/wiiu/WiiULiveSignIn.hpp"
+#endif
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -353,6 +357,10 @@ bool CProfile::IsSignedIn(int quadrant)
 
 bool CProfile::IsSignedInLive(int quadrant)
 {
+#if LCE_PLATFORM_SWITCH
+    if (quadrant == 0 && IsSignedIn(quadrant) && WiiULiveSignIn::IsSignedIn())
+        return true;
+#endif
     return IsSignedIn(quadrant) && mNetworkAvailable && mFriendPresenceOnline;
 }
 
@@ -544,12 +552,24 @@ PlayerUID CProfile::QuadrantOfflineXUID(int quadrant)
     if (quadrant < 0 || quadrant >= 4 || !mProfiles[quadrant].signedIn)
         return uid;
     uid.uuid = mProfiles[quadrant].uuid;
+#if LCE_PLATFORM_SWITCH
+    if (quadrant == 0)
+    {
+        const std::string uuid = WiiULiveSignIn::PlayerUuid();
+        if (uuid.size() == 32)
+            uid.uuid = UuidFromHex(uuid);
+    }
+#endif
     uid.flags = PlayerUID::FlagUuid | (mProfiles[quadrant].onlineAccount ? PlayerUID::FlagOnlineAccount : 0u);
     return uid;
 }
 
 PlayerUID CProfile::QuadrantOnlineXUID(int quadrant)
 {
+#if LCE_PLATFORM_SWITCH
+    if (quadrant == 0 && WiiULiveSignIn::IsSignedIn())
+        return QuadrantOfflineXUID(quadrant);
+#endif
     if (mFriendPresenceOnline)
         return QuadrantOfflineXUID(quadrant);
     return PlayerUID(0);
@@ -647,6 +667,19 @@ wchar_t* CProfile::GetMiiName(int quadrant)
 
 wchar_t* CProfile::GetGamertag(int quadrant)
 {
+#if LCE_PLATFORM_SWITCH
+    if (quadrant == 0 && IsSignedIn(quadrant))
+    {
+        const std::string name = WiiULiveSignIn::AccountName();
+        if (!name.empty())
+        {
+            static thread_local wchar_t accountName[21];
+            std::copy(name.begin(), name.end(), accountName);
+            accountName[name.size()] = L'\0';
+            return accountName;
+        }
+    }
+#endif
     return GetMiiName(quadrant);
 }
 

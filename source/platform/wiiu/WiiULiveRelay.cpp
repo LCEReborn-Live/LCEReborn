@@ -1,6 +1,10 @@
 #include "platform/wiiu/WiiULiveRelay.hpp"
 
+#if LCE_PLATFORM_SWITCH
+#include "platform/switch/SwitchLiveWorker.hpp"
+#else
 #include <coreinit/thread.h>
+#endif
 #include <deque>
 #include <memory>
 
@@ -36,8 +40,12 @@ struct Guest
     lcenet::Address peer;
 };
 
+#if LCE_PLATFORM_SWITCH
+SwitchLiveWorker worker;
+#else
 alignas(32) OSThread worker;
 alignas(32) unsigned char stack[128 * 1024];
+#endif
 C4JCriticalSection lock;
 bool initialised = false;
 bool workerActive = false;
@@ -191,9 +199,13 @@ void RoomCreated(const std::string& requestedListing, long status, const std::st
     EnterCriticalSection(&lock);
     cancelled = false;
     LeaveCriticalSection(&lock);
+#if LCE_PLATFORM_SWITCH
+    workerActive = worker.Start([] { ServeRoom(0, nullptr); });
+#else
     workerActive = OSCreateThread(&worker, ServeRoom, 0, NULL, stack + sizeof(stack), sizeof(stack), 16, 0);
     if (workerActive)
         OSResumeThread(&worker);
+#endif
 }
 
 std::string ListingPayload(bool privateGame, unsigned int miniGame, unsigned int firstFilter, unsigned int secondFilter)
@@ -240,9 +252,15 @@ void TickHost(bool hosting, bool privateGame, unsigned int miniGame, unsigned in
     }
     if (workerActive)
     {
+#if LCE_PLATFORM_SWITCH
+        if (!worker.Finished())
+            return;
+        worker.Join();
+#else
         if (!OSIsThreadTerminated(&worker))
             return;
         OSJoinThread(&worker, NULL);
+#endif
         workerActive = false;
     }
     if (!room.id.empty())
@@ -279,6 +297,15 @@ void StopHosting()
     guests.clear();
     LeaveCriticalSection(&lock);
 }
+
+#if LCE_PLATFORM_SWITCH
+void Shutdown()
+{
+    StopHosting();
+    worker.Join();
+    workerActive = false;
+}
+#endif
 
 bool TakeGuest(lcenet::TcpSocket& socket, lcenet::Address& peer)
 {

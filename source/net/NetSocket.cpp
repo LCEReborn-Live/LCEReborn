@@ -12,7 +12,6 @@
 #include <nn/ac/ac_cpp.h>
 
 #include "platform/wiiu/C4JThreadImpl.hpp"
-#include "platform/wiiu/WiiURelayTls.hpp"
 #elif defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -31,6 +30,10 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif
+
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+#include "platform/wiiu/WiiURelayTls.hpp"
 #endif
 
 namespace lcenet
@@ -711,7 +714,7 @@ bool LocalAddress(uint32_t& ip)
 }
 
 TcpSocket::TcpSocket() : m_handle(kInvalid)
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     , m_tls(0)
 #endif
 {
@@ -727,14 +730,14 @@ void TcpSocket::Swap(TcpSocket& other)
     intptr_t handle = m_handle;
     m_handle = other.m_handle;
     other.m_handle = handle;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     WiiURelayTls* tls = m_tls;
     m_tls = other.m_tls;
     other.m_tls = tls;
 #endif
 }
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 bool TcpSocket::EnableRelayTls(const std::string& hostname, const std::string& seed, int timeoutMs, const CancelFlag& cancel)
 {
     if (m_tls != 0 || m_handle == kInvalid)
@@ -885,7 +888,7 @@ bool TcpSocket::Accept(int timeoutMs, TcpSocket& accepted, Address& peer)
 
 bool TcpSocket::SendAll(const void* data, size_t size)
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_tls != 0)
         return m_tls->SendAll(data, size);
 #endif
@@ -906,7 +909,7 @@ bool TcpSocket::SendAll(const void* data, size_t size)
 
 int TcpSocket::Receive(void* data, size_t size, int timeoutMs)
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_tls != 0)
         return m_tls->Receive(data, size, timeoutMs);
 #endif
@@ -921,7 +924,7 @@ int TcpSocket::Receive(void* data, size_t size, int timeoutMs)
 
 void TcpSocket::Shutdown()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (m_tls != 0)
     {
         m_tls->Shutdown();
@@ -934,7 +937,7 @@ void TcpSocket::Shutdown()
 
 void TcpSocket::Close()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     delete m_tls;
     m_tls = 0;
 #endif

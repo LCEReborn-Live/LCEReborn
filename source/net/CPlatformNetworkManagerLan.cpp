@@ -24,9 +24,9 @@
 #include "net/NetMessages.hpp"
 #include "net/NetworkPlayerLan.hpp"
 #include "net/ServerList.hpp"
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
 #include "platform/pc/PcLiveBridge.hpp"
-#elif LCE_PLATFORM_WIIU
+#elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/wiiu/WiiULiveGames.hpp"
 #include "platform/wiiu/WiiULiveRelay.hpp"
 #endif
@@ -60,7 +60,7 @@ unsigned int g_liveReportedRevision = 0;
 
 FILE* LiveFile(const wchar_t* file, const wchar_t* mode)
 {
-#if LCE_PLATFORM_PC
+#if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
     return PcLiveBridge::Open(file, mode);
 #else
     (void)file;
@@ -86,14 +86,14 @@ std::wstring LiveName(const char* utf8)
     return result.empty() ? L"Live world" : result;
 }
 
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 std::string Narrow(const std::wstring& text);
 #endif
 
 std::vector<LiveEntry> ReadLiveEntries(std::string& snapshot)
 {
     std::vector<LiveEntry> entries;
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     for (const WiiULiveGames::Listing& listing : WiiULiveGames::Directory())
     {
         LiveEntry entry;
@@ -336,7 +336,7 @@ void CPlatformNetworkManagerLan::DoWork()
     FinishJoining();
     ProcessStateChanges();
     UpdateBeacon();
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     EnterCriticalSection(&m_lock);
     const bool relayHost = m_host && m_listening && !m_localGame && m_internalState == eState_Playing
         && m_sessionData.m_bGameStarted;
@@ -1864,7 +1864,7 @@ void CPlatformNetworkManagerLan::StartListening()
 
 void CPlatformNetworkManagerLan::StopListening()
 {
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     WiiULiveRelay::StopHosting();
 #endif
     if (!m_listening)
@@ -1926,7 +1926,7 @@ void CPlatformNetworkManagerLan::AdoptAcceptedSockets()
     EnterCriticalSection(&m_acceptLock);
     accepted.swap(m_acceptedSockets);
     LeaveCriticalSection(&m_acceptLock);
-#if LCE_PLATFORM_WIIU
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     for (;;)
     {
         lcenet::TcpSocket socket;

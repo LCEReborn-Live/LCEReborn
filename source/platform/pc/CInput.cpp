@@ -6,6 +6,7 @@
 #include "platform/pc/Renderer.hpp"
 #if LCE_PLATFORM_SWITCH
 #include "platform/switch/SwitchRuntime.hpp"
+#include <switch.h>
 #endif
 
 #include <SDL3/SDL.h>
@@ -2232,6 +2233,26 @@ void CInput::TickKeyboard()
 {
     if (keyboardState == EKeyboardState_Requested)
     {
+#if LCE_PLATFORM_SWITCH
+        SwkbdConfig config;
+        if (R_SUCCEEDED(swkbdCreate(&config, 0)))
+        {
+            swkbdConfigMakePresetDefault(&config);
+            const std::string title = WideToUtf8(keyboardTitle);
+            const std::string initial = WideToUtf8(keyboardText);
+            swkbdConfigSetHeaderText(&config, title.c_str());
+            swkbdConfigSetInitialText(&config, initial.c_str());
+            swkbdConfigSetStringLenMax(&config, keyboardMaximumLength);
+            char text[kKeyboardTextLimit * 4 + 1] = {};
+            const Result result = swkbdShow(&config, text, sizeof(text));
+            swkbdClose(&config);
+            keyboardEditText.clear();
+            if (R_SUCCEEDED(result))
+                HandleKeyboardTextInput(text);
+            FinishKeyboard(R_SUCCEEDED(result));
+            return;
+        }
+#endif
         keyboardEditText.assign(keyboardText, keyboardText + std::wcslen(keyboardText));
         keyboardAccepted = false;
         keyboardCancelled = false;

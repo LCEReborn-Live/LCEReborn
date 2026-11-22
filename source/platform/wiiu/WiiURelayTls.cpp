@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <cstring>
+#if LCE_PLATFORM_SWITCH
+#include <ctime>
+#include <switch.h>
+#endif
 #include "game/core/System.hpp"
 #include "net/NetLink.hpp"
 
@@ -79,12 +83,31 @@ bool WiiURelayTls::Connect(TcpSocket& socket, const std::string& hostname, const
     br_ssl_client_init_full(&m_client, &m_validation, m_anchors, 2);
     br_ssl_engine_set_versions(&m_client.eng, BR_TLS12, BR_TLS12);
     br_ssl_engine_add_flags(&m_client.eng, BR_OPT_NO_RENEGOTIATION);
+#if LCE_PLATFORM_SWITCH
+    const std::time_t unixTime = std::time(nullptr);
+    if (unixTime <= 0)
+        return false;
+    const uint64_t seconds = static_cast<uint64_t>(unixTime);
+    br_x509_minimal_set_time(&m_validation, static_cast<uint32_t>(seconds / 86400) + 719528,
+                            static_cast<uint32_t>(seconds % 86400));
+#else
     // Cafe's real-time counter starts at 2000-01-01. BearSSL counts days from 0000-01-01.
     const uint64_t seconds = System::currentRealTimeMillis() / 1000;
     br_x509_minimal_set_time(&m_validation, static_cast<uint32_t>(seconds / 86400) + 730485,
                             static_cast<uint32_t>(seconds % 86400));
+#endif
     br_ssl_engine_set_buffer(&m_client.eng, m_buffer, sizeof(m_buffer), 1);
     br_ssl_engine_inject_entropy(&m_client.eng, seed.data(), seed.size());
+#if LCE_PLATFORM_SWITCH
+    unsigned char entropy[32];
+    if (R_FAILED(csrngInitialize()))
+        return false;
+    const Result random = csrngGetRandomBytes(entropy, sizeof(entropy));
+    csrngExit();
+    if (R_FAILED(random))
+        return false;
+    br_ssl_engine_inject_entropy(&m_client.eng, entropy, sizeof(entropy));
+#endif
     if (!br_ssl_client_reset(&m_client, hostname.c_str(), 0))
         return false;
     m_socket.Swap(socket);

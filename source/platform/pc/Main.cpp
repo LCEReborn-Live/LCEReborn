@@ -214,6 +214,9 @@ int main(int argc, char** argv)
     float timingColour = 0.0f;
     while (!PcExitRequested())
     {
+#if LCE_PLATFORM_SWITCH
+        C4JThreadImpl::ReapFinishedThreads();
+#endif
         PcPumpEvents();
         InfoBarManager::StartTimingCategory(InfoBarManager::eTimingCagegory_Frame);
         gRenderer->StartFrame();

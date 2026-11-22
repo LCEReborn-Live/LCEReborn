@@ -32,6 +32,9 @@ public:
     virtual const char* getName();
     virtual void SetDeleteOnExit(bool deleteOnExit);
     static void SetMainThreadID();
+#if LCE_PLATFORM_SWITCH
+    static void ReapFinishedThreads();
+#endif
 
 private:
     static void entryPoint(C4JThreadImpl* thread);

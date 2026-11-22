@@ -39,6 +39,8 @@ The `wiiu-wuhb-complete` artifact contains `LCEReborn-complete.wuhb` with the ba
 
 The smaller `wiiu-wuhb` artifact contains `LCEReborn.wuhb` for an existing SD card layout. It uses prepared game files in `wiiu/LCEReborn/content/` on the Wii U SD card, or in the `sdcard/` folder under Cemu's user data directory.
 
+Both bundles include Modern Textures. The game loads it automatically as the default pack, and classic Minecraft textures are still available in the pack selector.
+
 The `wiiu-rpx` artifact contains `Minecraft.Client.rpx` and its link map. To combine the downloaded RPX and both of your dumps into a single WUHB, run:
 
 ```

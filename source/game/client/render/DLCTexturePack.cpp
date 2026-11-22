@@ -102,13 +102,13 @@ bool DLCTexturePack::IsModernTexturePack(DLCPack* pack)
 
 void DLCTexturePack::loadIcon()
 {
+#if LCE_PLATFORM_PC
     if (IsModernTexturePack(m_dlcPack))
     {
-#if LCE_PLATFORM_PC
         m_pIconData = getModernTexturePackIcon(m_iconSize);
-#endif
         return;
     }
+#endif
 
     if (m_dlcPack->doesPackContainFile(DLCManager::eDLCType_Texture, L"icon", true, true))
     {

@@ -532,7 +532,6 @@ const MiniGameDef::PlayerEquipmentInfo& MiniGameDef::ModeVariationLootGroup::Get
     return mPlayerEquipment;
 }
 
-#if LCE_PLATFORM_PC
 namespace
 {
 void AddBattleShieldLoot(std::vector<MiniGameDef::LootSetDef>& lootSets)
@@ -596,7 +595,6 @@ void AddBattleShieldLoot(std::vector<MiniGameDef::LootSetDef>& lootSets)
     }
 }
 }
-#endif
 
 MiniGameDef::MiniGameDef(const XmlObject& object)
     : mOptionDefaults(),
@@ -743,10 +741,8 @@ MiniGameDef::MiniGameDef(const XmlObject& object)
         }
     }
 
-#if LCE_PLATFORM_PC
     if (mId == eMiniGameId_Battle)
         AddBattleShieldLoot(mLootSets);
-#endif
 
     const XmlObject* blockTicking = object.child(L"BlockTicking");
     mBlockData.mTickOverride = (*blockTicking)[L"override"].maybeBool();

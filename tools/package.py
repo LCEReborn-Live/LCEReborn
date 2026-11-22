@@ -17,8 +17,8 @@ The bundle is its own title with its own saves; it needs no Wii U game installed
 Open it in Cemu with tools/launch_cemu.py, or copy it to
 wiiu/apps/ on the SD card for Aroma.
 
-Use --code-only to package the RPX for use with prepared content in
-wiiu/LCEReborn/content on an SD card or Cemu's virtual SD card.
+Use --code-only to package the RPX and project assets for use with prepared
+base game content in wiiu/LCEReborn/content on an SD card or Cemu's virtual SD card.
 """
 import argparse
 import gzip
@@ -90,12 +90,18 @@ def build_bundle(rpx, update, files):
     meta = root.add(wuhb.Dir("meta"))
     meta.add(wuhb.file_bytes("meta.ini", wuhb.meta_ini(LONG_NAME, SHORT_NAME, AUTHOR)))
     content = root.add(wuhb.Dir("content"))
+    files = dict(files)
+    for relative in ("resources/pc/experimental/shield_base_1_14.png",
+                     "resources/pc/experimental/shield_icon.png",
+                     "packs/1.14 Texture Pack/TexturePack.pck",
+                     "packs/1.14 Texture Pack/Data/x16Data.pck"):
+        files[relative.replace("resources/pc/", "resources/", 1)] = os.path.join(ROOT, relative)
     if update is not None:
         for name in META_IMAGES:
             image = read_file(os.path.join(update, "meta", name + ".tga"))
             meta.add(wuhb.file_bytes(name + ".tga.gz", gzip.compress(image, 9, mtime=0)))
-        for relative, path in sorted(files.items()):
-            content.add_path(relative, os.path.getsize(path), lambda path=path: read_file(path))
+    for relative, path in sorted(files.items()):
+        content.add_path(relative, os.path.getsize(path), lambda path=path: read_file(path))
     return root
 
 

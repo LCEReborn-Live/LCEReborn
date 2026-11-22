@@ -170,7 +170,7 @@ public:
     void TickSaveGame();
     void AddInstalled(CONTENT_DATA&);
     void AddPack(const char*, unsigned char, const char* label = NULL);
-    void EnumeratePacksFolder();
+    void EnumeratePacksFolder(const char* root);
     unsigned int EnumerateLocalDLCPackages();
     void MountInstalledDLC_thread();
     static int MountInstalledDLC_threadEntry(int, void*);

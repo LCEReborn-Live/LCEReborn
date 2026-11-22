@@ -16,9 +16,9 @@
 #include "game/item/Item.hpp"
 #include "game/world/block/Block.hpp"
 #include "game/world/generation/GlideRingGenerator.hpp"
-#if LCE_PLATFORM_PC
 #include "game/client/render/TextureUtil.hpp"
 #include "game/core/BufferedImage.hpp"
+#if LCE_PLATFORM_PC
 #include "platform/pc/PcPaths.hpp"
 #endif
 
@@ -337,9 +337,7 @@ void TextureAtlas::loadUVs()
         addIcon(false, 15, 14, L"bucketPuffer");
         addIcon(false, 15, 15, L"bucketTropical");
         addIcon(false, 16, 0, L"leather_horse_armor_detail");
-#if LCE_PLATFORM_PC
         addIcon(false, 16, 1, L"experimental_shield");
-#endif
         addIcon(false, 16, 7, L"kelp");
         addIcon(false, 16, 8, L"dried_kelp");
         addIcon(false, 16, 9, L"sea_pickle");
@@ -1030,12 +1028,15 @@ void TextureAtlas::stitch()
         height = image->getHeight();
         width = image->getWidth();
     }
-#if LCE_PLATFORM_PC
     // Place the test icon in an unused cell of the item atlas without changing
     // the user's texture pack. Scale to the selected atlas resolution.
     if (mIconType == 1 && width >= 256 && height >= 272)
     {
+#if LCE_PLATFORM_WIIU
+        const std::string iconPath = "/vol/content/resources/experimental/shield_icon.png";
+#else
         const std::string iconPath = PcResourceRoot() + "/experimental/shield_icon.png";
+#endif
         int iconWidth = 0, iconHeight = 0;
         int* iconPixels = NULL;
         if (TextureUtil::LoadTextureData(iconPath.c_str(), &iconWidth, &iconHeight, &iconPixels) == 0 &&
@@ -1051,7 +1052,6 @@ void TextureAtlas::stitch()
         }
         std::free(iconPixels);
     }
-#endif
     if (mStitchedTexture != 0)
     {
         TextureManager::getInstance()->unregisterTexture(mName, mStitchedTexture);

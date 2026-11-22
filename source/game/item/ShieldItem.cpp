@@ -30,7 +30,6 @@ bool ShieldItem::isCrouchBlocking(Player* player)
 
 void ShieldItem::updateCrouchBlocking(Player* player)
 {
-#if LCE_PLATFORM_PC
     if (player == NULL)
         return;
 
@@ -67,7 +66,6 @@ void ShieldItem::updateCrouchBlocking(Player* player)
             return;
         }
     }
-#endif
 }
 
 void ShieldItem::appendHoverText(not_null_ptr<ItemInstance> itemInstance, boost::shared_ptr<Player> player,
@@ -89,13 +87,7 @@ int ShieldItem::getUseDuration(not_null_ptr<ItemInstance> itemInstance)
 InteractionResultHolder ShieldItem::use(Level* level, boost::shared_ptr<Player> player,
                                         InteractionHand::EInteractionHand hand)
 {
-#if LCE_PLATFORM_PC
     return Item::use(level, player, hand);
-#else
-    not_null_ptr<ItemInstance> itemInstance = player->getItemInHand(hand);
-    player->startUsingItem(hand);
-    return InteractionResultHolder(InteractionResult::eInteractionResult_Success, itemInstance);
-#endif
 }
 
 bool ShieldItem::isValidRepairItem(not_null_ptr<ItemInstance> itemInstance, not_null_ptr<ItemInstance> repairItem)

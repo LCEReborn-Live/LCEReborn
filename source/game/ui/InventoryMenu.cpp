@@ -343,10 +343,8 @@ bool InventoryMenu::OffhandSlot::mayPlace(not_null_ptr<ItemInstance> item)
     if (!item->isEmpty())
     {
         Item* itemType = item->getItem();
-#if LCE_PLATFORM_PC
         if (Item::getId(itemType) == 442)
             return true;
-#endif
         if (itemType == Items::filledMap || itemType == Items::arrow || itemType == Items::tippedArrow
             || itemType == Items::totemOfUndying)
         {

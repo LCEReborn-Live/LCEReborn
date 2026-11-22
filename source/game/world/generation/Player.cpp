@@ -953,16 +953,12 @@ void Player::UpdateSize()
 
 void Player::hurtCurrentlyUsedShield(float damage)
 {
-#if LCE_PLATFORM_PC
     not_null_ptr<ItemInstance> shield = getUseItem();
     if (mLevel->mIsClientSide || shield->isEmpty() || Item::getId(shield->getItem()) != 442 || damage < 3.0f)
         return;
 
     boost::shared_ptr<Player> player = boost::dynamic_pointer_cast<Player>(shared_from_this());
     shield->hurtAndBreak(1 + static_cast<int>(std::floor(damage)), player);
-#else
-    (void)damage;
-#endif
 }
 
 void Player::crit(boost::shared_ptr<Entity>)
@@ -2842,7 +2838,6 @@ bool Player::isDamageSourceBlocked(const DamageSource* source)
     if (!LivingEntity::isDamageSourceBlocked(source))
         return false;
 
-#if LCE_PLATFORM_PC
     not_null_ptr<ItemInstance> shield = getUseItem();
     if (!shield->isEmpty() && Item::getId(shield->getItem()) == 442)
     {
@@ -2861,7 +2856,6 @@ bool Player::isDamageSourceBlocked(const DamageSource* source)
 
         return (toSourceX * view->x + toSourceZ * view->z) >= 0.0;
     }
-#endif
 
     return true;
 }

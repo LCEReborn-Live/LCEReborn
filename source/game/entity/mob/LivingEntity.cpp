@@ -1324,7 +1324,6 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
     {
         blocked = true;
 
-#if LCE_PLATFORM_PC
         if (eTYPE_DERIVED_FROM(EntityType::PLAYER, GetType()) && isBlocking())
         {
             shieldBlockedCompletely = true;
@@ -1358,7 +1357,6 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
             damage = 0.0f;
         }
         else
-#endif
         {
             damage = (damage + 1.0f) * 0.5f;
         }
@@ -2108,14 +2106,12 @@ void LivingEntity::handleEntityEvent(unsigned char event, int data)
         return;
     }
 
-#if LCE_PLATFORM_PC
     if (event == EntityEvent::ATTACK_BLOCKED)
     {
         playSound(SoundEvents::SHIELD_BLOCK, 1.0f,
                   (float)(mLevel->mRandom->nextFloat() * 0.4000000059604645 + 0.800000011920929));
         return;
     }
-#endif
 
     if (event != EntityEvent::HURT && event != EntityEvent::ATTACK_BLOCKED && event != EntityEvent::THORNED
         && event != EntityEvent::DROWNED && event != EntityEvent::BURNED)

@@ -1798,9 +1798,8 @@ void CStorage::AddPack(const char* path, unsigned char source, const char* label
     AddInstalled(content);
 }
 
-void CStorage::EnumeratePacksFolder()
+void CStorage::EnumeratePacksFolder(const char* root)
 {
-    const char* root = WiiUPacksFolder();
     if (root[0] == '\0' || !m_openDir(root, &m_dlcDirectory))
         return;
     std::vector<std::string> names;
@@ -1823,7 +1822,8 @@ unsigned int CStorage::EnumerateLocalDLCPackages()
     m_installedContent.clear();
     for (unsigned int index = 0; index < BUILT_IN_PACK_COUNT; ++index)
         AddPack(BUILT_IN_PACKS[index], EPackSource_BuiltIn);
-    EnumeratePacksFolder();
+    EnumeratePacksFolder("/vol/content/packs");
+    EnumeratePacksFolder(WiiUPacksFolder());
     return 1;
 }
 int CStorage::GetInstalledDLC(int, InstalledDLCCallback callback, void* context)

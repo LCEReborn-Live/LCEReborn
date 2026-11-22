@@ -1696,15 +1696,8 @@ unsigned char LocalPlayer::handleMouseClick(int button)
                     handIndex);
                 not_null_ptr<ItemInstance> heldItem = player->getItemInHand(useHand);
 
-                // The original client only uses the main hand. Limit the experimental
-                // second-hand path to the locally enabled shield.
-                if (handIndex != 0 &&
-#if LCE_PLATFORM_PC
-                    (heldItem->isEmpty() || Item::getId(heldItem->getItem()) != 442)
-#else
-                    true
-#endif
-                   )
+                // Only the shield can take this off-hand interaction path.
+                if (handIndex != 0 && (heldItem->isEmpty() || Item::getId(heldItem->getItem()) != 442))
                     continue;
 
                 if (hitResult != NULL)

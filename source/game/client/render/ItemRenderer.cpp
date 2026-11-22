@@ -40,12 +40,13 @@
 #include "game/world/block/Blocks.hpp"
 #include "game/world/generation/MultiplayerLocalPlayer.hpp"
 #include "game/item/ItemId.hpp"
-#if LCE_PLATFORM_PC
 #include "game/client/render/ShieldModel.hpp"
 #include "game/client/render/ModelDefinition.hpp"
 #include "game/client/render/TextureUtil.hpp"
 #include "game/core/BufferedImage.hpp"
+#if LCE_PLATFORM_PC
 #include "platform/pc/PcPaths.hpp"
+#endif
 #include <cstdlib>
 #include <cstring>
 
@@ -58,7 +59,11 @@ static int experimentalShieldTexture(Textures* textures)
         attempted = true;
         int width = 0, height = 0;
         int* pixels = NULL;
+#if LCE_PLATFORM_WIIU
+        const std::string path = "/vol/content/resources/experimental/shield_base_1_14.png";
+#else
         const std::string path = PcResourceRoot() + "/experimental/shield_base_1_14.png";
+#endif
         if (TextureUtil::LoadTextureData(path.c_str(), &width, &height, &pixels) == 0 && width == 64 && height == 64)
         {
             BufferedImage* image = new BufferedImage(width, height, 1);
@@ -69,7 +74,6 @@ static int experimentalShieldTexture(Textures* textures)
     }
     return texture;
 }
-#endif
 
 extern Renderer* gRenderer;
 
@@ -503,7 +507,6 @@ void ItemRenderer::renderStatic(const not_null_ptr<ItemInstance>& item, boost::s
 
     Block* block = Block::byItem(item->getItem());
     int blockId = Block::getId(block);
-#if LCE_PLATFORM_PC
     // Use the built-in model in the hotbar and inventory too. Java's GUI
     // transform supplies its icon angle and scale without a separate flat sprite.
     if (Item::getId(item->getItem()) == 442 && experimentalShieldTexture(minecraft->mTextures) >= 0)
@@ -516,7 +519,6 @@ void ItemRenderer::renderStatic(const not_null_ptr<ItemInstance>& item, boost::s
         model->render(true);
     }
     else
-#endif
     if (item->getItem() == Items::trident && transformType != ItemTransforms::GUI
         && transformType != ItemTransforms::FIXED)
     {

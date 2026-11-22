@@ -45,7 +45,6 @@
 #include "game/client/render/ModelDefinition.hpp"
 #include "game/client/render/TextureUtil.hpp"
 #include "game/core/BufferedImage.hpp"
-#include "platform/pc/PcPaths.hpp"
 #include <cstdlib>
 #include <cstring>
 
@@ -58,8 +57,8 @@ static int experimentalShieldTexture(Textures* textures)
         attempted = true;
         int width = 0, height = 0;
         int* pixels = NULL;
-        const std::string path = PcResourceRoot() + "/experimental/shield_base_1_14.png";
-        if (TextureUtil::LoadTextureData(path.c_str(), &width, &height, &pixels) == 0 && width == 64 && height == 64)
+        if (TextureUtil::LoadTextureData("/vol/resources/experimental/shield_base_1_14.png",
+                                         &width, &height, &pixels) == 0 && width == 64 && height == 64)
         {
             BufferedImage* image = new BufferedImage(width, height, 1);
             std::memcpy(image->getData(), pixels, width * height * sizeof(int));

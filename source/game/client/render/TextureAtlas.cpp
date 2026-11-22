@@ -19,7 +19,6 @@
 #if LCE_PLATFORM_PC
 #include "game/client/render/TextureUtil.hpp"
 #include "game/core/BufferedImage.hpp"
-#include "platform/pc/PcPaths.hpp"
 #endif
 
 static std::wstring MISSING_ICON_NAME(L"missingno");
@@ -1035,10 +1034,10 @@ void TextureAtlas::stitch()
     // the user's texture pack. Scale to the selected atlas resolution.
     if (mIconType == 1 && width >= 256 && height >= 272)
     {
-        const std::string iconPath = PcResourceRoot() + "/experimental/shield_icon.png";
         int iconWidth = 0, iconHeight = 0;
         int* iconPixels = NULL;
-        if (TextureUtil::LoadTextureData(iconPath.c_str(), &iconWidth, &iconHeight, &iconPixels) == 0 &&
+        if (TextureUtil::LoadTextureData("/vol/resources/experimental/shield_icon.png",
+                                         &iconWidth, &iconHeight, &iconPixels) == 0 &&
             iconPixels != NULL && iconWidth > 0 && iconHeight > 0)
         {
             const int cellWidth = width / 16;

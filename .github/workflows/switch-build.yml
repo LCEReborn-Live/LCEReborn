@@ -76,6 +76,10 @@ jobs:
           cp build/switch/LCEReborn.nro build/switch-package/LCEReborn/
           cp -r resources/pc build/switch-package/LCEReborn/resources
           cp -r packs build/switch-package/LCEReborn/packs
+          test -s "build/switch-package/LCEReborn/packs/1.14 Texture Pack/TexturePack.pck"
+          test -s "build/switch-package/LCEReborn/packs/1.14 Texture Pack/Data/x16Data.pck"
+          test -s build/switch-package/LCEReborn/resources/experimental/shield_base_1_14.png
+          test -s build/switch-package/LCEReborn/resources/experimental/shield_icon.png
           cp tools/build/third_party/bearssl-LICENSE.txt build/switch-package/LCEReborn/
       - name: Upload the experimental Switch client
         uses: actions/upload-artifact@v7

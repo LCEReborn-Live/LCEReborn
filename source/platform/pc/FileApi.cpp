@@ -349,6 +349,8 @@ static fs::path ResolvePath(const char* fileName)
         return UnderRoot(PcSaveRoot(), rest);
     if (MatchMount(path, "/vol/packs", rest))
         return UnderRoot(PcPacksRoot(), rest);
+    if (MatchMount(path, "/vol/resources", rest))
+        return UnderRoot(PcResourceRoot(), rest);
 
     const fs::path nativePath = GamePath(path);
 #if LCE_PLATFORM_SWITCH

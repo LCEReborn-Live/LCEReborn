@@ -243,6 +243,7 @@ int main()
     g_pLeaderboardManager->OpenSession();
     CGameNetworkManager::sInstance.Initialise();
     CGameNetworkManager::sInstance.SetLocalGame(true);
+    WiiULiveSignIn::RestoreSavedSession();
     if (noSpaceForSaveQuota)
         g_pInput->RequestErrorViewer(1, kStorageFullErrorCode,
                                      reinterpret_cast<C_4JInput::ErrorViewerCallback>(DeviceFullErrorReturn), 0);

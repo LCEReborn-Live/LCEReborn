@@ -365,10 +365,13 @@ void UIScene_MainMenu::updateLiveSignIn()
         m_liveDialogStatus = Status::Idle;
     }
 
-    const bool waiting = status == Status::Starting || status == Status::Waiting;
+    const bool waiting = status == Status::Starting || status == Status::Waiting || status == Status::Restoring;
     std::wstring text;
     switch (status)
     {
+    case Status::Restoring:
+        text = L"Checking your saved LCE Live sign-in...";
+        break;
     case Status::Starting:
         text = L"Getting a sign-in code for LCE Live...";
         break;

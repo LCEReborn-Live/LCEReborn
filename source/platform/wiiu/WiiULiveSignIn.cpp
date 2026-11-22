@@ -1,11 +1,15 @@
 #include "platform/wiiu/WiiULiveSignIn.hpp"
 #include "game/core/CriticalSection.hpp"
 #include "game/core/System.hpp"
+#include "platform/wiiu/CProfile.hpp"
 #include <coreinit/dynload.h>
 #include <coreinit/ios.h>
 #include <coreinit/thread.h>
 #include <curl/curl.h>
+#include <nn/act/client_cpp.h>
+#include <nn/save/save.h>
 #include <nsysnet/nssl.h>
+#include <cstring>
 #include <cwchar>
 #include <deque>
 #include <utility>
@@ -16,15 +20,21 @@ namespace
 {
 const char kStartUrl[] = "https://api.lcereborn.xyz/v1/device/start";
 const char kTokenUrl[] = "https://api.lcereborn.xyz/v1/device/token";
+const char kMeUrl[] = "https://api.lcereborn.xyz/v1/me";
 const char kPresenceUrl[] = "https://api.lcereborn.xyz/v1/presence";
 const char kApiUrl[] = "https://api.lcereborn.xyz/v1";
+const char kSessionFile[] = "lce_live_session.dat";
+const char kLowerHex[] = "0123456789abcdef";
+const char kUsernameChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
+const size_t kTokenLength = 64;
+const size_t kUuidLength = 32;
 // Cafe nlibcurl uses an NSSL verification bitmask in place of standard curl's TLS options.
 const CURLoption kNsslContext = static_cast<CURLoption>(210);
 const CURLoption kNsslVerifyOptions = static_cast<CURLoption>(211);
 const long kVerifyPeerHostnameAndDate = 7;
 const size_t kMaxResponse = 256 * 1024;
 
-enum class Request { None, Start, Poll, Presence, Api };
+enum class Request { None, Start, Poll, Restore, Presence, Api };
 
 struct ApiRequest
 {
@@ -41,6 +51,7 @@ alignas(32) unsigned char stack[128 * 1024];
 Request request = Request::None;
 Status status = Status::Idle;
 bool restartAfterRequest = false;
+bool restoreForMenu = false;
 std::string deviceCode;
 std::string userCode;
 std::string username;
@@ -48,6 +59,13 @@ std::string playerUuid;
 C4JCriticalSection identityLock;
 bool apiSignedIn = false;
 std::string sessionToken;
+std::string savedUuid;
+FSClient saveClient;
+FSCmdBlock saveCommand;
+unsigned char saveSlot;
+bool saveClientReady = false;
+bool sessionNeedsSave = false;
+long long saveRetryAt = 0;
 std::string response;
 long responseStatus = 0;
 CURLcode curlResult = CURLE_OK;
@@ -60,6 +78,73 @@ long long presenceAfter = 0;
 long long presenceRetryAt = 0;
 bool requestedPlaying = false;
 bool reportedPlaying = false;
+
+void ReadSavedSession()
+{
+    if (!saveClientReady)
+        return;
+    // One fixed-size record with a hex token and a zero-padded optional UUID.
+    alignas(64) char buffer[kTokenLength + kUuidLength + 1];
+    FSFileHandle handle;
+    gProfileInstance->EnterInitSaveDirCS();
+    int count = SAVEOpenFile(&saveClient, &saveCommand, saveSlot, kSessionFile, "r",
+                             &handle, FS_ERROR_FLAG_ALL);
+    if (count == FS_STATUS_OK)
+    {
+        count = FSReadFile(&saveClient, &saveCommand, buffer, 1, sizeof(buffer), handle, 0, FS_ERROR_FLAG_ALL);
+        FSCloseFile(&saveClient, &saveCommand, handle, FS_ERROR_FLAG_ALL);
+    }
+    gProfileInstance->LeaveInitSaveDirCS();
+    if (count != static_cast<int>(kTokenLength + kUuidLength))
+        return;
+    const std::string token(buffer, kTokenLength);
+    const std::string uuid(buffer + kTokenLength, kUuidLength);
+    if (token.find_first_not_of(kLowerHex) != std::string::npos)
+        return;
+    sessionToken = token;
+    if (uuid.find_first_not_of(kLowerHex) == std::string::npos)
+        savedUuid = uuid;
+}
+
+bool WriteSavedSession()
+{
+    if (!saveClientReady)
+        return false;
+    alignas(64) char buffer[kTokenLength + kUuidLength] = {};
+    std::memcpy(buffer, sessionToken.data(), kTokenLength);
+    std::memcpy(buffer + kTokenLength, savedUuid.data(), savedUuid.size());
+    FSFileHandle handle;
+    bool saved = false;
+    gProfileInstance->EnterInitSaveDirCS();
+    if (SAVEOpenFile(&saveClient, &saveCommand, saveSlot, kSessionFile, "w", &handle, FS_ERROR_FLAG_ALL) == FS_STATUS_OK)
+    {
+        const int count = FSWriteFile(&saveClient, &saveCommand, buffer, 1, sizeof(buffer), handle, 0, FS_ERROR_FLAG_ALL);
+        const int closed = FSCloseFile(&saveClient, &saveCommand, handle, FS_ERROR_FLAG_ALL);
+        saved = count == static_cast<int>(sizeof(buffer)) && closed == FS_STATUS_OK
+            && SAVEFlushQuota(&saveClient, &saveCommand, saveSlot, FS_ERROR_FLAG_ALL) == FS_STATUS_OK;
+        if (!saved)
+            SAVERollbackQuota(&saveClient, &saveCommand, saveSlot, FS_ERROR_FLAG_ALL);
+    }
+    gProfileInstance->LeaveInitSaveDirCS();
+    return saved;
+}
+
+void ClearSession()
+{
+    sessionNeedsSave = false;
+    sessionToken.clear();
+    savedUuid.clear();
+    username.clear();
+    EnterCriticalSection(&identityLock);
+    apiSignedIn = false;
+    LeaveCriticalSection(&identityLock);
+    if (!saveClientReady)
+        return;
+    gProfileInstance->EnterInitSaveDirCS();
+    if (SAVERemove(&saveClient, &saveCommand, saveSlot, kSessionFile, FS_ERROR_FLAG_ALL) == FS_STATUS_OK)
+        SAVEFlushQuota(&saveClient, &saveCommand, saveSlot, FS_ERROR_FLAG_ALL);
+    gProfileInstance->LeaveInitSaveDirCS();
+}
 
 size_t WriteResponse(char* bytes, size_t size, size_t count, void* destination)
 {
@@ -169,6 +254,11 @@ int SendRequest(int, const char**)
         url = kTokenUrl;
         body = "{\"device_code\":\"" + deviceCode + "\"}";
     }
+    else if (request == Request::Restore)
+    {
+        url = kMeUrl;
+        post = false;
+    }
     else if (request == Request::Api)
     {
         url = activeApi.url.c_str();
@@ -181,7 +271,7 @@ int SendRequest(int, const char**)
         body = requestedPlaying ? "{\"status\":\"game\",\"activity\":\"world\",\"platform\":\"wiiu\"}"
                                 : "{\"status\":\"launcher\",\"platform\":\"wiiu\"}";
     }
-    if (request == Request::Api || request == Request::Presence)
+    if (request == Request::Api || request == Request::Presence || request == Request::Restore)
     {
         authorization = "Authorization: Bearer " + sessionToken;
         bearer.data = &authorization[0];
@@ -267,12 +357,39 @@ int SecondsField(const char* name)
     return seconds;
 }
 
+Status SignedIn(const std::string& name)
+{
+    username = name;
+    EnterCriticalSection(&identityLock);
+    playerUuid = savedUuid;
+    apiSignedIn = true;
+    LeaveCriticalSection(&identityLock);
+    presenceAfter = 0;
+    presenceRetryAt = 0;
+    return Status::SignedIn;
+}
+
 Status Finish(Request finished, long long now)
 {
-    const char lowerHex[] = "0123456789abcdef";
+    if (finished == Request::Restore)
+    {
+        if (responseStatus == 401)
+        {
+            ClearSession();
+            restartAfterRequest = restoreForMenu;
+            return Status::Idle;
+        }
+        if (responseStatus == 200)
+        {
+            const std::string name = StringField("username", kUsernameChars, 3, 20);
+            if (!name.empty())
+                return SignedIn(name);
+        }
+        return Status::Failed;
+    }
     if (finished == Request::Start && responseStatus == 201)
     {
-        deviceCode = StringField("device_code", lowerHex, 64, 64);
+        deviceCode = StringField("device_code", kLowerHex, kTokenLength, kTokenLength);
         userCode = StringField("user_code", "0123456789ABCDEF", 12, 12);
         const int expiresIn = SecondsField("expires_in");
         const int interval = SecondsField("interval");
@@ -297,19 +414,15 @@ Status Finish(Request finished, long long now)
             return Status::Expired;
         if (responseStatus == 201)
         {
-            const std::string token = StringField("token", lowerHex, 64, 64);
-            const std::string name = StringField("username", "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_", 3, 20);
+            const std::string token = StringField("token", kLowerHex, kTokenLength, kTokenLength);
+            const std::string name = StringField("username", kUsernameChars, 3, 20);
             if (!token.empty() && !name.empty())
             {
                 sessionToken = token;
-                username = name;
-                EnterCriticalSection(&identityLock);
-                playerUuid = StringField("player_uuid", lowerHex, 32, 32);
-                apiSignedIn = true;
-                LeaveCriticalSection(&identityLock);
-                presenceAfter = 0;
-                presenceRetryAt = 0;
-                return Status::SignedIn;
+                savedUuid = StringField("player_uuid", kLowerHex, kUuidLength, kUuidLength);
+                sessionNeedsSave = !WriteSavedSession();
+                saveRetryAt = now + 10000;
+                return SignedIn(name);
             }
         }
     }
@@ -319,11 +432,28 @@ Status Finish(Request finished, long long now)
 
 void Init() { InitializeCriticalSection(&identityLock); }
 
+void RestoreSavedSession()
+{
+    saveSlot = nn::act::GetSlotNo();
+    FSInitCmdBlock(&saveCommand);
+    saveClientReady = FSAddClient(&saveClient, FS_ERROR_FLAG_ALL) == FS_STATUS_OK;
+    ReadSavedSession();
+    if (!sessionToken.empty())
+        status = Send(Request::Restore) ? Status::Restoring : Status::Failed;
+}
+
 void Start()
 {
     Update();
-    if (!sessionToken.empty() || status == Status::Starting || status == Status::Waiting)
+    if (status == Status::SignedIn || status == Status::Starting || status == Status::Waiting)
         return;
+    if (!sessionToken.empty())
+    {
+        restoreForMenu = true;
+        if (status != Status::Restoring)
+            status = Send(Request::Restore) ? Status::Restoring : Status::Failed;
+        return;
+    }
     if (request != Request::None)
     {
         restartAfterRequest = true;
@@ -336,6 +466,7 @@ void Start()
 void Cancel()
 {
     restartAfterRequest = false;
+    restoreForMenu = false;
     if (status == Status::Starting || status == Status::Waiting)
         status = Status::Idle;
 }
@@ -350,11 +481,7 @@ Status Update()
         request = Request::None;
         if ((finished == Request::Presence || finished == Request::Api) && responseStatus == 401)
         {
-            sessionToken.clear();
-            username.clear();
-            EnterCriticalSection(&identityLock);
-            apiSignedIn = false;
-            LeaveCriticalSection(&identityLock);
+            ClearSession();
             status = Status::Idle;
         }
         if (finished == Request::Api)
@@ -373,6 +500,11 @@ Status Update()
             {
                 presenceRetryAt = now + 10000;
             }
+        }
+        else if (finished == Request::Restore)
+        {
+            status = Finish(finished, now);
+            restoreForMenu = false;
         }
         else if (!restartAfterRequest && (status == Status::Starting || status == Status::Waiting))
             status = Finish(finished, now);
@@ -419,6 +551,11 @@ void TickPresence(bool playing)
     if (current != Status::SignedIn || request != Request::None)
         return;
     const long long now = System::processTimeInMilliSecs();
+    if (sessionNeedsSave && now >= saveRetryAt)
+    {
+        sessionNeedsSave = !WriteSavedSession();
+        saveRetryAt = now + 10000;
+    }
     if (now >= presenceRetryAt && (playing != reportedPlaying || now >= presenceAfter))
     {
         requestedPlaying = playing;

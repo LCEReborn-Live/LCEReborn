@@ -6,9 +6,10 @@
 
 namespace WiiULiveSignIn
 {
-enum class Status { Idle, Starting, Waiting, SignedIn, Denied, Expired, Failed };
+enum class Status { Idle, Starting, Waiting, SignedIn, Denied, Expired, Failed, Restoring };
 
 void Init();
+void RestoreSavedSession();
 void Start();
 void Cancel();
 Status Update();

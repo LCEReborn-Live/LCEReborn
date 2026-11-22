@@ -143,20 +143,10 @@ void C4JThreadImpl::Run()
     const auto worker = workers.threads.emplace(workers.threads.end());
     m_running = true;
     m_started = true;
-    try
-    {
-        worker->thread = std::thread([this, worker] {
-            entryPoint(this);
-            worker->finished = true;
-        });
-    }
-    catch (...)
-    {
-        workers.threads.erase(worker);
-        m_running = false;
-        m_started = false;
-        throw;
-    }
+    worker->thread = std::thread([this, worker] {
+        entryPoint(this);
+        worker->finished = true;
+    });
 #else
     m_running = true;
     m_started = true;

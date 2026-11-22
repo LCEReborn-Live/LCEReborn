@@ -1,4 +1,5 @@
 #include "platform/switch/SwitchRuntime.hpp"
+#include "platform/pc/Log.hpp"
 
 #include <cstdio>
 #include <switch.h>
@@ -7,6 +8,13 @@
 bool SwitchEnterGameDirectory()
 {
     return chdir("sdmc:/switch/LCEReborn") == 0;
+}
+
+void SwitchLogStartupStage(const char* stage)
+{
+    static const Logger log("Switch startup");
+    LOG_INFO(log, "%s", stage);
+    Log::Flush();
 }
 
 void SwitchShowStartupError(const std::string& message)

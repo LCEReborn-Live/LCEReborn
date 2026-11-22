@@ -96,10 +96,22 @@ int main(int argc, char** argv)
     PcDiscordStart(discordApp.empty() ? std::string(LCE_DISCORD_APP_ID) : discordApp);
 
     ShutdownManager::Initialise();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Creating the player profile");
+#endif
     if (gProfile == 0)
         gProfile = new CProfile();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Allocating compression thread storage");
+#endif
     Compression::CreateNewThreadStorage();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Initialising the renderer");
+#endif
     gRenderer->Initialise();
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Initialising input");
+#endif
     g_pInput->Initialise(1, EControllerActions_Count, 0x17);
     VideoSettings::Load(PcSaveRoot() + "/video.txt");
 
@@ -108,6 +120,9 @@ int main(int argc, char** argv)
     g_pInput->SetKeyRepeatRate(0.3f, 0.2f);
     g_pInput->SetDeadzoneAndMovementRange(0, 20000, 0x7fff);
 
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Loading the media archive");
+#endif
     gApp.loadMediaArchive();
     if (gApp.ReadProductCodes() == 0)
         gApp.FatalLoadError(L"ReadProductCodes");

@@ -15,6 +15,9 @@
 #include "platform/pc/PcApplication.hpp"
 #include "platform/pc/PcInputEvents.hpp"
 #include "platform/pc/PcPaths.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/switch/SwitchRuntime.hpp"
+#endif
 
 namespace
 {
@@ -121,6 +124,9 @@ void SetWindowIcon()
 
 bool PcWindowCreate(int width, int height)
 {
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Initialising SDL video and input");
+#endif
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS))
     {
         LOG_FATAL(sLog, "SDL_Init failed: %s", SDL_GetError());
@@ -137,6 +143,9 @@ bool PcWindowCreate(int width, int height)
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Creating the SDL window");
+#endif
     sWindow = SDL_CreateWindow(WindowTitle().c_str(), width, height,
                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN
                                    | SDL_WINDOW_HIGH_PIXEL_DENSITY);
@@ -148,6 +157,7 @@ bool PcWindowCreate(int width, int height)
     SetWindowIcon();
 
 #if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Creating the OpenGL context");
     static const int kVersions[][2] = {{4, 3}, {3, 3}};
 #else
     static const int kVersions[][2] = {{4, 6}, {4, 5}, {4, 3}, {4, 2}, {4, 1}, {4, 0}, {3, 3}};
@@ -168,6 +178,9 @@ bool PcWindowCreate(int width, int height)
         return false;
     }
 
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("Making the OpenGL context current");
+#endif
     SDL_GL_MakeCurrent(sWindow, sContext);
     LoadDisplaySettings();
     ApplyVSync();
@@ -177,6 +190,9 @@ bool PcWindowCreate(int width, int height)
         sFullscreen = false;
     }
     sShown = false;
+#if LCE_PLATFORM_SWITCH
+    SwitchLogStartupStage("SDL window and OpenGL context ready");
+#endif
     return true;
 }
 

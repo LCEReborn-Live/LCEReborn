@@ -1,6 +1,7 @@
 name: Windows and Linux build and release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -238,6 +239,7 @@ jobs:
     needs: [windows, linux]
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: write
     steps:
       - name: Check out release notes
@@ -256,6 +258,73 @@ jobs:
         with:
           name: LCEReborn-Live-Linux
           path: build/release-assets/linux
+
+      - name: Read console artifact sources
+        id: consoles
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sources="docs/releases/$RELEASE_TAG-artifacts.json"
+          if [[ -f "$sources" ]]; then
+            wiiu=$(jq -er '.wiiu_run | tostring | select(test("^[0-9]+$"))' "$sources")
+            switch=$(jq -er '.switch_run | tostring | select(test("^[0-9]+$"))' "$sources")
+            printf 'wiiu=%s\nswitch=%s\n' "$wiiu" "$switch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download Wii U artifacts
+        if: steps.consoles.outputs.wiiu != ''
+        uses: actions/download-artifact@v7
+        with:
+          pattern: wiiu-*
+          path: build/console-artifacts/wiiu
+          run-id: ${{ steps.consoles.outputs.wiiu }}
+          github-token: ${{ github.token }}
+
+      - name: Download Switch NRO files
+        if: steps.consoles.outputs.switch != ''
+        uses: actions/download-artifact@v7
+        with:
+          pattern: '*.nro'
+          merge-multiple: true
+          path: build/console-artifacts/switch
+          run-id: ${{ steps.consoles.outputs.switch }}
+          github-token: ${{ github.token }}
+
+      - name: Download Switch client bundle
+        if: steps.consoles.outputs.switch != ''
+        uses: actions/download-artifact@v7
+        with:
+          name: nintendo-switch-nro
+          path: build/console-artifacts/switch-package
+          run-id: ${{ steps.consoles.outputs.switch }}
+          github-token: ${{ github.token }}
+
+      - name: Stage console release assets
+        if: steps.consoles.outputs.switch != ''
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          input="$PWD/build/console-artifacts"
+          output="$PWD/build/release-assets/consoles"
+          mkdir -p "$output"
+          stage() {
+            test -s "$input/$1"
+            mv "$input/$1" "$output/$2"
+          }
+          stage 'wiiu/wiiu-rpx/Minecraft.Client.rpx' "LCEReborn-WiiU-Beta-$RELEASE_TAG.rpx"
+          stage 'wiiu/wiiu-rpx/Minecraft.Client.map' "LCEReborn-WiiU-Beta-$RELEASE_TAG.map"
+          stage 'wiiu/wiiu-rpx/BearSSL-LICENSE.txt' 'BearSSL-LICENSE.txt'
+          stage 'wiiu/wiiu-wuhb/LCEReborn.wuhb' "LCEReborn-WiiU-Beta-$RELEASE_TAG.wuhb"
+          stage 'wiiu/wiiu-wuhb-complete/LCEReborn-complete.wuhb' "LCEReborn-WiiU-Full-Beta-$RELEASE_TAG.wuhb"
+          stage 'switch/LCEReborn.nro' 'LCEReborn.nro'
+          stage 'switch/LCEReborn-Full.nro' 'LCEReborn-Full.nro'
+          cd "$input/switch-package"
+          test -s LCEReborn/LCEReborn.nro
+          python3 -m zipfile -c "$output/LCEReborn-Switch-Beta-$RELEASE_TAG.zip" LCEReborn
 
       - name: Publish GitHub Release
         env:
@@ -280,7 +349,7 @@ jobs:
               gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY" --title "$title" --notes-file "$notes"
             fi
           elif [[ -f "$notes" ]]; then
-            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$RELEASE_REPOSITORY" --title "$title" --notes-file "$notes"
+            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$RELEASE_REPOSITORY" --verify-tag --title "$title" --notes-file "$notes"
           else
-            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$RELEASE_REPOSITORY" --title "$title" --generate-notes
+            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$RELEASE_REPOSITORY" --verify-tag --title "$title" --generate-notes
           fi

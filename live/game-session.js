@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
+import { setTimeout as delay } from 'node:timers/promises';
 import { GameBridge } from './game-bridge.js';
 import { SocialBridge } from './social-bridge.js';
 
@@ -9,10 +10,13 @@ console.log = () => {};
 const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 let bridge, directory, username, running = false, stopped = false, lastWorld = '';
 let timer, leaderboardTimer, leaderboardBusy = false, leaderboardSubmissionBusy = false;
-let leaderboardRetryAt = 0;
+let leaderboardSubmitAt = 0, leaderboardRetryAt = 0;
 let socialTimer, socialActionTimer, social;
 
 const leaderboardBoards = ['traveling', 'mining', 'farming', 'kills'];
+const leaderboardColumns = { traveling: 4, mining: 7, farming: 6, kills: 7 };
+const leaderboardSubmitIntervalMs = 3 * 60 * 1000;
+const submittedScores = new Map();
 
 async function processLeaderboardRequest() {
   if (leaderboardBusy || stopped || !directory) return;
@@ -36,7 +40,7 @@ async function processLeaderboardRequest() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(`Leaderboard HTTP ${response.status}`);
-    const columns = { traveling: 4, mining: 7, farming: 6, kills: 7 }[board];
+    const columns = leaderboardColumns[board];
     const lines = [`${id}\t${data.total}\t${data.rows.length}`];
     for (const row of data.rows) {
       if (!Number.isSafeInteger(row.rank) || typeof row.username !== 'string'
@@ -60,44 +64,77 @@ async function processLeaderboardRequest() {
   } finally { leaderboardBusy = false; }
 }
 
-async function processLeaderboardSubmissions() {
-  if (leaderboardSubmissionBusy || stopped || !directory || Date.now() < leaderboardRetryAt) return;
+async function processLeaderboardSubmissions(flush = false) {
+  const now = Date.now();
+  if (leaderboardSubmissionBusy || !bridge || now < leaderboardRetryAt
+      || (!flush && (stopped || now < leaderboardSubmitAt))) return;
   leaderboardSubmissionBusy = true;
+  leaderboardSubmitAt = now + leaderboardSubmitIntervalMs;
   try {
-  let files;
-  try { files = await fs.readdir(directory); }
-  catch { return; }
-  for (const file of files.filter(name => /^leaderboard-submit-\d+-\d+\.tsv$/.test(name)).sort()) {
-    const fullPath = path.join(directory, file);
-    let rows;
-    try { rows = (await fs.readFile(fullPath, 'utf8')).trim().split('\n'); }
-    catch (error) { if (error.code !== 'ENOENT') console.error('Live leaderboard:', error.message); continue; }
-    let complete = true;
-    for (const row of rows) {
-      const [boardText, ...valuesText] = row.split('\t');
-      const board = leaderboardBoards[Number(boardText)];
-      const values = valuesText.map(Number);
-      const columns = { traveling: 4, mining: 7, farming: 6, kills: 7 }[board];
-      if (!board || values.length !== columns || values.some(value => !Number.isSafeInteger(value) || value < 0)) {
-        complete = false;
-        break;
+    const files = await fs.readdir(directory);
+    const pendingFiles = [];
+    const scores = new Map();
+    for (const file of files.filter(name => /^leaderboard-submit-\d+-\d+\.tsv$/.test(name))) {
+      const fullPath = path.join(directory, file);
+      let rows;
+      try { rows = (await fs.readFile(fullPath, 'utf8')).trim().split('\n'); }
+      catch (error) {
+        if (error.code !== 'ENOENT') console.error('Live leaderboard:', error.message);
+        continue;
       }
-      try {
-        const response = await bridge.fetchImpl(new URL(`/v1/leaderboards/${board}`, bridge.apiUrl), {
-          method: 'POST', headers: { authorization: `Bearer ${bridge.token}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ values }), signal: AbortSignal.timeout(10000)
-        });
-        if (!response.ok) throw new Error(`Leaderboard HTTP ${response.status}`);
-      } catch (error) {
-        console.error('Live leaderboard submit:', error.message);
-        complete = false;
-        break;
+      const entries = rows.map(row => {
+        const [boardIndex, ...fields] = row.split('\t');
+        return { board: /^[0-3]$/.test(boardIndex) ? leaderboardBoards[Number(boardIndex)] : undefined,
+          values: fields.map(Number) };
+      });
+      if (entries.some(({ board, values }) => !board || values.length !== leaderboardColumns[board]
+          || values.some(value => !Number.isSafeInteger(value) || value < 0 || value > 0xffffffff))) {
+        console.error('Live leaderboard: invalid score file', file);
+        continue;
       }
+      // The API keeps the maximum of each stat, so a single merge preserves every snapshot.
+      for (const { board, values } of entries) {
+        const previous = scores.get(board);
+        scores.set(board, previous ? values.map((value, index) => Math.max(value, previous[index])) : values);
+      }
+      pendingFiles.push(fullPath);
     }
-    if (complete) await fs.unlink(fullPath).catch(() => {});
-    else { leaderboardRetryAt = Date.now() + 5000; break; }
-  }
+
+    for (const [board, values] of scores) {
+      const previous = submittedScores.get(board);
+      if (previous && values.every((value, index) => value <= previous[index])) continue;
+      const merged = previous ? values.map((value, index) => Math.max(value, previous[index])) : values;
+      const response = await bridge.fetchImpl(new URL(`/v1/leaderboards/${board}`, bridge.apiUrl), {
+        method: 'POST', headers: { authorization: `Bearer ${bridge.token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ values: merged }), signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) {
+        if (response.status === 429) {
+          const retrySeconds = Number(response.headers.get('retry-after'));
+          leaderboardRetryAt = Number.isFinite(retrySeconds) && retrySeconds > 0
+            ? Date.now() + retrySeconds * 1000 : leaderboardSubmitAt;
+        }
+        throw new Error(`Leaderboard HTTP ${response.status}`);
+      }
+      submittedScores.set(board, merged);
+    }
+    for (const file of pendingFiles) await fs.unlink(file).catch(() => {});
+  } catch (error) {
+    if (error.code !== 'ENOENT') console.error('Live leaderboard submit:', error.message);
   } finally { leaderboardSubmissionBusy = false; }
+}
+
+async function replaceLiveFile(temporary, destination) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fs.rename(temporary, destination);
+      return;
+    } catch (error) {
+      if (process.platform !== 'win32' || !['EACCES', 'EPERM', 'EBUSY'].includes(error.code) || attempt === 4)
+        throw error;
+      await delay(25 * 2 ** attempt);
+    }
+  }
 }
 
 async function tick() {
@@ -134,10 +171,10 @@ async function tick() {
       }).join('\n');
     const temporary = path.join(directory, 'servers.tmp');
     await fs.writeFile(temporary, lines, { encoding: 'utf8', mode: 0o600 });
-    await fs.rename(temporary, path.join(directory, 'servers.txt'));
+    await replaceLiveFile(temporary, path.join(directory, 'servers.txt'));
     const directoryTemp = path.join(directory, 'directory.tmp');
     await fs.writeFile(directoryTemp, JSON.stringify(servers.map(({ owner, port }) => ({ owner, port }))), { encoding: 'utf8', mode: 0o600 });
-    await fs.rename(directoryTemp, path.join(directory, 'directory.json'));
+    await replaceLiveFile(directoryTemp, path.join(directory, 'directory.json'));
   } catch (error) { console.error('Live:', error.message); }
   finally { running = false; }
 }
@@ -150,6 +187,7 @@ input.once('line', line => {
     directory = init.directory;
     username = init.username;
     bridge = new GameBridge({ apiUrl: init.apiUrl, token: init.token });
+    leaderboardSubmitAt = Date.now() + leaderboardSubmitIntervalMs;
     void tick();
     timer = setInterval(() => void tick(), 2000);
     social = new SocialBridge({ bridge, directory });
@@ -177,6 +215,7 @@ input.on('close', () => {
   void (async () => {
     while (running) await new Promise(resolve => setTimeout(resolve, 50));
     while (leaderboardBusy || leaderboardSubmissionBusy) await new Promise(resolve => setTimeout(resolve, 50));
+    await processLeaderboardSubmissions(true);
     await social?.close();
     await bridge?.close();
   })();

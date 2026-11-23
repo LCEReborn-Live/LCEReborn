@@ -1,5 +1,6 @@
 #include "game/core/LceLeaderboardManager.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -87,6 +88,8 @@ std::wstring AsciiWide(const std::string& value)
 }
 #endif
 #if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+const long long kLiveUploadIntervalMs = 3 * 60 * 1000;
+
 const char* LiveBoardName(int board)
 {
     static const char* const names[] = {"traveling", "mining", "farming", "kills"};
@@ -131,6 +134,9 @@ LceLeaderboardManager::~LceLeaderboardManager()
 
 void LceLeaderboardManager::Tick()
 {
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+    TickLiveUploads();
+#endif
     if (m_pending == ePending_Live)
     {
 #if LCE_PLATFORM_PC && !LCE_PLATFORM_SWITCH
@@ -198,22 +204,33 @@ bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores
 #elif LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     if (scores != NULL && WiiULiveSignIn::IsSignedIn())
     {
+        const std::string account = WiiULiveSignIn::PlayerUuid();
+        if (account.empty())
+            return true;
+        if (m_liveScoreAccount != account)
+        {
+            m_liveScoreAccount = account;
+            m_liveScores = {};
+            m_liveSeenBoards = 0;
+            m_liveDirtyBoards = 0;
+            m_liveUploadBatch = 0;
+            m_liveUploadAfter = System::processTimeInMilliSecs() + kLiveUploadIntervalMs;
+        }
         for (unsigned int index = 0; index < count; ++index)
         {
             const RegisterScore& score = scores[index];
-            const char* board = LiveBoardName(score.m_eStatsType);
-            if (!board || score.m_usNumStats != LeaderboardBoards::ColumnCount(score.m_eStatsType)
+            const int board = score.m_eStatsType;
+            if (!LiveBoardName(board) || score.m_usNumStats != LeaderboardBoards::ColumnCount(board)
                 || score.m_usNumStats > MAX_STATS_PER_SCORE)
                 continue;
-            std::string body = "{\"values\":[";
+            const unsigned int bit = 1u << board;
+            LiveScoreValues merged = m_liveScores[board];
             for (unsigned int column = 0; column < score.m_usNumStats; ++column)
-            {
-                if (column) body += ',';
-                body += std::to_string(score.m_auiStats[column]);
-            }
-            body += "]}";
-            const std::string path = std::string("/leaderboards/") + board;
-            WiiULiveSignIn::RequestApi(path.c_str(), body.c_str(), [](long, const std::string&) {});
+                merged[column] = std::max(merged[column], score.m_auiStats[column]);
+            if (!(m_liveSeenBoards & bit) || merged != m_liveScores[board])
+                m_liveDirtyBoards |= bit;
+            m_liveSeenBoards |= bit;
+            m_liveScores[board] = merged;
         }
     }
 #else
@@ -222,6 +239,57 @@ bool LceLeaderboardManager::WriteStats(unsigned int count, RegisterScore* scores
 #endif
     return true;
 }
+
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+void LceLeaderboardManager::TickLiveUploads()
+{
+    if (m_liveUploadInFlight || !m_liveDirtyBoards)
+        return;
+    const long long now = System::processTimeInMilliSecs();
+    if ((!m_liveUploadBatch && now < m_liveUploadAfter) || !WiiULiveSignIn::IsSignedIn()
+        || m_liveScoreAccount != WiiULiveSignIn::PlayerUuid())
+        return;
+    if (!m_liveUploadBatch)
+    {
+        m_liveUploadBatch = m_liveDirtyBoards;
+        m_liveUploadAfter = now + kLiveUploadIntervalMs;
+    }
+
+    for (int board = 0; board < 4; ++board)
+    {
+        const unsigned int bit = 1u << board;
+        if (!(m_liveUploadBatch & bit))
+            continue;
+        const LiveScoreValues values = m_liveScores[board];
+        const std::string account = m_liveScoreAccount;
+        std::string body = "{\"values\":[";
+        for (int column = 0; column < LeaderboardBoards::ColumnCount(board); ++column)
+        {
+            if (column) body += ',';
+            body += std::to_string(values[column]);
+        }
+        body += "]}";
+        const std::string path = std::string("/leaderboards/") + LiveBoardName(board);
+        m_liveUploadBatch &= ~bit;
+        m_liveUploadInFlight = WiiULiveSignIn::RequestApi(path.c_str(), body.c_str(),
+            [this, board, bit, values, account](long status, const std::string&) {
+                m_liveUploadInFlight = false;
+                if (m_liveScoreAccount != account)
+                    return;
+                if (status != 200)
+                {
+                    m_liveUploadBatch = 0;
+                    return;
+                }
+                if (m_liveScores[board] == values)
+                    m_liveDirtyBoards &= ~bit;
+            });
+        if (!m_liveUploadInFlight)
+            m_liveUploadBatch = 0;
+        return;
+    }
+}
+#endif
 
 void LceLeaderboardManager::FlushStats()
 {

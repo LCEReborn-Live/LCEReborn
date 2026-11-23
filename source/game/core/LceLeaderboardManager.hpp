@@ -2,6 +2,10 @@
 #define GAME_CORE_LCELEADERBOARDMANAGER_HPP
 
 #include <vector>
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+#include <array>
+#include <string>
+#endif
 
 #include "game/core/LeaderboardManager.hpp"
 #include "game/world/biome/arrayWithLength.hpp"
@@ -44,6 +48,19 @@ private:
     void RequestFromServer(bool aroundMe, unsigned int startRank, unsigned int count);
     void RequestFromLive(const char* filter, unsigned int startRank, unsigned int count);
     bool ReadLiveResponse();
+
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+    void TickLiveUploads();
+
+    using LiveScoreValues = std::array<unsigned int, MAX_STATS_PER_SCORE>;
+    std::array<LiveScoreValues, 4> m_liveScores{};
+    std::string m_liveScoreAccount;
+    unsigned int m_liveSeenBoards = 0;
+    unsigned int m_liveDirtyBoards = 0;
+    unsigned int m_liveUploadBatch = 0;
+    long long m_liveUploadAfter = 0;
+    bool m_liveUploadInFlight = false;
+#endif
 
     EPending m_pending;
     eStatsReturn m_result;

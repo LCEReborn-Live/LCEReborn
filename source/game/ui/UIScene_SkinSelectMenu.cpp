@@ -334,6 +334,22 @@ void UIScene_SkinSelectMenu::handleSkinIndexChanged()
     if (m_pack != NULL)
     {
         skinFile = static_cast<DLCSkinFile*>(m_pack->getSkinFile(m_skinIndex));
+        if (skinFile == NULL)
+        {
+            m_noSkinsToShow = true;
+            m_selectedSkinPath.clear();
+            m_selectedCapePath.clear();
+            m_additionalSkinBoxes = NULL;
+            m_labelSkinName.setLabel(UIString(L""), false, false);
+            m_labelSkinOrigin.setLabel(UIString(L""), false, false);
+            setCharacterLocked(false);
+            setCharacterBlocked(false);
+            setCharacterFavourite(false);
+            for (auto& character : m_characters)
+                character.setVisible(false);
+            updateTooltips();
+            return;
+        }
         m_selectedSkinPath = skinFile->getPath();
         m_selectedCapePath = skinFile->getParameterAsString(DLCManager::eDLCParameterType_CapePath, L"");
         m_additionalSkinBoxes = skinFile->getAdditionalBoxes();
@@ -447,7 +463,7 @@ void UIScene_SkinSelectMenu::handleSkinIndexChanged()
             if (m_pack == NULL)
                 skinId = static_cast<int>(m_skinIndex);
             else
-                skinId = static_cast<int>(m_pack->getSkinFile(m_skinIndex)->m_fileID);
+                skinId = static_cast<int>(skinFile->m_fileID);
             if (favouriteSkin == skinId)
             {
                 setCharacterFavourite(true);
@@ -515,6 +531,12 @@ void UIScene_SkinSelectMenu::handleSkinIndexChanged()
         if (m_pack != NULL)
         {
             otherSkinFile = static_cast<DLCSkinFile*>(m_pack->getSkinFile(nextIndex));
+            if (otherSkinFile == NULL)
+            {
+                preview.setVisible(false);
+                nextIndex = getNextSkinIndex(nextIndex);
+                continue;
+            }
             otherSkinPath = otherSkinFile->getPath();
             otherCapePath = otherSkinFile->getParameterAsString(DLCManager::eDLCParameterType_CapePath, L"");
             otherSkinBoxes = otherSkinFile->getAdditionalBoxes();
@@ -582,6 +604,12 @@ void UIScene_SkinSelectMenu::handleSkinIndexChanged()
         if (m_pack != NULL)
         {
             otherSkinFile = static_cast<DLCSkinFile*>(m_pack->getSkinFile(previousIndex));
+            if (otherSkinFile == NULL)
+            {
+                preview.setVisible(false);
+                previousIndex = static_cast<unsigned int>(getPreviousSkinIndex(previousIndex));
+                continue;
+            }
             otherSkinPath = otherSkinFile->getPath();
             otherCapePath = otherSkinFile->getParameterAsString(DLCManager::eDLCParameterType_CapePath, L"");
             otherSkinBoxes = otherSkinFile->getAdditionalBoxes();
@@ -680,6 +708,8 @@ void UIScene_SkinSelectMenu::SetSkinPackButtonList()
     if (!m_packListDirty)
         return;
     m_packListDirty = false;
+    m_hasTexturePackSkinPack = false;
+    m_texturePackSkinPackId = 0;
 
     DLCPack* texturePackSkinPack = NULL;
     unsigned int packIndex = m_packIndex;
@@ -713,7 +743,7 @@ void UIScene_SkinSelectMenu::SetSkinPackButtonList()
          ++i)
     {
         DLCPack* pack = gApp.mDLCManager.getPack(i, DLCManager::eDLCType_Skin);
-        if (pack == NULL || pack->GetSource() == C4JStorage::EPackSource_Server)
+        if (pack == NULL || pack->GetSource() == C4JStorage::EPackSource_Server || pack->getSkinCount() == 0)
             continue;
 
         if (m_hasTexturePackSkinPack && texturePackSkinPack != NULL && texturePackSkinPack->GetPackId() >= 0x400
@@ -802,7 +832,9 @@ void UIScene_SkinSelectMenu::setPackLabel()
     }
     else
     {
-        packName = gApp.mDLCManager.getPackFromPackID(static_cast<int>(m_packIndex))->getLocalisedDisplayName();
+        const auto pack = gApp.mDLCManager.getPackFromPackID(static_cast<int>(m_packIndex));
+        if (pack != NULL)
+            packName = pack->getLocalisedDisplayName();
     }
     m_labelPackName.setLabel(UIString(packName), false, false);
 
@@ -829,7 +861,15 @@ void UIScene_SkinSelectMenu::handlePackIndexChanged()
 
     DLCPack* pack = NULL;
     if (m_packIndex > 1)
+    {
         pack = gApp.mDLCManager.getPackFromPackID(static_cast<int>(m_packIndex));
+        if (pack == NULL || pack->getSkinCount() == 0)
+        {
+            pack = NULL;
+            m_packIndex = 0;
+            m_packList.HighlightItem(0, false);
+        }
+    }
     m_skinIndex = 0;
     m_pack = pack;
 
@@ -871,8 +911,8 @@ void UIScene_SkinSelectMenu::handlePackIndexChanged()
 
         if (m_packIndex == 0)
         {
-            if (m_originalSkinId >= 0 && (m_originalSkinId & 0x7fffffe0) == 0)
-                m_skinIndex = static_cast<unsigned int>(m_originalSkinId & 0x1f);
+            if (m_originalSkinId >= 0 && m_originalSkinId < 19)
+                m_skinIndex = static_cast<unsigned int>(m_originalSkinId);
         }
         else if (m_packIndex == 1)
         {
@@ -1047,6 +1087,8 @@ void UIScene_SkinSelectMenu::InputActionOK(unsigned int player)
         if (m_pack != NULL)
         {
             DLCSkinFile* skinFile = static_cast<DLCSkinFile*>(m_pack->getSkinFile(m_skinIndex));
+            if (skinFile == NULL)
+                break;
             if (!Minecraft::GetInstance()->GetMiniGame()->AllowSmallSkins()
                 || (skinFile->getSkinAdjustments().mGameFlags & 1) == 0)
             {
@@ -1157,7 +1199,7 @@ void UIScene_SkinSelectMenu::InputActionFavorite(unsigned int player)
             m_skinIndex = favouriteCount - 1;
         handleSkinIndexChanged();
     }
-    else
+    else if (m_pack != NULL)
     {
         DLCSkinFile* skinFile = static_cast<DLCSkinFile*>(m_pack->getSkinFile(m_skinIndex));
         if (skinFile != NULL)

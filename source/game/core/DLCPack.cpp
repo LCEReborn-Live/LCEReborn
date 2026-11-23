@@ -413,27 +413,25 @@ void DLCPack::AddCreditString(const std::wstring& value)
 }
 int DLCPack::getFileIndexAt(DLCManager::EDLCType type, const std::wstring& name, bool& found)
 {
+    found = false;
     if (type == DLCManager::eDLCType_All)
         return 0;
-    found = false;
     int index = 0;
     for (std::vector<DLCFile*>::iterator file = m_files[type].begin(); file != m_files[type].end(); ++file)
     {
-        if (name == (*file)->getPath())
+        if (*file != NULL && name == (*file)->getPath())
         {
             found = true;
             return index;
         }
         ++index;
     }
-    if (!found)
+    for (DLCPack* child : m_childPacks)
     {
-        for (std::vector<DLCPack*>::iterator child = m_childPacks.begin(); child != m_childPacks.end(); ++child)
-        {
-            int childIndex = (*child)->getFileIndexAt(type, name, found);
-            if (found)
-                return childIndex;
-        }
+        const int childIndex = child->getFileIndexAt(type, name, found);
+        if (found)
+            return index + childIndex;
+        index += child->getDLCItemsCount(type);
     }
     return 0;
 }
@@ -447,7 +445,18 @@ int DLCPack::getSkinIndexAt(const std::wstring& name, bool& found)
 }
 DLCFile* DLCPack::getSkinFile(unsigned int index)
 {
-    return getFile(DLCManager::eDLCType_Skin, index, true, true);
+    const auto& skins = m_files[DLCManager::eDLCType_Skin];
+    if (index < skins.size())
+        return skins[index];
+    index -= static_cast<unsigned int>(skins.size());
+    for (DLCPack* child : m_childPacks)
+    {
+        const auto count = static_cast<unsigned int>(child->getSkinCount());
+        if (index < count)
+            return child->getSkinFile(index);
+        index -= count;
+    }
+    return NULL;
 }
 std::wstring DLCPack::getLocalisedDisplayName()
 {

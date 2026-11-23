@@ -2,6 +2,10 @@ name: Windows and Linux build and release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing version tag to build and publish from this workflow
+        type: string
   push:
     branches:
       - main
@@ -15,6 +19,9 @@ on:
 permissions:
   contents: write
 
+env:
+  LCE_RELEASE_TAG: ${{ inputs.release_tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+
 jobs:
   windows:
     runs-on: windows-2022
@@ -25,6 +32,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || '' }}
           fetch-depth: 0
           submodules: recursive
           persist-credentials: false
@@ -122,7 +130,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0' }
+          $version = if ($env:LCE_RELEASE_TAG) { $env:LCE_RELEASE_TAG.TrimStart('v') } else { '0.1.0' }
           $server = @(Get-ChildItem build -Filter 'LCEReborn-server-windows-*.zip')
           if ($server.Count -ne 1) { throw 'Expected exactly one Windows dedicated server package' }
           Move-Item -LiteralPath $server[0].FullName -Destination "build/LCEReborn-Live-Server-Windows-$version.zip"
@@ -133,7 +141,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $archive = Get-ChildItem build -Filter 'LCEReborn-pc-*.zip' | Select-Object -First 1
           if (-not $archive) { throw 'The portable package ZIP was not created' }
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0' }
+          $version = if ($env:LCE_RELEASE_TAG) { $env:LCE_RELEASE_TAG.TrimStart('v') } else { '0.1.0' }
           Move-Item -LiteralPath $archive.FullName -Destination (Join-Path $archive.DirectoryName "LCEReborn-Live-Portable-$version.zip")
           $archive = Get-ChildItem build -Filter 'LCEReborn-Live-Portable-*.zip' | Select-Object -First 1
           $stage = Join-Path $env:GITHUB_WORKSPACE 'build/installer-files'
@@ -168,6 +176,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || '' }}
           fetch-depth: 0
           submodules: recursive
           persist-credentials: false
@@ -211,8 +220,8 @@ jobs:
           python tools/build/deps.py build/deps
           python tools/build/layout.py build/deps build/third_party
           python tools/build_linux.py --compiler-cache
-          version="${GITHUB_REF_NAME#v}"
-          if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then version="0.1.0"; fi
+          version="${LCE_RELEASE_TAG#v}"
+          if [[ -z "$version" ]]; then version="0.1.0"; fi
           mv build/LCEReborn-linux-*.AppImage "build/LCEReborn-Live-Linux-$version.AppImage"
           mv build/LCEReborn-linux-*.tar.gz "build/LCEReborn-Live-Linux-Portable-$version.tar.gz"
           mv build/LCEReborn-server-linux-*.tar.gz "build/LCEReborn-Live-Server-Linux-$version.tar.gz"
@@ -235,7 +244,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(inputs.release_tag, 'v')
     needs: [windows, linux]
     runs-on: ubuntu-24.04
     permissions:
@@ -262,7 +271,7 @@ jobs:
       - name: Read console artifact sources
         id: consoles
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -273,38 +282,28 @@ jobs:
             printf 'wiiu=%s\nswitch=%s\n' "$wiiu" "$switch" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download Wii U artifacts
+      - name: Download the complete Wii U WUHB
         if: steps.consoles.outputs.wiiu != ''
         uses: actions/download-artifact@v7
         with:
-          pattern: wiiu-*
+          name: wiiu-wuhb-complete
           path: build/console-artifacts/wiiu
           run-id: ${{ steps.consoles.outputs.wiiu }}
           github-token: ${{ github.token }}
 
-      - name: Download Switch NRO files
+      - name: Download the complete Switch NRO
         if: steps.consoles.outputs.switch != ''
         uses: actions/download-artifact@v7
         with:
-          pattern: '*.nro'
-          merge-multiple: true
+          name: LCEReborn-Full.nro
           path: build/console-artifacts/switch
-          run-id: ${{ steps.consoles.outputs.switch }}
-          github-token: ${{ github.token }}
-
-      - name: Download Switch client bundle
-        if: steps.consoles.outputs.switch != ''
-        uses: actions/download-artifact@v7
-        with:
-          name: nintendo-switch-nro
-          path: build/console-artifacts/switch-package
           run-id: ${{ steps.consoles.outputs.switch }}
           github-token: ${{ github.token }}
 
       - name: Stage console release assets
         if: steps.consoles.outputs.switch != ''
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -315,21 +314,14 @@ jobs:
             test -s "$input/$1"
             mv "$input/$1" "$output/$2"
           }
-          stage 'wiiu/wiiu-rpx/Minecraft.Client.rpx' "LCEReborn-WiiU-Beta-$RELEASE_TAG.rpx"
-          stage 'wiiu/wiiu-rpx/Minecraft.Client.map' "LCEReborn-WiiU-Beta-$RELEASE_TAG.map"
-          stage 'wiiu/wiiu-rpx/BearSSL-LICENSE.txt' 'BearSSL-LICENSE.txt'
-          stage 'wiiu/wiiu-wuhb/LCEReborn.wuhb' "LCEReborn-WiiU-Beta-$RELEASE_TAG.wuhb"
-          stage 'wiiu/wiiu-wuhb-complete/LCEReborn-complete.wuhb' "LCEReborn-WiiU-Full-Beta-$RELEASE_TAG.wuhb"
-          stage 'switch/LCEReborn.nro' 'LCEReborn.nro'
+          stage 'wiiu/LCEReborn-complete.wuhb' "LCEReborn-WiiU-Full-Beta-$RELEASE_TAG.wuhb"
+          stage 'wiiu/BearSSL-LICENSE.txt' 'BearSSL-LICENSE.txt'
           stage 'switch/LCEReborn-Full.nro' 'LCEReborn-Full.nro'
-          cd "$input/switch-package"
-          test -s LCEReborn/LCEReborn.nro
-          python3 -m zipfile -c "$output/LCEReborn-Switch-Beta-$RELEASE_TAG.zip" LCEReborn
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
           RELEASE_REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |

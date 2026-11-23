@@ -48,6 +48,7 @@
 #include "platform/pc/PcStartWorld.hpp"
 #include "platform/pc/PcWindow.hpp"
 #if LCE_PLATFORM_SWITCH
+#include "game/core/System.hpp"
 #include "game/minigame/MiniGameDef.hpp"
 #include "platform/switch/SwitchRuntime.hpp"
 #include "platform/wiiu/WiiULiveCosmetics.hpp"
@@ -229,6 +230,7 @@ int main(int argc, char** argv)
     while (!PcExitRequested())
     {
 #if LCE_PLATFORM_SWITCH
+        const auto frameStart = System::processTimeInNanoSecs();
         C4JThreadImpl::ReapFinishedThreads();
 #endif
         PcPumpEvents();
@@ -287,8 +289,12 @@ int main(int argc, char** argv)
         InfoBarManager::EndTimingCategory(InfoBarManager::eTimingCagegory_UIRender);
         InfoBarManager::EndTimingCategory(InfoBarManager::eTimingCagegory_Frame);
         PIXBeginNamedEvent(timingColour, "Frame present");
+#if LCE_PLATFORM_SWITCH
+        const auto presentStart = System::processTimeInNanoSecs();
+#endif
         gRenderer->Present();
 #if LCE_PLATFORM_SWITCH
+        const auto presentNs = System::processTimeInNanoSecs() - presentStart;
         if (firstFrame)
         {
             firstFrame = false;
@@ -324,6 +330,10 @@ int main(int argc, char** argv)
         PcFrameCaptureTick();
 #endif
         Vec3::resetPool();
+#if LCE_PLATFORM_SWITCH
+        if (playing)
+            SwitchRecordFrame(System::processTimeInNanoSecs() - frameStart, presentNs);
+#endif
     }
 
 #if LCE_PLATFORM_SWITCH

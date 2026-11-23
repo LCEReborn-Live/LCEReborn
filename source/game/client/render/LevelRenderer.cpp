@@ -46,6 +46,9 @@
 #include "game/item/ThrownPotion.hpp"
 #include "game/core/StringConversion.hpp"
 #include "game/core/System.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/switch/SwitchRuntime.hpp"
+#endif
 #include "game/entity/mob/Entity.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
 #include "game/entity/projectile/DragonFireball.hpp"
@@ -2669,12 +2672,7 @@ unsigned int LevelRenderer::updateDirtyChunks(unsigned int* count)
                         ClipChunk* clipChunk =
                             &mClipChunks[player].data[(gridZ * mChunkGridHeight + gridY) * mChunkGridWidth + gridX];
 
-                        int dx = clipChunk->mX - cameraX;
-                        int dy = clipChunk->mY - cameraY;
-                        int dz = clipChunk->mZ - cameraZ;
                         int globalIndex = clipChunk->mGlobalIndex;
-                        int distance = dx * dx + dy * dy + dz * dz;
-                        int squishedDistance = dx * dx + dy * dy * 4 + dz * dz;
 
                         if (globalIndex == -1)
                         {
@@ -2687,11 +2685,16 @@ unsigned int LevelRenderer::updateDirtyChunks(unsigned int* count)
                             continue;
                         }
 
+                        const int dx = clipChunk->mX - cameraX;
+                        const int dy = clipChunk->mY - cameraY;
+                        const int dz = clipChunk->mZ - cameraZ;
+                        const int distance = dx * dx + dy * dy + dz * dz;
                         if (commandBufferSize >= commandBufferBudget && (flags & 1) == 0 && distance >= 400)
                         {
                             continue;
                         }
 
+                        const int squishedDistance = distance + 3 * dy * dy;
                         if (squishedDistance < nearestDistance)
                         {
                             Chunk* chunk = clipChunk->mChunk;
@@ -2751,7 +2754,13 @@ unsigned int LevelRenderer::updateDirtyChunks(unsigned int* count)
 
     LeaveCriticalSection(&mChunkMutex);
 
+#if LCE_PLATFORM_SWITCH
+    const auto meshStart = System::processTimeInNanoSecs();
+#endif
     rebuildChunk.rebuild(count);
+#if LCE_PLATFORM_SWITCH
+    SwitchRecordChunkMesh(System::processTimeInNanoSecs() - meshStart);
+#endif
 
     PIXEndNamedEvent();
 

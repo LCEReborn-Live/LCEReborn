@@ -721,7 +721,7 @@ public:
     GLuint StreamVertexTexture();
     void ExecuteTextureStorage(Texture& texture, const void* pixels);
     void ExecuteTextureLevel(Texture& texture, int level, int width, int height, const void* pixels);
-    bool PrepareDraw(Renderer& renderer, Context& context);
+    bool PrepareDraw(Renderer& renderer, Context& context, bool reuseTerrainRaster = false);
     void DrawRange(int primitiveType, unsigned int firstVertex, unsigned int count);
     void DrawStream(Renderer& renderer, Context& context, const void* vertices, unsigned int size,
                     unsigned int stride, int layout, int primitiveType, unsigned int count);
@@ -753,6 +753,9 @@ public:
     bool mPixelConstantsBound;
     Context* mBoundConstantContext;
     bool mCacheValid;
+#if LCE_PLATFORM_SWITCH
+    bool mTerrainRasterReady;
+#endif
     GLuint mCurrentFramebuffer;
     GLuint mCurrentProgram;
     GLuint mCurrentVertexArray;
@@ -898,6 +901,9 @@ bool Renderer::Device::IsGlThread() const
 void Renderer::Device::Invalidate()
 {
     mCacheValid = false;
+#if LCE_PLATFORM_SWITCH
+    mTerrainRasterReady = false;
+#endif
     mCurrentFramebuffer = 0xFFFFFFFFu;
     mCurrentProgram = 0xFFFFFFFFu;
     mCurrentVertexArray = 0xFFFFFFFFu;
@@ -1686,7 +1692,7 @@ const ShaderLinkedProgram* Renderer::Device::PreparePackDraw(Renderer& renderer,
     return program;
 }
 
-bool Renderer::Device::PrepareDraw(Renderer& renderer, Context& context)
+bool Renderer::Device::PrepareDraw(Renderer& renderer, Context& context, bool reuseTerrainRaster)
 {
     if (!IsGlThread() || renderer.mScreen != 0)
     {
@@ -1715,105 +1721,118 @@ bool Renderer::Device::PrepareDraw(Renderer& renderer, Context& context)
     bool bShadowDraw = mPackDraw && ShaderPipeline::Get().InShadow();
 
     bool bAlphaTarget = !mPackDraw && mTarget == RenderTarget_OrderIndependentAlpha;
-    if (mPackDraw)
+#if LCE_PLATFORM_SWITCH
+    // A terrain layer uses the same raster state for every chunk. Uniforms,
+    // uploads and vertex buffers still go through the usual draw path.
+    const bool terrainRaster = !mPackDraw && gpu.mVertexShader == RenderVertexShader_Terrain;
+    const bool rasterAlreadySet = reuseTerrainRaster && terrainRaster && mTerrainRasterReady;
+    mTerrainRasterReady = terrainRaster;
+#else
+    (void)reuseTerrainRaster;
+    constexpr bool rasterAlreadySet = false;
+#endif
+    if (!rasterAlreadySet)
     {
-        mCurrentFramebuffer = packTarget.framebuffer;
-
-        if (bShadowDraw)
+        if (mPackDraw)
         {
-            Gl::Viewport(0, 0, packTarget.width, packTarget.height);
-            SetCapability(Capability_Scissor, Gl::SCISSOR_TEST, false);
+            mCurrentFramebuffer = packTarget.framebuffer;
+
+            if (bShadowDraw)
+            {
+                Gl::Viewport(0, 0, packTarget.width, packTarget.height);
+                SetCapability(Capability_Scissor, Gl::SCISSOR_TEST, false);
+            }
+            else
+            {
+                float scaleX = (float)packTarget.width / (float)(mWidth > 0 ? mWidth : 1);
+                float scaleY = (float)packTarget.height / (float)(mHeight > 0 ? mHeight : 1);
+                float flippedY = (float)mHeight - (gpu.mViewport[1] + gpu.mViewport[3]);
+                Gl::Viewport((GLint)floorf(gpu.mViewport[0] * scaleX + 0.5f), (GLint)floorf(flippedY * scaleY + 0.5f),
+                             (GLsizei)floorf(gpu.mViewport[2] * scaleX + 0.5f),
+                             (GLsizei)floorf(gpu.mViewport[3] * scaleY + 0.5f));
+                int scissorY = mHeight - (gpu.mScissor[1] + gpu.mScissor[3]);
+                SetCapability(Capability_Scissor, Gl::SCISSOR_TEST, true);
+                Gl::Scissor((GLint)floorf((float)gpu.mScissor[0] * scaleX), (GLint)floorf((float)scissorY * scaleY),
+                            (GLsizei)ceilf((float)gpu.mScissor[2] * scaleX), (GLsizei)ceilf((float)gpu.mScissor[3] * scaleY));
+            }
         }
         else
         {
-            float scaleX = (float)packTarget.width / (float)(mWidth > 0 ? mWidth : 1);
-            float scaleY = (float)packTarget.height / (float)(mHeight > 0 ? mHeight : 1);
-            float flippedY = (float)mHeight - (gpu.mViewport[1] + gpu.mViewport[3]);
-            Gl::Viewport((GLint)floorf(gpu.mViewport[0] * scaleX + 0.5f), (GLint)floorf(flippedY * scaleY + 0.5f),
-                         (GLsizei)floorf(gpu.mViewport[2] * scaleX + 0.5f),
-                         (GLsizei)floorf(gpu.mViewport[3] * scaleY + 0.5f));
-            int scissorY = mHeight - (gpu.mScissor[1] + gpu.mScissor[3]);
+            BindFramebuffer(bAlphaTarget ? mAlphaFramebuffer : mMainFramebuffer);
+
+            Gl::Viewport((GLint)floorf(gpu.mViewport[0] + 0.5f), (GLint)floorf(gpu.mViewport[1] + 0.5f),
+                         (GLsizei)floorf(gpu.mViewport[2] + 0.5f), (GLsizei)floorf(gpu.mViewport[3] + 0.5f));
             SetCapability(Capability_Scissor, Gl::SCISSOR_TEST, true);
-            Gl::Scissor((GLint)floorf((float)gpu.mScissor[0] * scaleX), (GLint)floorf((float)scissorY * scaleY),
-                        (GLsizei)ceilf((float)gpu.mScissor[2] * scaleX), (GLsizei)ceilf((float)gpu.mScissor[3] * scaleY));
+            Gl::Scissor(gpu.mScissor[0], gpu.mScissor[1], gpu.mScissor[2], gpu.mScissor[3]);
         }
-    }
-    else
-    {
-        BindFramebuffer(bAlphaTarget ? mAlphaFramebuffer : mMainFramebuffer);
 
-        Gl::Viewport((GLint)floorf(gpu.mViewport[0] + 0.5f), (GLint)floorf(gpu.mViewport[1] + 0.5f),
-                     (GLsizei)floorf(gpu.mViewport[2] + 0.5f), (GLsizei)floorf(gpu.mViewport[3] + 0.5f));
-        SetCapability(Capability_Scissor, Gl::SCISSOR_TEST, true);
-        Gl::Scissor(gpu.mScissor[0], gpu.mScissor[1], gpu.mScissor[2], gpu.mScissor[3]);
-    }
+        SetCapability(Capability_DepthTest, Gl::DEPTH_TEST, gpu.mDepthTest);
+        Gl::DepthFunc(CompareFunction(gpu.mDepthFunc));
+        Gl::DepthMask(gpu.mDepthWrite ? 1 : 0);
 
-    SetCapability(Capability_DepthTest, Gl::DEPTH_TEST, gpu.mDepthTest);
-    Gl::DepthFunc(CompareFunction(gpu.mDepthFunc));
-    Gl::DepthMask(gpu.mDepthWrite ? 1 : 0);
+        SetCapability(Capability_StencilTest, Gl::STENCIL_TEST, true);
+        Gl::StencilFunc(CompareFunction(gpu.mStencilFunc), gpu.mStencilReference, gpu.mStencilCompareMask);
+        Gl::StencilOp(Gl::KEEP, Gl::KEEP, Gl::REPLACE);
+        Gl::StencilMask(gpu.mStencilWriteMask);
 
-    SetCapability(Capability_StencilTest, Gl::STENCIL_TEST, true);
-    Gl::StencilFunc(CompareFunction(gpu.mStencilFunc), gpu.mStencilReference, gpu.mStencilCompareMask);
-    Gl::StencilOp(Gl::KEEP, Gl::KEEP, Gl::REPLACE);
-    Gl::StencilMask(gpu.mStencilWriteMask);
-
-    SetCapability(Capability_CullFace, Gl::CULL_FACE, gpu.mCullBack && !bShadowDraw);
-    Gl::CullFace(Gl::BACK);
-    if (mPackDraw)
-    {
-        Gl::FrontFace(gpu.mFrontFaceCCW ? Gl::CCW : Gl::CW);
-    }
-    else
-    {
-        Gl::FrontFace(gpu.mFrontFaceCCW ? Gl::CW : Gl::CCW);
-    }
-
-    SetCapability(Capability_PolygonOffset, Gl::POLYGON_OFFSET_FILL, true);
-    Gl::PolygonOffset(gpu.mPolygonOffsetScale, gpu.mPolygonOffsetBias);
-
-    if (bAlphaTarget)
-    {
-        SetCapability(Capability_Blend, Gl::BLEND, true);
-        Gl::BlendFuncSeparate(Gl::ONE, Gl::ONE, Gl::ZERO, Gl::ONE_MINUS_SRC_ALPHA);
-        SetColourMaskMode(ColourMaskMode_OrderIndependentAlpha, CHANNEL_MASK_RGBA);
-    }
-    else if (mPackDraw)
-    {
-        if (packTarget.blendOverride)
+        SetCapability(Capability_CullFace, Gl::CULL_FACE, gpu.mCullBack && !bShadowDraw);
+        Gl::CullFace(Gl::BACK);
+        if (mPackDraw)
         {
-            SetCapability(Capability_Blend, Gl::BLEND, packTarget.blendEnable);
-            Gl::BlendFuncSeparate(packTarget.blend[0], packTarget.blend[1], packTarget.blend[2], packTarget.blend[3]);
+            Gl::FrontFace(gpu.mFrontFaceCCW ? Gl::CCW : Gl::CW);
+        }
+        else
+        {
+            Gl::FrontFace(gpu.mFrontFaceCCW ? Gl::CW : Gl::CCW);
+        }
+
+        SetCapability(Capability_PolygonOffset, Gl::POLYGON_OFFSET_FILL, true);
+        Gl::PolygonOffset(gpu.mPolygonOffsetScale, gpu.mPolygonOffsetBias);
+
+        if (bAlphaTarget)
+        {
+            SetCapability(Capability_Blend, Gl::BLEND, true);
+            Gl::BlendFuncSeparate(Gl::ONE, Gl::ONE, Gl::ZERO, Gl::ONE_MINUS_SRC_ALPHA);
+            SetColourMaskMode(ColourMaskMode_OrderIndependentAlpha, CHANNEL_MASK_RGBA);
+        }
+        else if (mPackDraw)
+        {
+            if (packTarget.blendOverride)
+            {
+                SetCapability(Capability_Blend, Gl::BLEND, packTarget.blendEnable);
+                Gl::BlendFuncSeparate(packTarget.blend[0], packTarget.blend[1], packTarget.blend[2], packTarget.blend[3]);
+            }
+            else
+            {
+                SetCapability(Capability_Blend, Gl::BLEND, gpu.mBlendEnable);
+                Gl::BlendFunc(BlendFunction(gpu.mBlendSource), BlendFunction(gpu.mBlendDestination));
+            }
+
+            if (packTarget.bufferBlendOff != 0)
+            {
+                for (GLuint buffer = 0; buffer < 8; ++buffer)
+                {
+                    if ((packTarget.bufferBlendOff & (1u << buffer)) != 0)
+                    {
+                        Gl::Disablei(Gl::BLEND, buffer);
+                    }
+                }
+
+                mCapabilities[Capability_Blend] = -1;
+            }
+
+            unsigned char mask = (gpu.mColourMask & 7) != 0 ? CHANNEL_MASK_RGBA : gpu.mColourMask;
+            SetColourMaskMode(ColourMaskMode_Main, mask);
         }
         else
         {
             SetCapability(Capability_Blend, Gl::BLEND, gpu.mBlendEnable);
             Gl::BlendFunc(BlendFunction(gpu.mBlendSource), BlendFunction(gpu.mBlendDestination));
+            SetColourMaskMode(ColourMaskMode_Main, gpu.mColourMask);
         }
 
-        if (packTarget.bufferBlendOff != 0)
-        {
-            for (GLuint buffer = 0; buffer < 8; ++buffer)
-            {
-                if ((packTarget.bufferBlendOff & (1u << buffer)) != 0)
-                {
-                    Gl::Disablei(Gl::BLEND, buffer);
-                }
-            }
-
-            mCapabilities[Capability_Blend] = -1;
-        }
-
-        unsigned char mask = (gpu.mColourMask & 7) != 0 ? CHANNEL_MASK_RGBA : gpu.mColourMask;
-        SetColourMaskMode(ColourMaskMode_Main, mask);
+        Gl::BlendColor(gpu.mBlendColour[0], gpu.mBlendColour[1], gpu.mBlendColour[2], gpu.mBlendColour[3]);
     }
-    else
-    {
-        SetCapability(Capability_Blend, Gl::BLEND, gpu.mBlendEnable);
-        Gl::BlendFunc(BlendFunction(gpu.mBlendSource), BlendFunction(gpu.mBlendDestination));
-        SetColourMaskMode(ColourMaskMode_Main, gpu.mColourMask);
-    }
-
-    Gl::BlendColor(gpu.mBlendColour[0], gpu.mBlendColour[1], gpu.mBlendColour[2], gpu.mBlendColour[3]);
 
     if (mPackDraw)
     {
@@ -5107,6 +5126,10 @@ bool Renderer::CBuffCall(int id, bool bApplyMatrix, unsigned char layerMask)
     Context& context = getContext();
     int vertexType = mCommandBufferVertexTypes[slot];
     unsigned char primitiveType = mCommandBufferPrimitiveTypes[slot];
+#if LCE_PLATFORM_SWITCH
+    if (bApplyMatrix && IsGlThread())
+        mDevice->mTerrainRasterReady = false;
+#endif
 
     if (!bApplyMatrix)
     {
@@ -5516,7 +5539,11 @@ void Renderer::CommandBuffer::Render(C4JRender::eVertexType vertexType, Context&
             device->mPendingTerrainQuadData = !mQuadData.empty() || mQuadTexture != 0;
         }
 
-        bool bDraw = device != NULL && device->PrepareDraw(*renderer, context)
+        bool reuseTerrainRaster = false;
+#if LCE_PLATFORM_SWITCH
+        reuseTerrainRaster = !bApplyMatrix && !mRecordState;
+#endif
+        bool bDraw = device != NULL && device->PrepareDraw(*renderer, context, reuseTerrainRaster)
                      && EnsureUploaded(device, LayoutForVertexType(shaderVertexType));
 
         if (device != NULL)

@@ -1,10 +1,11 @@
 function(lce_switch_romfs target)
   set(folder "${CMAKE_CURRENT_BINARY_DIR}/${target}")
   set(resources "${PROJECT_SOURCE_DIR}/resources/pc")
+  set(platform_skin "${PROJECT_SOURCE_DIR}/resources/switch/skinSwitch.fui")
   set(packs "${PROJECT_SOURCE_DIR}/packs")
   set(license "${PROJECT_SOURCE_DIR}/tools/build/third_party/bearssl-LICENSE.txt")
   set(copy_game_assets "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/copy-game-assets.cmake")
-  set(sources "${resources}/*" "${packs}/*" "${license}")
+  set(sources "${resources}/*" "${packs}/*" "${license}" "${platform_skin}")
   if(ARGC GREATER 1)
     get_filename_component(assets "${ARGV1}" ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
     if(NOT EXISTS "${assets}/Common/Media/MediaWiiU.arc")
@@ -29,6 +30,7 @@ function(lce_switch_romfs target)
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${folder}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${folder}"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${resources}" "${folder}/resources"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${platform_skin}" "${folder}/resources/ui/skinSwitch.fui"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${packs}" "${folder}/packs"
     COMMAND "${CMAKE_COMMAND}" -E copy "${license}" "${folder}/"
     ${copy_assets}

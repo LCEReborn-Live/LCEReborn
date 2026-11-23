@@ -191,6 +191,8 @@ private:
     friend class MultiPlayerGameMode;
     friend class ItemFrameRenderer;
 
+    void prepareChunkGrid(const boost::shared_ptr<Entity>& camera);
+
     int mDebugRenderTick;
     ChunkBlockEntityMap mBlockEntities;
     C4JCriticalSection mBlockEntityMutex;
@@ -198,6 +200,9 @@ private:
     Level* mLevels[4];
     Textures* mTextures;
     arrayWithLength<ClipChunk> mClipChunks[4];
+#if LCE_PLATFORM_SWITCH
+    std::vector<unsigned int> mVisibleChunkIndices[4];
+#endif
     int mActivePlayers[4];
     int mRenderDistance[4];
     int mChunkGridWidth;

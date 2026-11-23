@@ -906,6 +906,9 @@ void LevelRenderer::setLevel(int dimension, MultiPlayerLevel* level)
             delete mClipChunks[dimension].data;
             mClipChunks[dimension].length = 0;
             mClipChunks[dimension].data = 0;
+#if LCE_PLATFORM_SWITCH
+            mVisibleChunkIndices[dimension].clear();
+#endif
         }
 
         if (dimension == gProfile->GetPrimaryPad())
@@ -953,6 +956,9 @@ void LevelRenderer::allChanged(int dimension)
     }
 
     mClipChunks[dimension] = arrayWithLength<ClipChunk>(mChunkGridWidth * mChunkGridHeight * mChunkGridDepth, true);
+#if LCE_PLATFORM_SWITCH
+    mVisibleChunkIndices[dimension].clear();
+#endif
 
     for (int index = 0; index < mChunkGridWidth * mChunkGridHeight * mChunkGridDepth; ++index)
     {
@@ -1572,6 +1578,26 @@ int LevelRenderer::renderChunks(int first, int count, int layer, double partialT
     bool running = true;
     unsigned int mask = (unsigned int)(4 << (layer & 0x3f)) & 0xff;
 
+#if LCE_PLATFORM_SWITCH
+    int visibleCount = 0;
+    setupCameraInsideAreas(camera);
+    const bool restrictView = !mCameraInsideAreas.empty() && Minecraft::InMiniGame(eMiniGameId_Glide, true);
+    for (unsigned int index : mVisibleChunkIndices[userIndex])
+    {
+        ClipChunk* chunk = &mClipChunks[userIndex][index];
+        const int globalIndex = chunk->mGlobalIndex;
+        if (!chunk->mVisible || globalIndex < 0 || (mask & mGlobalChunkFlags[globalIndex]) == mask
+            || (restrictView && clippedByCameraInsideAreas(chunk) != 0))
+        {
+            continue;
+        }
+
+        // The OpenGL renderer draws full command buffers and ignores the face mask.
+        if (gRenderer->CBuffCall(globalIndex * 3 + layer + mDisplayList, running, 0x7f))
+            running = false;
+        ++visibleCount;
+    }
+#else
     ClipChunk* chunk = mClipChunks[userIndex].data;
     int visibleCount = 0;
 
@@ -1605,6 +1631,7 @@ int LevelRenderer::renderChunks(int first, int count, int layer, double partialT
             }
         }
     }
+#endif
 
     GlStateManager::popMatrix();
     mMinecraft->mGameRenderer->turnOffLightLayer(partialTick);
@@ -1872,7 +1899,7 @@ int LevelRenderer::renderShadowEntities(double partialTick, float distance, cons
     return drawn;
 }
 
-void LevelRenderer::render(boost::shared_ptr<Entity> camera, int layer, double partialTick, bool sort)
+void LevelRenderer::prepareChunkGrid(const boost::shared_ptr<Entity>& camera)
 {
     int dimension = mMinecraft->mPlayer->mUserIndex;
 
@@ -1880,14 +1907,6 @@ void LevelRenderer::render(boost::shared_ptr<Entity> camera, int layer, double p
         || mRenderDistance[dimension] != VideoSettings::GetRenderDistance())
     {
         allChanged();
-    }
-
-    if (layer == 0)
-    {
-        for (int counter = 0; counter < 5; ++counter)
-        {
-            mRenderCounters[counter] = 0;
-        }
     }
 
     double deltaX = camera->mX - mLastSortX[dimension];
@@ -1902,10 +1921,23 @@ void LevelRenderer::render(boost::shared_ptr<Entity> camera, int layer, double p
 
         resortChunks(Mth::floor(camera->mX), Mth::floor(camera->mY), Mth::floor(camera->mZ), -1);
     }
+}
+
+void LevelRenderer::render(boost::shared_ptr<Entity> camera, int layer, double partialTick, bool sort)
+{
+#if !LCE_PLATFORM_SWITCH
+    prepareChunkGrid(camera);
+#endif
+
+    if (layer == 0)
+    {
+        for (int counter = 0; counter < 5; ++counter)
+            mRenderCounters[counter] = 0;
+    }
 
     Lighting::turnOff();
 
-    renderChunks(0, mClipChunks[dimension].length, layer, partialTick);
+    renderChunks(0, mClipChunks[mMinecraft->mPlayer->mUserIndex].length, layer, partialTick);
 }
 
 void LevelRenderer::renderSky(float partialTick)
@@ -3428,6 +3460,14 @@ void LevelRenderer::cull(Culler* culler, float partialTick)
 {
     int userIndex = mMinecraft->mPlayer->mUserIndex;
 
+#if LCE_PLATFORM_SWITCH
+    // The grid can move or be replaced. Build the visible list after updating it.
+    prepareChunkGrid(mMinecraft->getCameraEntity());
+    auto& visible = mVisibleChunkIndices[userIndex];
+    visible.clear();
+    int extremeCorner[6][3];
+#endif
+
     FrustumCuller* frustumCuller = reinterpret_cast<FrustumCuller*>(culler);
     double xOffset = -frustumCuller->xOffset;
     double yOffset = -frustumCuller->yOffset;
@@ -3443,6 +3483,11 @@ void LevelRenderer::cull(Culler* culler, float partialTick)
         planes[i * 4 + 1] = plane[1];
         planes[i * 4 + 2] = plane[2];
         planes[i * 4 + 3] = (float)(plane[3] + plane[0] * xOffset + plane[1] * yOffset + plane[2] * zOffset);
+#if LCE_PLATFORM_SWITCH
+        extremeCorner[i][0] = plane[0] < 0.0f ? 0 : 3;
+        extremeCorner[i][1] = plane[1] < 0.0f ? 1 : 4;
+        extremeCorner[i][2] = plane[2] < 0.0f ? 2 : 5;
+#endif
     }
 
     ClipChunk* chunks = mClipChunks[userIndex].data;
@@ -3466,7 +3511,27 @@ void LevelRenderer::cull(Culler* culler, float partialTick)
             continue;
         }
 
+#if LCE_PLATFORM_SWITCH
+        const float bounds[] = {chunk->mMinX, chunk->mMinY, chunk->mMinZ, chunk->mMaxX, chunk->mMaxY, chunk->mMaxZ};
+        bool inside = true;
+        for (int planeIndex = 0; planeIndex < 6; ++planeIndex)
+        {
+            const float* plane = &planes[planeIndex * 4];
+            const int* corner = extremeCorner[planeIndex];
+            // The plane reaches its maximum on this corner of the box.
+            if (plane[0] * bounds[corner[0]] + plane[1] * bounds[corner[1]] + plane[2] * bounds[corner[2]]
+                    + plane[3] <= 0.0f)
+            {
+                inside = false;
+                break;
+            }
+        }
+        chunk->mVisible = inside;
+        if (inside)
+            visible.push_back(i);
+#else
         chunk->mVisible = clip(&chunk->mMinX, planes);
+#endif
     }
 }
 

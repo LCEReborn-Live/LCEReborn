@@ -7,6 +7,11 @@
 #include <climits>
 #include <cstring>
 #include <cwchar>
+#if LCE_PLATFORM_SWITCH
+#include <fstream>
+#include <limits>
+#include <vector>
+#endif
 
 #include "game/client/audio/SoundEngine.hpp"
 #include "game/client/audio/SoundEvent.hpp"
@@ -340,6 +345,20 @@ void ConsoleUIController::SetupFont()
 intptr_t ConsoleUIController::loadSkin(const std::wstring& name, const std::wstring& path, int fileIndex)
 {
     (void)path;
+#if LCE_PLATFORM_SWITCH
+    if (name == L"skinWiiU.fui")
+    {
+        std::ifstream file("romfs:/resources/ui/skinSwitch.fui", std::ios::binary | std::ios::ate);
+        const std::streamoff size = file.tellg();
+        if (size >= static_cast<std::streamoff>(sizeof(fuiFileHeader)) &&
+            size <= std::numeric_limits<unsigned int>::max())
+        {
+            std::vector<unsigned char> bytes(static_cast<std::size_t>(size));
+            if (file.seekg(0) && file.read(reinterpret_cast<char*>(bytes.data()), size))
+                return gFui->load({bytes.data(), static_cast<unsigned int>(bytes.size())}, false, fileIndex);
+        }
+    }
+#endif
     intptr_t scene = 0;
     if (name.size() != 0 && gApp.hasArchiveFile(name, false))
     {

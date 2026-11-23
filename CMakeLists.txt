@@ -298,7 +298,7 @@ if(NINTENDO_SWITCH)
   set(LCE_SWITCH_ASSETS_DIR "" CACHE PATH "Prepared base game and Update 688 assets for the full Switch NRO")
   include(tools/build/switch-romfs.cmake)
 
-  nx_generate_nacp(OUTPUT LCEReborn.nacp NAME "LCEReborn" AUTHOR "LCEReborn" VERSION "0.1.0")
+  nx_generate_nacp(OUTPUT LCEReborn.nacp NAME "LCEReborn" AUTHOR "LCEReborn" VERSION "1.2.8")
   lce_switch_romfs(switch_client_romfs)
   nx_create_nro(LCEReborn_nro TARGET LCEReborn OUTPUT LCEReborn.nro NACP LCEReborn.nacp ROMFS switch_client_romfs)
 

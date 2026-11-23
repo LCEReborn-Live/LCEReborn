@@ -61,6 +61,9 @@
 #include "platform/CInput.hpp"
 #endif
 #include "game/core/System.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "platform/switch/SwitchRuntime.hpp"
+#endif
 #include "game/entity/mob/Animal.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
 #include "game/entity/mob/MobEffectInstance.hpp"
@@ -470,6 +473,9 @@ int GameRenderer::runUpdate(void*)
 
         sRenderUpdateEvents->Set(0);
 
+#if LCE_PLATFORM_SWITCH
+        const auto batchStart = System::processTimeInNanoSecs();
+#endif
         int passCount = 0;
         do
         {
@@ -481,6 +487,9 @@ int GameRenderer::runUpdate(void*)
         } while (passCount < 10);
 
         gRenderer->CBuffDeferredModeEnd();
+#if LCE_PLATFORM_SWITCH
+        SwitchRecordChunkBatch(System::processTimeInNanoSecs() - batchStart, passCount);
+#endif
         minecraft->mLevelRenderer->fullyFlagRenderableBlockEntitiesToBeRemoved();
 
         EnterCriticalSection(&sDeleteMutex);

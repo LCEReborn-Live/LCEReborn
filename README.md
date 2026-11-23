@@ -3,7 +3,7 @@
 ![LCEReborn Live banner](docs/assets/lcereborn-live-banner.png)
 
 
-**Legacy Console Edition with Live accounts and online play. Available on PC, with experimental Wii U support in development.**
+**Legacy Console Edition with Live accounts and online play on Windows, Linux, Nintendo Switch (Beta), and Wii U (Beta).**
 
 [English](#en) · [Русский](#ru) · [Website](https://lcereborn.xyz) · [Downloads](https://github.com/LCEReborn-Live/LCEReborn/releases/latest) · [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI)
 
@@ -13,13 +13,7 @@
 
 ## English
    
-**LCEReborn Live** is the PC version of LCEReborn with Live accounts and online features. The game is based on the reconstructed Minecraft: Wii U Edition source, corresponding to the Aquatic Update 1.13.
-
-### Nintendo Wii U (beta)
-
-The Wii U version is in active development. This experimental work focuses on signing into **LCE Live** with a code entered on your phone or PC and showing **Playing on Wii U** to friends. Setup for Cemu and Wii U with Aroma requires your own decrypted base game and Update 688 dumps. [Wii U build and setup guide](docs/building.md)
-
-## Nintendo Switch (in a few days)
+**LCEReborn Live** adds Live accounts, friends, online worlds and mini-games to LCEReborn. The game is based on the reconstructed Minecraft: Wii U Edition source for the Aquatic Update 1.13.
 
 ### PC features
 
@@ -39,7 +33,7 @@ The Wii U version is in active development. This experimental work focuses on si
 - Wii U-style open-mic Game Chat in online play, with local microphone noise suppression, automatic voice activity detection and no push-to-talk key.
 - Keyboard, mouse, and controller support; single-player and split-screen play.
 
-### Installation
+### Install on PC
 
 Hosting a world? Separate **Windows and Linux dedicated-server packages** are also produced for releases. See [server setup](docs/dedicated-server.md).
 
@@ -47,7 +41,20 @@ Hosting a world? Separate **Windows and Linux dedicated-server packages** are al
 2. Start the launcher and choose **Download & install**, or import **your own dumps** of the base game and Update 688.
 3. Sign in to Live from the launcher, choose a profile, and select **Play**.
 
-Game data and saves are not bundled with the client download. The launcher can download and verify the game files during setup, or import them from your own copy. See [game data installation](docs/game-downloads.md).
+The PC launcher prepares game data during first-run setup and stores your saves locally. [Game data installation](docs/game-downloads.md)
+
+### Install on Nintendo Switch or Wii U (Beta)
+
+Download the full build for your console from [Releases](https://github.com/LCEReborn-Live/LCEReborn/releases). Both full builds include the base game data and Update 688.
+
+| Platform | File | How to start |
+| --- | --- | --- |
+| Nintendo Switch | `LCEReborn-Full.nro` | Copy it to `switch/` on the SD card and open it from the Homebrew Menu in application mode. In an emulator, put the NRO on its virtual SD card. [Switch guide](docs/switch-building.md) |
+| Wii U | `LCEReborn-WiiU-Full-Beta-*.wuhb` | Copy it to `wiiu/apps/` on an Aroma SD card, or open it in Cemu with `python tools/launch_cemu.py --bundle "<file>.wuhb"`. [Wii U guide](docs/building.md) |
+
+Open **LCE Live** in the game's main menu and enter the displayed code on your phone or PC. Your sign-in is saved for the next launch. Friends can see **Playing on Nintendo Switch** or **Playing on Wii U** when you're in a world or mini-game. [Enter your code](https://lcereborn.xyz/authorize)
+
+Relay crossplay, movement corrections and full online Battle, Tumble and Glide rounds are still being tested on consoles. [Release notes](docs/releases/v1.2.7.md)
 
 ### Live networking
 
@@ -59,7 +66,7 @@ The game host limits each player's voice stream to 75 packets and 16384 audio by
 
 ### Build from source
 
-Client build instructions are in [`docs/pc-platform.md`](docs/pc-platform.md). Release build details are in [`docs/live-release.md`](docs/live-release.md). The separate server and website are maintained in [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI).
+See the build guides for [Windows and Linux](docs/pc-platform.md), [Nintendo Switch](docs/switch-building.md), and [Wii U](docs/building.md). Release build details are in [`docs/live-release.md`](docs/live-release.md). The separate server and website are maintained in [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI).
 
 ## Disclaimers
 
@@ -71,17 +78,13 @@ Special thanks to the team and contributors behind **[LCEReborn](https://github.
 
 ## Credits and license
 
-LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party components retain their respective licenses. Game files and assets are not included in this repository or installer.
+LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party components retain their respective licenses.
 
 <a id="ru"></a>
 
 ## Русский
 
-**LCEReborn Live** — PC-версия проекта LCEReborn с учётными записями и сетевыми функциями Live. Основа игры — восстановленный исходный код Minecraft: Wii U Edition на версии Aquatic Update 1.13.
-
-### Wii U (Experimental)
-
-Версия для Wii U активно разрабатывается. На экспериментальном этапе работаем над входом в **LCE Live** по коду через телефон или ПК и статусом **Playing on Wii U** для друзей. Для запуска в Cemu или на Wii U с Aroma нужны собственные расшифрованные дампы базовой игры и Update 688. [Сборка и запуск на Wii U](docs/building.md)
+**LCEReborn Live** добавляет в LCEReborn аккаунты Live, друзей, сетевые миры и мини-игры. Основа игры — восстановленный исходный код Minecraft: Wii U Edition на версии Aquatic Update 1.13.
 
 ### Возможности на ПК
 
@@ -100,7 +103,7 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 - Голосовой Game Chat в стиле Wii U: открытый микрофон в сетевой игре с шумоподавлением и автоматическим определением речи, без кнопки PTT.
 - Клавиатура, мышь и геймпады; одиночная игра и разделённый экран.
 
-### Установка
+### Установка на ПК
 
 Для хостинга мира также собираются отдельные **dedicated-серверы для Windows и Linux**. Подробнее: [настройка сервера](docs/dedicated-server.md).
 
@@ -108,7 +111,20 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 2. Запустите лаунчер и выберите **Download & install** или импортируйте **собственные дампы** базовой игры и Update 688.
 3. Войдите в Live через кнопку в лаунчере, выберите профиль и нажмите **Play**.
 
-Игровые данные и сохранения не входят в архив клиента. Во время настройки лаунчер может скачать и проверить игровые файлы или импортировать файлы вашей копии игры. Подробнее: [установка игровых данных](docs/game-downloads.md).
+При первом запуске лаунчер подготовит игровые данные. Сохранения хранятся локально. [Установка игровых данных](docs/game-downloads.md)
+
+### Установка на Nintendo Switch и Wii U (Beta)
+
+Скачайте полный файл для своей консоли со [страницы релизов](https://github.com/LCEReborn-Live/LCEReborn/releases). В оба полных файла входят данные базовой игры и Update 688.
+
+| Платформа | Файл | Как запустить |
+| --- | --- | --- |
+| Nintendo Switch | `LCEReborn-Full.nro` | Скопируйте файл в `switch/` на SD-карте и запустите его из Homebrew Menu в режиме приложения. В эмуляторе используйте виртуальную SD-карту. [Инструкция для Switch](docs/switch-building.md) |
+| Wii U | `LCEReborn-WiiU-Full-Beta-*.wuhb` | Скопируйте файл в `wiiu/apps/` на SD-карте для Aroma или запустите его в Cemu командой `python tools/launch_cemu.py --bundle "<файл>.wuhb"`. [Инструкция для Wii U](docs/building.md) |
+
+Откройте **LCE Live** в главном меню игры и введите код с экрана на телефоне или ПК. Вход сохранится после перезапуска. Когда вы в мире или мини-игре, друзья увидят **Playing on Nintendo Switch** или **Playing on Wii U**. [Ввести код](https://lcereborn.xyz/authorize)
+
+На консолях ещё проверяем кроссплей через Relay, откаты позиции и прохождение полных онлайн-раундов Battle, Tumble и Glide. [Заметки к релизу](docs/releases/v1.2.7.md)
 
 ### Сеть Live
 
@@ -118,7 +134,7 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 
 ### Сборка из исходников
 
-Инструкции по сборке клиента находятся в [`docs/pc-platform.md`](docs/pc-platform.md), а сведения о сборке релизов — в [`docs/live-release.md`](docs/live-release.md). Сервер и сайт находятся в отдельном репозитории [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI).
+Инструкции по сборке есть для [Windows и Linux](docs/pc-platform.md), [Nintendo Switch](docs/switch-building.md) и [Wii U](docs/building.md). Сведения о сборке релизов находятся в [`docs/live-release.md`](docs/live-release.md). Сервер и сайт находятся в отдельном репозитории [LiveAPI](https://github.com/LCEReborn-Live/LiveAPI).
 
 ### Отдельная благодарность
 
@@ -128,7 +144,7 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 
 LCEReborn основан на восстановленном коде Minecraft: Wii U Edition и других открытых компонентах. Проект не связан с Mojang Studios, Microsoft, 4J Studios или Nintendo и не одобрен ими. Minecraft — товарный знак Mojang Studios и Microsoft; Wii U — товарный знак Nintendo.
 
-Код LCEReborn распространяется по лицензии [GNU GPL v3 или новее](LICENSE). Лицензии сторонних компонентов остаются за их авторами. Игровые файлы и ресурсы в репозитории и установщике отсутствуют.
+Код LCEReborn распространяется по лицензии [GNU GPL v3 или новее](LICENSE). Сторонние компоненты распространяются по своим лицензиям.
 
 ## Contributors
 

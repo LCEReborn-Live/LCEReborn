@@ -1,6 +1,7 @@
 name: Nintendo Switch build
 
 on:
+  workflow_dispatch:
   push:
     branches: [nintendo-switch-port]
   pull_request:
@@ -109,6 +110,10 @@ jobs:
           SWITCH_ASSETS_SHA256: ${{ vars.SWITCH_ASSETS_SHA256 }}
         run: |
           if [[ -z "$SWITCH_ASSETS_URL" && -z "$SWITCH_ASSETS_SHA256" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+              echo "::error::The full NRO requires SWITCH_ASSETS_URL and SWITCH_ASSETS_SHA256."
+              exit 1
+            fi
             echo "::notice::Full NRO skipped. No prepared game assets source is configured."
             exit 0
           fi

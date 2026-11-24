@@ -34,6 +34,7 @@ public:
     static bool IsTUImage(_TEXTURE_NAME textureName, const std::wstring& name);
     static bool IsOriginalImage(_TEXTURE_NAME textureName, const std::wstring& name);
     BufferedImage* readImage(_TEXTURE_NAME textureName, const std::wstring& name);
+    BufferedImage* readIndexedImage(unsigned int textureName);
     void setTextureFormat(const std::wstring& name);
     arrayWithLength<int> anaglyph(arrayWithLength<int> pixels);
     void loadTexture(BufferedImage* image, int texture, bool blur, bool clamp);

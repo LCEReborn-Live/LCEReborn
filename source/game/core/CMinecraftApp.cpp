@@ -2885,11 +2885,19 @@ std::wstring CMinecraftApp::GetVKReplacement(int32_t player, uint32_t key, bool 
             {
             case VK_PAD_A:
                 action = EControllerActions_MenuOk;
+#if LCE_PLATFORM_SWITCH
+                buttons = swapped ? EJoypadButton_Face1 : EJoypadButton_Face2;
+#else
                 buttons = swapped ? EJoypadButton_Face2 : EJoypadButton_Face1;
+#endif
                 break;
             case VK_PAD_B:
                 action = EControllerActions_MenuCancel;
+#if LCE_PLATFORM_SWITCH
+                buttons = swapped ? EJoypadButton_Face2 : EJoypadButton_Face1;
+#else
                 buttons = swapped ? EJoypadButton_Face1 : EJoypadButton_Face2;
+#endif
                 break;
             case VK_PAD_X:
                 action = EControllerActions_MenuX;

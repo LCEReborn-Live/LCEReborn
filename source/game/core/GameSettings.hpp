@@ -244,6 +244,7 @@ public:
     static void SetPlayerSkin(int, const std::wstring&);
     static std::wstring GetPlayerSkinName(int);
     static uint32_t GetPlayerSkinId(int);
+    static uint32_t GetSelectedPlayerSkinId(int);
     static int GetPlayerFov(int);
     static void SetPlayerFov(int, int);
     static void SetPlayerFavoriteSkin(int, int, unsigned int);

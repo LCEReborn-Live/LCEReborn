@@ -195,6 +195,7 @@ input.once('line', line => {
     socialTimer = setInterval(() => {
       void social.refresh();
       void social.syncAchievements();
+      void social.syncGameAvatar();
     }, 2000);
     socialActionTimer = setInterval(() => {
       void social.processAction().catch(error => console.error('Live social action:', error.message));

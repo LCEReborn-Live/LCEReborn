@@ -1,13 +1,21 @@
 #include "game/ui/UILiveAvatar.hpp"
 #include "game/ui/UIScene.hpp"
+#include "game/client/render/Textures.hpp"
 #include "game/core/BufferedImage.hpp"
+#include "game/core/CConsoleMinecraftApp.hpp"
+#include "game/core/GameSettings.hpp"
+#include "game/core/Minecraft.hpp"
+#include "game/core/System.hpp"
+#include "game/world/generation/Player.hpp"
 #include "platform/pc/PcLiveBridge.hpp"
 #if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
 #include "platform/wiiu/WiiULiveCosmetics.hpp"
+#include "platform/wiiu/WiiULiveSignIn.hpp"
 #endif
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <memory>
 #include <vector>
 #include <png.h>
 namespace {
@@ -69,7 +77,116 @@ bool ReadSkin(const std::wstring& name, std::vector<unsigned char>& data)
     return ok;
 }
 #endif
+bool ExtractFace(BufferedImage& skin, unsigned char* rgba)
+{
+    const unsigned int scale = skin.getWidth() / 64;
+    if (skin.getData() == NULL || scale == 0 || scale > 8
+        || skin.getWidth() != scale * 64 || skin.getHeight() < scale * 16)
+        return false;
+    const unsigned int size = 8 * scale;
+    std::vector<int> basePixels(size * size), hatPixels(size * size);
+    arrayWithLength<int> base(basePixels.data(), size * size), hat(hatPixels.data(), size * size);
+    skin.getRGB(size, size, size, size, base, 0, size, 0);
+    skin.getRGB(size * 5, size, size, size, hat, 0, size, 0);
+    for (int pixel = 0; pixel < 64; ++pixel)
+    {
+        const unsigned int sample = (pixel / 8 * size + pixel % 8) * scale;
+        const unsigned int under = static_cast<unsigned int>(base[sample]);
+        const unsigned int over = static_cast<unsigned int>(hat[sample]);
+        const unsigned int alpha = over >> 24;
+        const unsigned int underAlpha = under >> 24;
+        const unsigned int outAlpha = alpha + (underAlpha * (255 - alpha) + 127) / 255;
+        unsigned int channels[3] = {(under >> 16) & 255, (under >> 8) & 255, under & 255};
+        const unsigned int top[3] = {(over >> 16) & 255, (over >> 8) & 255, over & 255};
+        if (outAlpha != 0)
+            for (int channel = 0; channel < 3; ++channel)
+                channels[channel] = (top[channel] * alpha + channels[channel] * underAlpha * (255 - alpha) / 255
+                                     + outAlpha / 2) / outAlpha;
+        rgba[pixel * 4 + 0] = static_cast<unsigned char>(channels[0]);
+        rgba[pixel * 4 + 1] = static_cast<unsigned char>(channels[1]);
+        rgba[pixel * 4 + 2] = static_cast<unsigned char>(channels[2]);
+        rgba[pixel * 4 + 3] = static_cast<unsigned char>(outAlpha);
+    }
+    return true;
 }
+
+std::string SelectedFaceHex(unsigned int skinId)
+{
+    std::unique_ptr<BufferedImage> skin;
+    if (skinId < 19)
+    {
+        skin.reset(Minecraft::GetInstance()->mTextures->readIndexedImage(Player::getDefaultSkinTexture(skinId)));
+    }
+    else
+    {
+        unsigned char* bytes = NULL;
+        unsigned int size = 0;
+        gApp.GetMemFileDetails(CMinecraftApp::getSkinPathFromId(skinId), &bytes, &size);
+        if (bytes != NULL && size != 0 && size <= 512 * 1024)
+            skin.reset(new BufferedImage(bytes, size));
+    }
+    unsigned char rgba[8 * 8 * 4];
+    if (!skin || !ExtractFace(*skin, rgba))
+        return std::string();
+    static const char digits[] = "0123456789abcdef";
+    std::string hex;
+    hex.reserve(sizeof(rgba) * 2);
+    for (const unsigned char channel : rgba)
+    {
+        hex.push_back(digits[channel >> 4]);
+        hex.push_back(digits[channel & 15]);
+    }
+    return hex;
+}
+}
+
+void PublishLiveGameAvatar(int profile)
+{
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+    if (!WiiULiveSignIn::IsSignedIn()) return;
+#else
+    if (!PcLiveBridge::Enabled()) return;
+#endif
+    static long long checkAt = 0;
+    const long long now = System::processTimeInMilliSecs();
+    if (now < checkAt) return;
+    checkAt = now + 2000;
+
+    const unsigned int skinId = GameSettings::GetSelectedPlayerSkinId(profile);
+    static long long publishedSkin = -1;
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+    static std::string publishedAccount;
+    static bool pending = false;
+    const std::string account = WiiULiveSignIn::PlayerUuid();
+    if (account.empty() || pending || (account == publishedAccount && publishedSkin == skinId)) return;
+#else
+    if (publishedSkin == skinId) return;
+#endif
+    const std::string hex = SelectedFaceHex(skinId);
+    if (hex.empty()) return;
+#if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
+    const std::string body = "{\"pixels\":\"" + hex + "\"}";
+    pending = WiiULiveSignIn::RequestApi("/me/avatar", body.c_str(), [account, skinId](long status, const std::string&) {
+        pending = false;
+        if (status == 200)
+        {
+            publishedSkin = skinId;
+            publishedAccount = account;
+        }
+        else
+        {
+            checkAt = System::processTimeInMilliSecs() + 60000;
+        }
+    });
+#else
+    FILE* file = PcLiveBridge::Open(L"game-avatar.tmp", L"wb");
+    if (file == NULL) return;
+    const bool written = std::fwrite(hex.data(), 1, hex.size(), file) == hex.size();
+    if (std::fclose(file) == 0 && written && PcLiveBridge::Rename(L"game-avatar.tmp", L"game-avatar.hex"))
+        publishedSkin = skinId;
+#endif
+}
+
 std::wstring RegisterLiveFaceIcon(UIScene& scene, unsigned int id, const std::string& revision)
 {
     std::vector<unsigned char> bytes;
@@ -94,34 +211,13 @@ std::wstring RegisterLiveFaceIcon(UIScene& scene, unsigned int id, const std::st
     std::swprintf(fileName, 64, L"friend-%u.skin.png", id);
     if (!ReadSkin(fileName, bytes)) return std::wstring();
 #endif
-    BufferedImage skin(&bytes[0], static_cast<unsigned int>(bytes.size()));
-    if (skin.getData() == NULL || skin.getWidth() < 64 || skin.getHeight() < 16) return std::wstring();
-    arrayWithLength<int> base(64, false), hat(64, false);
-    skin.getRGB(8, 8, 8, 8, base, 0, 8, 0);
-    skin.getRGB(40, 8, 8, 8, hat, 0, 8, 0);
-    std::vector<unsigned char> rgba(8 * 8 * 4);
-    for (int pixel = 0; pixel < 64; ++pixel)
-    {
-        const unsigned int under = static_cast<unsigned int>(base[pixel]);
-        const unsigned int over = static_cast<unsigned int>(hat[pixel]);
-        const unsigned int alpha = over >> 24;
-        const unsigned int underAlpha = under >> 24;
-        const unsigned int outAlpha = alpha + (underAlpha * (255 - alpha) + 127) / 255;
-        unsigned int channels[3] = {(under >> 16) & 255, (under >> 8) & 255, under & 255};
-        const unsigned int top[3] = {(over >> 16) & 255, (over >> 8) & 255, over & 255};
-        if (outAlpha != 0)
-            for (int channel = 0; channel < 3; ++channel)
-                channels[channel] = (top[channel] * alpha + channels[channel] * underAlpha * (255 - alpha) / 255
-                                     + outAlpha / 2) / outAlpha;
-        rgba[pixel * 4 + 0] = static_cast<unsigned char>(channels[0]);
-        rgba[pixel * 4 + 1] = static_cast<unsigned char>(channels[1]);
-        rgba[pixel * 4 + 2] = static_cast<unsigned char>(channels[2]);
-        rgba[pixel * 4 + 3] = static_cast<unsigned char>(outAlpha);
-    }
+    BufferedImage skin(bytes.data(), static_cast<unsigned int>(bytes.size()));
+    unsigned char rgba[8 * 8 * 4];
+    if (!ExtractFace(skin, rgba)) return std::wstring();
 
 #if LCE_PLATFORM_WIIU || LCE_PLATFORM_SWITCH
     FacePng output = {};
-    if (!EncodeFace(rgba.data(), output)) return std::wstring();
+    if (!EncodeFace(rgba, output)) return std::wstring();
     unsigned char* textureBytes = new unsigned char[output.size];
     std::memcpy(textureBytes, output.bytes, output.size);
     scene.registerSubstitutionTexture(textureName, textureBytes, static_cast<unsigned int>(output.size), true);

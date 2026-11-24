@@ -810,7 +810,7 @@ void MainWindow::LoadLivePlayerFace(qint64 userId, QLabel* target)
     if (mPlayerFacesPending.contains(userId)) return;
 
     mPlayerFacesPending.insert(userId);
-    QNetworkRequest request{QUrl(QString("https://api.lcereborn.xyz/v1/users/%1/skin").arg(userId))};
+    QNetworkRequest request{QUrl(QString("https://api.lcereborn.xyz/v1/users/%1/skin?avatar=1").arg(userId))};
     request.setTransferTimeout(8000);
     QNetworkReply* reply = mLiveNetwork->get(request);
     QPointer<QLabel> safeTarget(target);

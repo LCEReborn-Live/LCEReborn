@@ -937,13 +937,18 @@ bool Player::mayBuild()
 
 uint8_t Player::getTexture()
 {
+    return getDefaultSkinTexture(mField0x7d8);
+}
+
+uint8_t Player::getDefaultSkinTexture(unsigned int skin)
+{
     static const uint8_t textures[20] = {0,    0,    0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x70,
                                          0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0xaa, 0xa9, 0};
-    if (mField0x7d8 < 2 || mField0x7d8 > 0x12)
+    if (skin < 2 || skin > 0x12)
     {
         return 0x25;
     }
-    return textures[mField0x7d8];
+    return textures[skin];
 }
 
 void Player::UpdateSize()

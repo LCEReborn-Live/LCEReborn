@@ -1285,6 +1285,11 @@ std::wstring GameSettings::GetPlayerSkinName(int profile)
 {
     return CMinecraftApp::getSkinPathFromId(GetPlayerSkinId(profile));
 }
+uint32_t GameSettings::GetSelectedPlayerSkinId(int profile)
+{
+    return profile >= 0 && profile < 4 && gGameSettings[profile] != NULL ? gGameSettings[profile]->mSkinId : 0;
+}
+
 uint32_t GameSettings::GetPlayerSkinId(int profile)
 {
 #if LCE_PLATFORM_PC

@@ -19,6 +19,7 @@ export class SocialBridge {
     this.closed = false;
     this.profileCache = new Map();
     this.achievementRetryAt = 0;
+    this.gameAvatarRetryAt = 0;
   }
 
   async write(name, text) {
@@ -60,7 +61,7 @@ export class SocialBridge {
     if (previous?.version === version && (version || this.now() - previous.checked < 60000)) return previous.revision;
     const file = `friend-${id}.skin.png`;
     try {
-      const response = await this.bridge.fetchImpl(new URL(`/v1/users/${id}/skin`, this.bridge.apiUrl), {
+      const response = await this.bridge.fetchImpl(new URL(`/v1/users/${id}/skin?avatar=1`, this.bridge.apiUrl), {
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000)
       });
       if (response.status === 404) {
@@ -235,6 +236,21 @@ export class SocialBridge {
       this.sentAchievements = local.join(',');
     } catch { this.achievementRetryAt = this.now() + 60000; }
     finally { this.syncBusy = false; }
+  }
+
+  async syncGameAvatar() {
+    if (this.gameAvatarBusy || this.closed || this.now() < this.gameAvatarRetryAt) return;
+    this.gameAvatarBusy = true;
+    try {
+      const pixels = await this.read('game-avatar.hex');
+      if (pixels === this.sentGameAvatar || !/^[a-f0-9]{512}$/.test(pixels)) return;
+      await this.request('/v1/me/avatar', 'POST', { pixels });
+      this.sentGameAvatar = pixels;
+    } catch {
+      this.gameAvatarRetryAt = this.now() + 60000;
+    } finally {
+      this.gameAvatarBusy = false;
+    }
   }
 
   async close() {

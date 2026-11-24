@@ -419,8 +419,10 @@ void CInput::ResolveFaceButtons(Joypad& joypad)
 {
     int faceCount = 0;
     const int* faceButtons = PcInputGamepadFaceButtons(faceCount);
+#if !LCE_PLATFORM_SWITCH
     int labelCount = 0;
     const PcGamepadLabelBinding* labels = PcInputGamepadLabelBindings(labelCount);
+#endif
     for (int face = 0; face < 4; ++face)
     {
         joypad.padFaceButtons[face] = 0;
@@ -429,6 +431,17 @@ void CInput::ResolveFaceButtons(Joypad& joypad)
             continue;
         }
         SDL_GamepadButton button = static_cast<SDL_GamepadButton>(faceButtons[face]);
+#if LCE_PLATFORM_SWITCH
+        // SDL positions are stable even when an emulator reports a generic controller.
+        switch (button)
+        {
+        case SDL_GAMEPAD_BUTTON_SOUTH: joypad.padFaceButtons[face] = EPcButton_Face1; break; // B
+        case SDL_GAMEPAD_BUTTON_EAST: joypad.padFaceButtons[face] = EPcButton_Face2; break; // A
+        case SDL_GAMEPAD_BUTTON_WEST: joypad.padFaceButtons[face] = EPcButton_Face3; break; // Y
+        case SDL_GAMEPAD_BUTTON_NORTH: joypad.padFaceButtons[face] = EPcButton_Face4; break; // X
+        default: break;
+        }
+#else
         if (button == SDL_GAMEPAD_BUTTON_NORTH)
         {
             joypad.padFaceButtons[face] = EPcButton_Face4;
@@ -452,6 +465,7 @@ void CInput::ResolveFaceButtons(Joypad& joypad)
                 break;
             }
         }
+#endif
     }
 }
 
@@ -1781,11 +1795,13 @@ void CInput::SetMenuDrawsPointer(bool drawsPointer)
 int CInput::PromptJoypad(int pad)
 {
     int mappedPad = pad;
-    if (RemapIpad(mappedPad))
-    {
-        return mappedPad;
-    }
-    return lastInputJoypad;
+    const int joypad = RemapIpad(mappedPad) ? mappedPad : lastInputJoypad;
+#if LCE_PLATFORM_SWITCH
+    // Use virtual Nintendo prompts before the first controller input.
+    if (joypad == kKeyboardJoypad)
+        return -1;
+#endif
+    return joypad;
 }
 
 bool CInput::UseKeyboardPrompts(int pad)
@@ -1795,6 +1811,10 @@ bool CInput::UseKeyboardPrompts(int pad)
 
 int CInput::PadFamily(int joypad)
 {
+#if LCE_PLATFORM_SWITCH
+    (void)joypad;
+    return EPcPadFamily_Nintendo;
+#else
     SDL_Gamepad* gamepad = joypad > 0 && joypad < JOYPAD_COUNT ? joypads[joypad].gamepad : 0;
     switch (gamepad != 0 ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN)
     {
@@ -1815,6 +1835,7 @@ int CInput::PadFamily(int joypad)
     default:
         return EPcPadFamily_Generic;
     }
+#endif
 }
 
 int CInput::PadElement(int joypad, unsigned int button)
@@ -1850,8 +1871,9 @@ int CInput::PadElement(int joypad, unsigned int button)
     }
 
     int family = PadFamily(joypad);
-    SDL_Gamepad* gamepad = joypad > 0 && joypad < JOYPAD_COUNT ? joypads[joypad].gamepad : 0;
     SDL_GamepadButtonLabel label = SDL_GAMEPAD_BUTTON_LABEL_UNKNOWN;
+#if !LCE_PLATFORM_SWITCH
+    SDL_Gamepad* gamepad = joypad > 0 && joypad < JOYPAD_COUNT ? joypads[joypad].gamepad : 0;
     if (gamepad != 0)
     {
         int faceCount = 0;
@@ -1865,6 +1887,7 @@ int CInput::PadElement(int joypad, unsigned int button)
             }
         }
     }
+#endif
     if (label == SDL_GAMEPAD_BUTTON_LABEL_UNKNOWN)
     {
         bool playStation = family == EPcPadFamily_PlayStation3 || family == EPcPadFamily_PlayStation4

@@ -23,6 +23,9 @@
 #include "game/ui/fuiFile.hpp"
 #include "game/ui/fuiRenderNode.hpp"
 #include "game/core/GameSettings.hpp"
+#if LCE_PLATFORM_SWITCH
+#include "game/ui/fui.hpp"
+#endif
 
 extern ConsoleUIController gConsoleUIController;
 
@@ -81,6 +84,18 @@ void UIScene_ControlsMenu::SetControlsHelp(int, int control, std::wstring help)
         text = UIString(gApp.FormatHTMLString(m_playerId, html.ToString(), -1));
     }
     std::wstring helpText(text.c_str());
+#if LCE_PLATFORM_SWITCH
+    if (helpText.empty() && gApp.GetLocalPlayerCount() <= 1)
+    {
+        fuiFile* source = NULL;
+        if (gFui->findBitmapFromSymbol("SwitchJoyConDiagram", &source)
+            && gFui->findBitmapFromSymbol("SwitchProControllerDiagram", &source))
+        {
+            helpText = L"<p align=\"center\">Joy-Con<br><img src=\"SwitchJoyConDiagram\" width=\"120\"/><br>"
+                       L"Pro Controller<br><img src=\"SwitchProControllerDiagram\" width=\"120\"/></p>";
+        }
+    }
+#endif
     FJ_ControlsMenu* menu = static_cast<FJ_ControlsMenu*>(m_movie->getRootNode()->getFuiNode());
     menu->SetControlsHelp(control, helpText);
 }

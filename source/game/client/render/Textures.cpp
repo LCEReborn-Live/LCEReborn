@@ -489,9 +489,9 @@ int Textures::loadTexture(_TEXTURE_NAME textureName, const std::wstring& name)
     return texture;
 }
 
-void Textures::loadIndexedTextures()
+namespace
 {
-    static const wchar_t* textureNames[] = {
+const wchar_t* const kIndexedTextureNames[] = {
         L"misc/grasscolor",
         L"misc/foliagecolor",
         L"%blur%misc/pumpkinblur",
@@ -732,11 +732,22 @@ void Textures::loadIndexedTextures()
         L"item/conduit/conduit_closed",
         L"item/conduit/conduit_open",
         L"mob/phantom",
-    };
-    for (unsigned int i = 0; i < sizeof(textureNames) / sizeof(textureNames[0]); ++i)
+};
+}
+
+void Textures::loadIndexedTextures()
+{
+    for (unsigned int i = 0; i < sizeof(kIndexedTextureNames) / sizeof(kIndexedTextureNames[0]); ++i)
     {
-        sIndexedTextures[i] = loadTexture(static_cast<_TEXTURE_NAME>(i), textureNames[i]);
+        sIndexedTextures[i] = loadTexture(static_cast<_TEXTURE_NAME>(i), kIndexedTextureNames[i]);
     }
+}
+
+BufferedImage* Textures::readIndexedImage(unsigned int textureName)
+{
+    if (textureName >= sizeof(kIndexedTextureNames) / sizeof(kIndexedTextureNames[0]))
+        return NULL;
+    return readImage(static_cast<_TEXTURE_NAME>(textureName), kIndexedTextureNames[textureName]);
 }
 
 arrayWithLength<int> Textures::loadTexturePixels(BufferedImage* image, arrayWithLength<int> pixels)

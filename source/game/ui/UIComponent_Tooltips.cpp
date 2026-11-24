@@ -394,6 +394,11 @@ std::wstring UIComponent_Tooltips::PromptHtml(unsigned int index, int type, int 
     if (type < 0 || type >= 16)
         return std::wstring();
     unsigned int buttons = kGlyphButtons[type];
+#if LCE_PLATFORM_SWITCH
+    if (!value.m_dynamic && (action == EControllerActions_MenuOk || action == EControllerActions_MenuCancel))
+        buttons = (action == EControllerActions_MenuOk) != (g_pInput->IsCircleCrossSwapped() != 0)
+            ? EJoypadButton_Face2 : EJoypadButton_Face1;
+#endif
     if (!value.m_dynamic && GameSettings::InventoryControlForAction(action) >= 0)
     {
         buttons = g_pInput->GetGameJoypadMaps(m_promptPad, static_cast<unsigned char>(action));

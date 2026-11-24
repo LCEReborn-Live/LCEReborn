@@ -105,6 +105,7 @@
 #include "game/core/GrassColor.hpp"
 #include "game/core/ChatScreen.hpp"
 #include "game/core/DebugOverlay.hpp"
+#include "game/ui/UILiveAvatar.hpp"
 #include "game/core/Gui.hpp"
 #include "game/core/HitResult.hpp"
 #include "game/core/Input.hpp"
@@ -1496,6 +1497,8 @@ void Minecraft::tick(bool handleInput, bool lastTickOfFrame)
 #endif
     int playerIdx = mPlayer->mUserIndex;
 
+    if (playerIdx == gProfile->GetPrimaryPad())
+        PublishLiveGameAvatar(playerIdx);
     mStats[playerIdx]->tick(playerIdx);
     gApp.TickOpacityTimer(playerIdx);
 

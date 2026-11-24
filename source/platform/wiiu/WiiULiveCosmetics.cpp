@@ -192,7 +192,7 @@ void Tick()
         if (now < item.second.refreshAt || now - item.second.usedAt > 30000)
             continue;
         const unsigned int user = item.first;
-        const std::string path = "/users/" + std::to_string(user) + "/skin";
+        const std::string path = "/users/" + std::to_string(user) + "/skin?avatar=1";
         if (!WiiULiveSignIn::RequestApi(path.c_str(), NULL, [user](long status, const std::string& response) {
             requestedAvatar = 0;
             Avatar& avatar = avatars.at(user);

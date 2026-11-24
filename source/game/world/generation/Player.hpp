@@ -474,6 +474,7 @@ public:
     uint64_t GetSpectateEntity();
     Vec3* getAttachPos(Entity::EEntityLocation location, float partialTicks);
     virtual uint8_t getTexture();
+    static uint8_t getDefaultSkinTexture(unsigned int skin);
     virtual void setCustomSkin(uint32_t skin);
     uint32_t CheckPowerup(PowerupItems::eGlide_Timed_Powerup_ID powerup);
     uint8_t CanRecordStats(Stat* stat, arrayWithLength<unsigned char> parameters);

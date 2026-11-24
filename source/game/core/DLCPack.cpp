@@ -432,7 +432,17 @@ int DLCPack::getFileIndexAt(DLCManager::EDLCType type, const std::wstring& name,
         {
             int childIndex = (*child)->getFileIndexAt(type, name, found);
             if (found)
+            {
+#if LCE_PLATFORM_SWITCH
+                if (type == DLCManager::eDLCType_Skin)
+                    return index + childIndex;
+#endif
                 return childIndex;
+            }
+#if LCE_PLATFORM_SWITCH
+            if (type == DLCManager::eDLCType_Skin)
+                index += (*child)->getSkinCount();
+#endif
         }
     }
     return 0;
@@ -447,7 +457,24 @@ int DLCPack::getSkinIndexAt(const std::wstring& name, bool& found)
 }
 DLCFile* DLCPack::getSkinFile(unsigned int index)
 {
+#if LCE_PLATFORM_SWITCH
+    // Match getSkinCount(): flatten this pack and its descendants in order.
+    // Parent fallback is not part of the counted skin list.
+    const size_t localCount = m_files[DLCManager::eDLCType_Skin].size();
+    if (index < localCount)
+        return m_files[DLCManager::eDLCType_Skin][index];
+    index -= static_cast<unsigned int>(localCount);
+    for (std::vector<DLCPack*>::iterator child = m_childPacks.begin(); child != m_childPacks.end(); ++child)
+    {
+        const unsigned int count = static_cast<unsigned int>((*child)->getSkinCount());
+        if (index < count)
+            return (*child)->getSkinFile(index);
+        index -= count;
+    }
+    return NULL;
+#else
     return getFile(DLCManager::eDLCType_Skin, index, true, true);
+#endif
 }
 std::wstring DLCPack::getLocalisedDisplayName()
 {

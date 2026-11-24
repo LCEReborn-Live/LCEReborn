@@ -55,12 +55,10 @@ std::wstring packFilePath(DLCPack* pack, const std::wstring& name)
     if (root != NULL && !root->GetRootPath().empty())
     {
         const std::wstring path = root->GetRootPath() + L"/Data/" + name;
-#if LCE_PLATFORM_SWITCH
         // The bundled modern pack and Candy share DLC ID 2050. Keep all
         // modern-pack lookups on its own mount, including optional files.
         if (DLCTexturePack::IsModernTexturePack(pack))
             return path;
-#endif
         if (File(path).exists())
             return path;
     }
@@ -95,12 +93,10 @@ bool DLCTexturePack::IsModernTexturePack(DLCPack* pack)
 
     std::wstring name = pack->getName();
     std::wstring root = pack->GetRootPath();
-#if LCE_PLATFORM_SWITCH
     // A texture-pack entry lives in a child PCK. The containing pack owns
     // the mount path that identifies the bundled 1.14 files.
     for (DLCPack* parent = pack->GetParentPack(); root.empty() && parent != NULL; parent = parent->GetParentPack())
         root = parent->GetRootPath();
-#endif
     std::transform(name.begin(), name.end(), name.begin(),
                    [](wchar_t character) { return static_cast<wchar_t>(std::towlower(character)); });
     std::transform(root.begin(), root.end(), root.begin(),

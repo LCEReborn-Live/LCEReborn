@@ -330,6 +330,25 @@ void UIScene_SkinSelectMenu::handleSkinIndexChanged()
 
     m_noSkinsToShow = false;
     setCharacterSelected(false);
+#if LCE_PLATFORM_SWITCH
+    if (m_pack != NULL && (m_skinIndex >= static_cast<unsigned int>(m_pack->getSkinCount())
+                         || m_pack->getSkinFile(m_skinIndex) == NULL))
+    {
+        m_noSkinsToShow = true;
+        m_selectedSkinPath.clear();
+        m_selectedCapePath.clear();
+        m_additionalSkinBoxes = NULL;
+        setCharacterLocked(false);
+        setCharacterBlocked(false);
+        setCharacterFavourite(false);
+        m_labelSkinName.setLabel(UIString(L""), false, false);
+        m_labelSkinOrigin.setLabel(UIString(L""), false, false);
+        for (int i = 0; i < eCharacter_Count; ++i)
+            m_characters[i].setVisible(false);
+        updateTooltips();
+        return;
+    }
+#endif
 
     if (m_pack != NULL)
     {
@@ -515,6 +534,14 @@ void UIScene_SkinSelectMenu::handleSkinIndexChanged()
         if (m_pack != NULL)
         {
             otherSkinFile = static_cast<DLCSkinFile*>(m_pack->getSkinFile(nextIndex));
+#if LCE_PLATFORM_SWITCH
+            if (otherSkinFile == NULL)
+            {
+                preview.setVisible(false);
+                nextIndex = getNextSkinIndex(nextIndex);
+                continue;
+            }
+#endif
             otherSkinPath = otherSkinFile->getPath();
             otherCapePath = otherSkinFile->getParameterAsString(DLCManager::eDLCParameterType_CapePath, L"");
             otherSkinBoxes = otherSkinFile->getAdditionalBoxes();
@@ -582,6 +609,14 @@ void UIScene_SkinSelectMenu::handleSkinIndexChanged()
         if (m_pack != NULL)
         {
             otherSkinFile = static_cast<DLCSkinFile*>(m_pack->getSkinFile(previousIndex));
+#if LCE_PLATFORM_SWITCH
+            if (otherSkinFile == NULL)
+            {
+                preview.setVisible(false);
+                previousIndex = static_cast<unsigned int>(getPreviousSkinIndex(previousIndex));
+                continue;
+            }
+#endif
             otherSkinPath = otherSkinFile->getPath();
             otherCapePath = otherSkinFile->getParameterAsString(DLCManager::eDLCParameterType_CapePath, L"");
             otherSkinBoxes = otherSkinFile->getAdditionalBoxes();
@@ -687,9 +722,16 @@ void UIScene_SkinSelectMenu::SetSkinPackButtonList()
                                   == TexturePackRepository::defaultTexturePack;
     if (!usingDefaultPack)
     {
+#if LCE_PLATFORM_SWITCH
+        DLCTexturePack* selected = dynamic_cast<DLCTexturePack*>(
+            Minecraft::GetInstance()->mTexturePackRepository->getSelected());
+        if (selected != NULL)
+            texturePackSkinPack = selected->getDLCInfoParentPack();
+#else
         texturePackSkinPack = static_cast<DLCTexturePack*>(
                                   Minecraft::GetInstance()->mTexturePackRepository->getSelected())
                                   ->getDLCInfoParentPack();
+#endif
     }
 
     m_packList.clearList();
@@ -802,7 +844,13 @@ void UIScene_SkinSelectMenu::setPackLabel()
     }
     else
     {
+#if LCE_PLATFORM_SWITCH
+        DLCPack* pack = gApp.mDLCManager.getPackFromPackID(static_cast<int>(m_packIndex));
+        if (pack != NULL)
+            packName = pack->getLocalisedDisplayName();
+#else
         packName = gApp.mDLCManager.getPackFromPackID(static_cast<int>(m_packIndex))->getLocalisedDisplayName();
+#endif
     }
     m_labelPackName.setLabel(UIString(packName), false, false);
 
@@ -830,6 +878,14 @@ void UIScene_SkinSelectMenu::handlePackIndexChanged()
     DLCPack* pack = NULL;
     if (m_packIndex > 1)
         pack = gApp.mDLCManager.getPackFromPackID(static_cast<int>(m_packIndex));
+#if LCE_PLATFORM_SWITCH
+    if (m_packIndex > 1 && (pack == NULL || pack->getSkinCount() <= 0))
+    {
+        m_packIndex = 0;
+        pack = NULL;
+        m_packList.HighlightItem(0, false);
+    }
+#endif
     m_skinIndex = 0;
     m_pack = pack;
 
@@ -991,6 +1047,10 @@ std::wstring UIScene_SkinSelectMenu::getMoviePath()
 
 void UIScene_SkinSelectMenu::InputActionOK(unsigned int player)
 {
+#if LCE_PLATFORM_SWITCH
+    if (m_noSkinsToShow || (m_packIndex > 1 && (m_pack == NULL || m_pack->getSkinFile(m_skinIndex) == NULL)))
+        return;
+#endif
     const int pad = static_cast<int>(player);
     gConsoleUIController.AnimateKeyPress(pad, 0x14, false, true, false);
 
@@ -1134,6 +1194,10 @@ void UIScene_SkinSelectMenu::SetFavoriteSkin(int player, int skin)
 
 void UIScene_SkinSelectMenu::InputActionFavorite(unsigned int player)
 {
+#if LCE_PLATFORM_SWITCH
+    if (m_packIndex > 1 && (m_pack == NULL || m_pack->getSkinFile(m_skinIndex) == NULL))
+        return;
+#endif
     const int pad = static_cast<int>(player);
     if (m_packIndex == 0)
     {
@@ -1318,7 +1382,11 @@ void UIScene_SkinSelectMenu::customDraw(const char* name, fuiRect* rect)
 
     int character = -1;
     std::sscanf(name, "Character%d", &character);
+#if LCE_PLATFORM_SWITCH
+    if (character >= 0 && character < eCharacter_Count)
+#else
     if (character != -1)
+#endif
         m_characters[character].render(rect);
 }
 

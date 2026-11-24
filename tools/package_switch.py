@@ -8,6 +8,8 @@ import sys
 import tempfile
 import zipfile
 
+from prepare import is_original_candy_pack
+
 
 GAME_FOLDERS = ("Common", "music", "WiiU")
 CLIENT_ROOT = "LCEReborn"
@@ -30,6 +32,8 @@ def client_files(archive):
         if entry.is_dir() or not path.parts or path.parts[0] != CLIENT_ROOT:
             continue
         relative = path.relative_to(CLIENT_ROOT)
+        if is_original_candy_pack(relative):
+            continue
         if relative.parts and (relative.parts[0] in ("packs", "resources")
                                or relative.as_posix() in ("LCEReborn.nro", "bearssl-LICENSE.txt")):
             name = relative.as_posix()
@@ -64,8 +68,9 @@ def package(client, assets, output):
                         shutil.copyfileobj(incoming, outgoing, 1024 * 1024)
                 for folder in GAME_FOLDERS:
                     for path in sorted((assets / folder).rglob("*")):
-                        if path.is_file():
-                            target.write(path, f"{OUTPUT_ROOT}/assets/{path.relative_to(assets).as_posix()}")
+                        relative = path.relative_to(assets)
+                        if path.is_file() and not is_original_candy_pack(relative):
+                            target.write(path, f"{OUTPUT_ROOT}/assets/{relative.as_posix()}")
 
             # Reserve the output name exclusively before publishing the completed ZIP.
             with output.open("xb"):

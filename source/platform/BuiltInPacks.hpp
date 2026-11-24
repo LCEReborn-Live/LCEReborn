@@ -1,6 +1,20 @@
 #ifndef PLATFORM_BUILTINPACKS_HPP
 #define PLATFORM_BUILTINPACKS_HPP
 
+#include <algorithm>
+#include <cctype>
+#include <string>
+
+inline bool IsOriginalCandyPackPath(std::string path)
+{
+    std::transform(path.begin(), path.end(), path.begin(), [](unsigned char character) {
+        return character == '\\' ? '/' : static_cast<char>(std::tolower(character));
+    });
+    path = '/' + path + '/';
+    return path.find("/candy texture pack/") != std::string::npos
+           || path.find("/candy texture pack.pck/") != std::string::npos;
+}
+
 static const char* const BUILT_IN_PACKS[] = {
     "/vol/content/WiiU/DLC/Tutorial World",
     "/vol/content/WiiU/DLC/Battle Map Pack 0",

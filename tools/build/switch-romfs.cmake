@@ -3,6 +3,7 @@ function(lce_switch_romfs target)
   set(resources "${PROJECT_SOURCE_DIR}/resources/pc")
   set(packs "${PROJECT_SOURCE_DIR}/packs")
   set(license "${PROJECT_SOURCE_DIR}/tools/build/third_party/bearssl-LICENSE.txt")
+  set(copy_game_assets "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/copy-game-assets.cmake")
   set(sources "${resources}/*" "${packs}/*" "${license}")
   if(ARGC GREATER 1)
     get_filename_component(assets "${ARGV1}" ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
@@ -15,7 +16,8 @@ function(lce_switch_romfs target)
       endif()
       list(APPEND sources "${assets}/${group}/*")
       list(APPEND copy_assets
-        COMMAND "${CMAKE_COMMAND}" -E copy_directory "${assets}/${group}" "${folder}/assets/${group}")
+        COMMAND "${CMAKE_COMMAND}" "-DASSET_SOURCE=${assets}/${group}" "-DASSET_DESTINATION=${folder}/assets/${group}"
+          -P "${copy_game_assets}")
     endforeach()
   endif()
 
@@ -31,7 +33,7 @@ function(lce_switch_romfs target)
     COMMAND "${CMAKE_COMMAND}" -E copy "${license}" "${folder}/"
     ${copy_assets}
     COMMAND "${CMAKE_COMMAND}" -E touch "${stamp}"
-    DEPENDS "${manifest}" ${inputs}
+    DEPENDS "${manifest}" "${copy_game_assets}" ${inputs}
     VERBATIM)
   add_custom_target(${target} DEPENDS "${stamp}")
   set_target_properties(${target} PROPERTIES DKP_ASSET_FOLDER "${folder}" DKP_ASSET_FILES "${stamp}")

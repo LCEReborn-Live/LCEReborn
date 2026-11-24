@@ -1851,6 +1851,9 @@ static bool IsPackFile(const std::string& name)
 
 void CStorage::AddPack(const std::string& path, unsigned char source, const char* label)
 {
+    if (IsOriginalCandyPackPath(path))
+        return;
+
     const std::string::size_type slash = path.find_last_of('/');
     CONTENT_DATA content;
     std::string name = slash == std::string::npos ? path : path.substr(slash + 1);

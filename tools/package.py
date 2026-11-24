@@ -73,11 +73,12 @@ def read_file(path):
 
 def prepared_content():
     files = {}
-    for directory, _, names in os.walk(prepare.ASSETS_DIR):
+    for directory, folders, names in os.walk(prepare.ASSETS_DIR):
+        folders[:] = [folder for folder in folders if not prepare.is_original_candy_pack(folder)]
         for name in names:
             path = os.path.join(directory, name)
             relative = os.path.relpath(path, prepare.ASSETS_DIR).replace(os.sep, "/")
-            if relative != prepare.MANIFEST:
+            if relative != prepare.MANIFEST and not prepare.is_original_candy_pack(name):
                 files[relative] = path
     return files
 

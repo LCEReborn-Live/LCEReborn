@@ -69,13 +69,13 @@ def read_file(path):
 
 
 def add_content(content):
-    """Add every file in assets/ apart from the manifest, in a fixed order."""
+    """Add supported asset files in a fixed order."""
     for directory, folders, names in os.walk(prepare.ASSETS_DIR):
-        folders.sort()
+        folders[:] = sorted(folder for folder in folders if not prepare.is_original_candy_pack(folder))
         for name in sorted(names):
             path = os.path.join(directory, name)
             relative = os.path.relpath(path, prepare.ASSETS_DIR).replace(os.sep, "/")
-            if relative != prepare.MANIFEST:
+            if relative != prepare.MANIFEST and not prepare.is_original_candy_pack(name):
                 content.add_path(relative, os.path.getsize(path), lambda path=path: read_file(path))
 
 

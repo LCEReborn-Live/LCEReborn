@@ -15,6 +15,7 @@
 #include <QStorageInfo>
 
 #include "LauncherPaths.hpp"
+#include "platform/BuiltInPacks.hpp"
 
 namespace
 {
@@ -43,7 +44,9 @@ QMap<QString, QString> ContentFiles(const QString& dump)
         while (it.hasNext())
         {
             const QString full = it.next();
-            files.insert(content.relativeFilePath(full), full);
+            const QString relative = content.relativeFilePath(full);
+            if (!IsOriginalCandyPackPath(relative.toStdString()))
+                files.insert(relative, full);
         }
     }
     return files;

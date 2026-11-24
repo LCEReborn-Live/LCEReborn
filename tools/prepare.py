@@ -85,6 +85,11 @@ def prepare_shaders(update, recipe):
     return shaders.generate(executable, SHADER_DIR)
 
 
+def is_original_candy_pack(path):
+    names = {"candy texture pack", "candy texture pack.pck"}
+    return any(part.casefold() in names for part in str(path).replace("\\", "/").split("/"))
+
+
 def content_files(dump):
     """Map content-relative path to absolute path for the game folders."""
     files = {}
@@ -92,8 +97,11 @@ def content_files(dump):
         top = os.path.join(dump, "content", folder)
         if not os.path.isdir(top):
             continue
-        for directory, _, names in os.walk(top):
+        for directory, folders, names in os.walk(top):
+            folders[:] = [folder for folder in folders if not is_original_candy_pack(folder)]
             for name in names:
+                if is_original_candy_pack(name):
+                    continue
                 full = os.path.join(directory, name)
                 files[os.path.relpath(full, os.path.join(dump, "content")).replace(os.sep, "/")] = full
     return files

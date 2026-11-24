@@ -1783,6 +1783,9 @@ static bool IsPackFile(const char* name)
 
 void CStorage::AddPack(const char* path, unsigned char source, const char* label)
 {
+    if (IsOriginalCandyPackPath(path))
+        return;
+
     const char* slash = std::strrchr(path, '/');
     CONTENT_DATA content;
     const char* name = slash == NULL ? path : slash + 1;

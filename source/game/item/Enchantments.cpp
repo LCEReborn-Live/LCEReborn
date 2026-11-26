@@ -37,6 +37,9 @@ Enchantment* Enchantments::IMPALING = NULL;
 Enchantment* Enchantments::RIPTIDE = NULL;
 Enchantment* Enchantments::LOYALTY = NULL;
 Enchantment* Enchantments::CHANNELING = NULL;
+Enchantment* Enchantments::MULTISHOT = NULL;
+Enchantment* Enchantments::QUICK_CHARGE = NULL;
+Enchantment* Enchantments::PIERCING = NULL;
 
 Enchantment* Enchantments::get(const std::wstring& name)
 {
@@ -78,4 +81,7 @@ void Enchantments::staticCtor()
     RIPTIDE = get(L"riptide");
     LOYALTY = get(L"loyalty");
     CHANNELING = get(L"channeling");
+    MULTISHOT = get(L"multishot");
+    QUICK_CHARGE = get(L"quick_charge");
+    PIERCING = get(L"piercing");
 }

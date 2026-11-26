@@ -43,6 +43,9 @@ public:
     static Enchantment* RIPTIDE;
     static Enchantment* LOYALTY;
     static Enchantment* CHANNELING;
+    static Enchantment* MULTISHOT;
+    static Enchantment* QUICK_CHARGE;
+    static Enchantment* PIERCING;
 
 private:
     static Enchantment* get(const std::wstring& name);

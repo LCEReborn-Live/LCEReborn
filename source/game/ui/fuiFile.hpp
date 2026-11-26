@@ -2,6 +2,7 @@
 #define GAME_UI_FUIFILE_HPP
 
 #include <stdint.h>
+#include <vector>
 
 #include "game/ui/fuiFileHeader.hpp"
 #include "game/world/biome/arrayWithLength.hpp"
@@ -49,6 +50,8 @@ struct fuiFile
     void (*customDrawCallback)(void*, const char*, fuiRect*);
     void* customDrawContext;
     unsigned char* data;
+    // Imported HD images retain their original pixels in a 720p movie.
+    std::vector<float> bitmapCoordinateScales;
 
     fuiFile();
     ~fuiFile();
@@ -57,6 +60,7 @@ struct fuiFile
     unsigned int resolveReferences(fuiFile* other);
     void dumpUnresolvedReferences();
     void initialiseRenderTexture(fuiBitmap* bitmap, bool force);
+    float getBitmapCoordinateScale(const fuiBitmap* bitmap) const;
     fuiRenderNode* getRootNode();
     intptr_t createNodeFromSymbol(const char* name, fuiRenderNode* parent, int fileIndex);
     fuiRenderNode* findNode(const char* name);

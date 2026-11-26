@@ -46,7 +46,8 @@ enum UseAnim
     UseAnim_drink,
     UseAnim_block,
     UseAnim_bow,
-    UseAnim_spear
+    UseAnim_spear,
+    UseAnim_crossbow
 };
 
 class Item

@@ -96,6 +96,7 @@
 #include "game/core/Parrot.hpp"
 #include "game/entity/mob/EntityDamageSource.hpp"
 #include "game/item/BowItem.hpp"
+#include "game/item/CrossbowItem.hpp"
 #include "game/item/FishingRodItem.hpp"
 #include "game/item/Items.hpp"
 #include "game/item/Item.hpp"
@@ -3519,6 +3520,8 @@ void Player::killed(boost::shared_ptr<LivingEntity> entity)
 
 TextureAtlasSprite* Player::getItemInHandIcon(not_null_ptr<ItemInstance> item, int frame)
 {
+    if (item->getItem() == Items::crossbow && getUseItem() == item)
+        return static_cast<CrossbowItem*>(Items::crossbow)->getPullingIcon(getTicksUsingItem(), item);
     TextureAtlasSprite* icon = LivingEntity::getItemInHandIcon(item, frame);
     if (item->getItem() == Items::fishingRod && mFishing != NULL)
     {
@@ -3698,6 +3701,7 @@ uint32_t Player::isAllowedToUse(not_null_ptr<ItemInstance> item)
         {
         case ItemId::APPLE:
         case ItemId::BOW:
+        case ItemId::CROSSBOW:
         case ItemId::IRON_SWORD:
         case ItemId::WOODEN_SWORD:
         case ItemId::STONE_SWORD:

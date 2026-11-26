@@ -66,6 +66,11 @@ void ModelDefinition::readModel(DataInputStream* input, int version)
 
     for (int i = 0; i < numParts; ++i)
     {
-        mModelParts[input->readUTF()].readModelPart(input, version);
+        std::wstring partName = input->readUTF();
+        // Version 2 records the parent name before the part data. Existing
+        // renderers supply their animated parent explicitly when creating parts.
+        if (version >= 2)
+            input->readUTF();
+        mModelParts[partName].readModelPart(input, version);
     }
 }

@@ -150,6 +150,10 @@ TexturePack* TexturePackRepository::addTexturePackFromDLC(DLCPack* dlcPack, unsi
     if (dlcPack != NULL)
     {
         const bool modernTexturePack = DLCTexturePack::IsModernTexturePack(dlcPack);
+        // An imported Common update already contains the newer default art.
+        // The bundled older pack must not replace it at startup.
+        if (modernTexturePack && File(L"Common/res/TitleUpdate/common-update.json").exists())
+            return defaultTexturePack;
         if (modernTexturePack && m_modernDefaultPackRegistered)
         {
             // The same PCK may be found in the bundled packs folder and in an

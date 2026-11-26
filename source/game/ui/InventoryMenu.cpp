@@ -346,7 +346,8 @@ bool InventoryMenu::OffhandSlot::mayPlace(not_null_ptr<ItemInstance> item)
         if (Item::getId(itemType) == 442)
             return true;
         if (itemType == Items::filledMap || itemType == Items::arrow || itemType == Items::tippedArrow
-            || itemType == Items::totemOfUndying)
+            || itemType == Items::spectralArrow || itemType == Items::totemOfUndying
+            || itemType == Items::fireworks || itemType == Items::crossbow)
         {
             return true;
         }

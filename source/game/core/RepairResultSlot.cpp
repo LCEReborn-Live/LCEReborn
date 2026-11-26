@@ -2,6 +2,8 @@
 #include "game/world/LevelEvent.hpp"
 
 #include "game/item/ItemInstance.hpp"
+#include "game/item/Item.hpp"
+#include "game/core/GenericStats.hpp"
 #include "game/item/RepairContainer.hpp"
 #include "game/ui/AnvilMenu.hpp"
 #include "game/world/Level.hpp"
@@ -33,6 +35,12 @@ bool RepairResultSlot::mayPickup(boost::shared_ptr<Player> player)
 
 not_null_ptr<ItemInstance> RepairResultSlot::onTake(boost::shared_ptr<Player> player, not_null_ptr<ItemInstance> item)
 {
+    const not_null_ptr<ItemInstance> input = mMenu->mInputSlots->getItem(0);
+    if (!player->mLevel->mIsClientSide && !item->isEmpty() && Item::IsShulkerBox(item->getItem())
+        && item->hasCustomHoverName() && !input->isEmpty()
+        && item->getHoverNameUnfiltered() != input->getHoverNameUnfiltered())
+        player->awardStat(GenericStats::achievement(eAward_OrganizationalWizard), GenericStats::param_noArgs());
+
     if (!player->mAbilities.mInstabuild)
     {
         player->giveExperienceLevels(-mMenu->mRepairCost);

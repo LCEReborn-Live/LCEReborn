@@ -33,12 +33,20 @@ public:
     TextureAtlasSprite* getTexture(const std::wstring& name);
 
 private:
+    struct SpriteCell
+    {
+        SpriteCell(int column = 0, int row = 0, int width = 1, int height = 1)
+            : column(column), row(row), width(width), height(height) {}
+        int column, row, width, height;
+    };
+
     int mIconType;
     std::wstring mName;
     std::wstring mPath;
     std::wstring mSpritePrefix;
     bool mSingleImage;
     boost::unordered_map<std::wstring, TextureAtlasSprite*> mSprites;
+    boost::unordered_map<std::wstring, SpriteCell> mSpriteCells;
     BufferedImage* mImage;
     TextureAtlasSprite* mMissingIcon;
     Texture* mStitchedTexture;

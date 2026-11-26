@@ -308,6 +308,9 @@ Recipes::Recipes()
     addShapedRecipe(new ItemInstance(Items::bread, 1), L"scig", L"###", L'#', Items::wheat, L'F');
     addShapedRecipe(new ItemInstance(Items::bow, 1), L"ssscicig", L" #X", L"# X", L" #X", L'X', Items::string, L'#',
                     Items::stick, L'T');
+    addShapedRecipe(new ItemInstance(Items::crossbow, 1), L"ssscicicictg", L"SIS", L"THT", L" S ",
+                    L'S', Items::stick, L'I', Items::ironIngot, L'T', Items::string, L'H', Blocks::tripwire_hook,
+                    L'T');
     addShapedRecipe(new ItemInstance(Items::arrow, 4), L"ssscicicig", L"X", L"#", L"Y", L'Y', Items::feather, L'X',
                     Items::flint, L'#', Items::stick, L'T');
     mTippedArrowRecipe->addRecipes(this);
@@ -798,6 +801,16 @@ not_null_ptr<ItemInstance> Recipes::getItemFor(boost::shared_ptr<CraftingContain
 eAward Recipes::hasAchievementAttachedToRecipe(boost::shared_ptr<CraftingContainer> craftingContainer, Level* level,
                                                Recipe* recipe, ERecipeCategory category)
 {
+    if (category == eRecipeCategory_Crafting && (recipe == NULL || recipe == BannerRecipes::mAddPatternRecipe))
+    {
+        for (unsigned int slot = 0; slot < craftingContainer->getContainerSize(); ++slot)
+        {
+            not_null_ptr<ItemInstance> ingredient = craftingContainer->getItem(slot);
+            if (!ingredient->isEmpty() && ingredient->getItem() == Items::goldenApple
+                && ingredient->getAuxValue() == 1 && BannerRecipes::mAddPatternRecipe->matches(craftingContainer, level))
+                return eAward_FruitOnTheLoom;
+        }
+    }
     not_null_ptr<ItemInstance> first = ItemInstance::EMPTY;
     not_null_ptr<ItemInstance> second = ItemInstance::EMPTY;
     int itemCount = 0;

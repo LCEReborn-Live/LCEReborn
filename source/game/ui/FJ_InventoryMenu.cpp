@@ -5,6 +5,7 @@
 #include "game/ui/FJ_FuiNode.hpp"
 #include "game/ui/FJ_FuiNodeStage.hpp"
 #include "game/ui/FJ_MobEffect.hpp"
+#include "game/ui/fuiRenderNode.hpp"
 #include "game/util/Math.hpp"
 
 static const int s_effectSlots[28] = {-1, 12, 9,  2,  14, 11, 5,  3,  6,  13, 16, 7,  8,  1,
@@ -56,6 +57,9 @@ void FJ_InventoryMenu::init(FJ_Event* event)
     m_armorSlots[1] = bodySlot->getChildByName(std::string("Icon_Body"))->asMovieClip();
     m_armorSlots[2] = legsSlot->getChildByName(std::string("Icon_Legs"))->asMovieClip();
     m_armorSlots[3] = feetSlot->getChildByName(std::string("Icon_Feet"))->asMovieClip();
+    // Both layouts have a slot background. TU80 adds the shield silhouette above it.
+    FJ_FuiNode* shieldSlot = mainPanel->getChildByName("ShieldSlot");
+    m_offhandSlotIcon = shieldSlot->getNumChildren() > 1 ? shieldSlot->getRenderNodeChildAt(1) : NULL;
 }
 
 void FJ_InventoryMenu::SetSafeZone(int top, int bottom, int left, int right)
@@ -189,4 +193,10 @@ unsigned int FJ_InventoryMenu::UpdateEffects(int count, int* effects)
 void FJ_InventoryMenu::ShowArmorSlot(int slot, bool visible)
 {
     m_armorSlots[slot]->setVisible(visible);
+}
+
+void FJ_InventoryMenu::ShowOffhandSlotIcon(bool visible)
+{
+    if (m_offhandSlotIcon != NULL)
+        m_offhandSlotIcon->setVisibility(visible);
 }

@@ -217,6 +217,11 @@ const SoundEvent* AbstractRotatedItemProjectile::getOnHitSound() const
     return SoundEvents::ARROW_HIT;
 }
 
+bool AbstractRotatedItemProjectile::canHitEntity(const boost::shared_ptr<Entity>& entity)
+{
+    return mFlightTime >= 5 || (entity != mOwner && entity != mLastDeflectedEntity.lock());
+}
+
 boost::shared_ptr<Entity> AbstractRotatedItemProjectile::findHitEntity(Vec3* from, Vec3* to)
 {
     boost::shared_ptr<Entity> hitEntity;
@@ -226,9 +231,7 @@ boost::shared_ptr<Entity> AbstractRotatedItemProjectile::findHitEntity(Vec3* fro
     for (unsigned int i = 0; i < entities->size(); ++i)
     {
         boost::shared_ptr<Entity> entity = entities->at(i);
-        if (entity == mOwner && mFlightTime < 5)
-            continue;
-        if (entity == mLastDeflectedEntity.lock() && mFlightTime < 5)
+        if (!canHitEntity(entity))
             continue;
         HitResult* hit = entity->mBoundingBox->grow(0.3)->clip(from, to);
         if (hit != NULL)
@@ -340,11 +343,31 @@ void AbstractRotatedItemProjectile::tick()
                    ? Vec3::newTemp(mX + mXd, mY + mYd, mZ + mZd)
                    : Vec3::newTemp(hitResult->mLocation->x, hitResult->mLocation->y, hitResult->mLocation->z);
 
-    boost::shared_ptr<Entity> hitEntity = findHitEntity(from, to);
-    if (hitEntity)
+    if (canPierceEntities() && !isNoPhysics())
     {
-        delete hitResult;
-        hitResult = new HitResult(hitEntity);
+        if (!mLevel->mIsClientSide)
+        {
+            while (auto hitEntity = findHitEntity(from, to))
+            {
+                HitResult entityHit(hitEntity);
+                onHit(&entityHit);
+                if (mRemoved || mFlightTime == 0)
+                {
+                    delete hitResult;
+                    hitResult = nullptr;
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        boost::shared_ptr<Entity> hitEntity = findHitEntity(from, to);
+        if (hitEntity)
+        {
+            delete hitResult;
+            hitResult = new HitResult(hitEntity);
+        }
     }
 
     if (hitResult != NULL && hitResult->mType == HitResult::ENTITY
@@ -362,10 +385,8 @@ void AbstractRotatedItemProjectile::tick()
     if (hitResult != NULL)
     {
         if (!isNoPhysics())
-        {
             onHit(hitResult);
-            delete hitResult;
-        }
+        delete hitResult;
     }
 
     if (isCritArrow())

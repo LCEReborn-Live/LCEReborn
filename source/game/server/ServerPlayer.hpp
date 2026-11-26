@@ -65,7 +65,9 @@ public:
     std::vector<int32_t> mEntitiesToRemove;
     boost::unordered_set<ChunkPos, ChunkPosKeyHash, ChunkPosKeyEq> mTrackedChunks;
     int32_t mState;
-    Biome* mLastBiome;
+    Biome* mLastBiome = NULL;
+    unsigned int mTu80OceanBiomes = 0;
+    unsigned int mTu80DiscoveredStructures = 0;
     int64_t mChunkRequestTime;
     int32_t mChunkViewDistance;
     double* mLevitationSourceY;

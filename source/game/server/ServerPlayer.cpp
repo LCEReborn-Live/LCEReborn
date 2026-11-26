@@ -33,6 +33,8 @@
 #include "game/network/ClientboundSoundPacket.hpp"
 #include "game/network/ServerGamePacketListenerImpl.hpp"
 #include "game/server/ServerLevel.hpp"
+#include "game/server/ServerChunkCache.hpp"
+#include "game/world/generation/LargeFeature.hpp"
 #include "game/world/Dimension.hpp"
 #include "game/ui/AbstractContainerMenu.hpp"
 #include "game/ui/ChestMenu.hpp"
@@ -721,6 +723,7 @@ void ServerPlayer::resetChunkFlagsOutsideArea(int32_t minX, int32_t minZ, int32_
 void ServerPlayer::readAdditionalSaveData(CompoundTag* tag)
 {
     Player::readAdditionalSaveData(tag);
+    mTu80OceanBiomes = static_cast<unsigned int>(tag->getInt(L"Tu80OceanBiomes")) & 0x3ffu;
 
     if (tag->contains(std::wstring(L"playerGameType"), 99))
     {
@@ -769,6 +772,7 @@ void ServerPlayer::addWalkers(DataFixerUpper* dataFixer)
 void ServerPlayer::addAdditonalSaveData(CompoundTag* tag)
 {
     Player::addAdditonalSaveData(tag);
+    tag->putInt(L"Tu80OceanBiomes", static_cast<int>(mTu80OceanBiomes));
 
     GameRulesInstance* gameRules = mGameMode->mGameRules;
     if (gameRules != NULL)
@@ -852,6 +856,32 @@ void ServerPlayer::tick()
     {
         awardStat(GenericStats::enteredBiome(biome->id), GenericStats::param_enteredBiome(biome->id));
         mLastBiome = biome;
+        // This generator has ten ocean variants, including deep warm ocean.
+        const unsigned int previousOceanBiomes = mTu80OceanBiomes;
+        const int oceans[] = {0, 24, 40, 41, 42, 43, 44, 45, 46, 47};
+        for (unsigned int i = 0; i < sizeof(oceans) / sizeof(oceans[0]); ++i)
+            if (biome->id == oceans[i])
+                mTu80OceanBiomes |= 1u << i;
+        if (previousOceanBiomes != 0x3ffu && mTu80OceanBiomes == 0x3ffu)
+            awardStat(GenericStats::achievement(eAward_SailThe7Seas), GenericStats::param_noArgs());
+    }
+
+    if (mTickCount % 20 == 0 && mTu80DiscoveredStructures != 3u)
+    {
+        ServerChunkCache* chunks = dynamic_cast<ServerChunkCache*>(mLevel->getChunkSource());
+        const BlockPos position(shared_from_this());
+        if (chunks && !(mTu80DiscoveredStructures & 1u)
+            && chunks->isPosInFeature(mLevel, LargeFeature::SHIPWRECK, position))
+        {
+            awardStat(GenericStats::achievement(eAward_Ahoy), GenericStats::param_noArgs());
+            mTu80DiscoveredStructures |= 1u;
+        }
+        if (chunks && !(mTu80DiscoveredStructures & 2u)
+            && chunks->isPosInFeature(mLevel, LargeFeature::RUIN, position))
+        {
+            awardStat(GenericStats::achievement(eAward_Atlantis), GenericStats::param_noArgs());
+            mTu80DiscoveredStructures |= 2u;
+        }
     }
 
     if (!mLevel->mIsClientSide && !mContainerMenu->stillValid(boost::dynamic_pointer_cast<Player>(shared_from_this())))
@@ -1856,6 +1886,8 @@ void ServerPlayer::restoreFrom(boost::shared_ptr<Player> oldPlayer, bool keepEve
     mLastSentTotalExperience = -1;
 
     const boost::shared_ptr<ServerPlayer> oldServerPlayer = boost::dynamic_pointer_cast<ServerPlayer>(oldPlayer);
+    mTu80OceanBiomes = oldServerPlayer->mTu80OceanBiomes;
+    mTu80DiscoveredStructures = oldServerPlayer->mTu80DiscoveredStructures;
     mEntitiesToRemove = oldServerPlayer->mEntitiesToRemove;
 
     setShoulderEntityLeft(oldPlayer->getShoulderEntityLeft()->copy());

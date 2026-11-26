@@ -59,6 +59,7 @@ public:
     virtual BlockPos* findNearestMapFeature(Level* level, const std::wstring& feature, const BlockPos& pos,
                                             bool takeBlock);
     virtual void recreateLogicStructuresForChunk(LevelChunk* chunk, int x, int z);
+    bool isPosInFeature(Level* level, const std::wstring& feature, const BlockPos& pos);
     virtual LevelChunk* getChunkAt(const BlockPos& pos);
     static unsigned int runSaveThreadProc(void* data);
     virtual int getLoadedChunks();

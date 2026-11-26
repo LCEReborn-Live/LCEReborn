@@ -12,6 +12,7 @@ Item* Items::ironAxe = NULL;
 Item* Items::flintAndSteel = NULL;
 Item* Items::apple = NULL;
 Item* Items::bow = NULL;
+Item* Items::crossbow = NULL;
 Item* Items::arrow = NULL;
 Item* Items::spectralArrow = NULL;
 Item* Items::tippedArrow = NULL;
@@ -243,6 +244,7 @@ void Items::staticCtor()
     flintAndSteel = get(L"flint_and_steel");
     apple = get(L"apple");
     bow = get(L"bow");
+    crossbow = get(L"crossbow");
     arrow = get(L"arrow");
     spectralArrow = get(L"spectral_arrow");
     tippedArrow = get(L"tipped_arrow");

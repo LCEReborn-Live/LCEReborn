@@ -205,7 +205,7 @@ int FurnaceBlockEntity::getBurnDuration(not_null_ptr<ItemInstance> item)
                 return 200;
             if (itemType == Items::stick)
                 return 100;
-            if (itemType != Items::bow && itemType != Items::fishingRod)
+            if (itemType != Items::bow && itemType != Items::crossbow && itemType != Items::fishingRod)
             {
                 if (itemType == Items::sign)
                     return 200;

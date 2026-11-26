@@ -36,6 +36,7 @@ public:
     virtual void lerpMotion(double xd, double yd, double zd);
     double HandleDirectionalAcceleration(int direction, double velocity);
     void dealExplosionDamage();
+    void shootFromCrossbow(double x, double y, double z);
     virtual void tick();
     void setExplosionColourToPipColour(CompoundTag* tag);
     virtual void handleEntityEvent(unsigned char event, int data);
@@ -55,6 +56,10 @@ public:
     static const EntityDataAccessor<int>* DATA_ATTACHED_TO_ENTITY;
 
 private:
+    bool wasShotFromCrossbow() const;
+    bool hasExplosions() const;
+    static const EntityDataAccessor<bool>* DATA_SHOT_FROM_CROSSBOW;
+
     int mLife;
     int mLifetime;
     boost::weak_ptr<LivingEntity> mAttachedToEntity;

@@ -13,6 +13,15 @@
 #include "game/core/TridentCategory.hpp"
 #include "game/core/WeaponCategory.hpp"
 #include "game/core/WearableCategory.hpp"
+#include "game/item/CrossbowItem.hpp"
+
+namespace
+{
+class CrossbowCategory : public EnchantmentCategory
+{
+    bool canEnchant(Item* item) const override { return dynamic_cast<CrossbowItem*>(item) != nullptr; }
+};
+}
 
 std::vector<const EnchantmentCategory*> EnchantmentCategory::CATEGORIES;
 
@@ -29,6 +38,7 @@ const EnchantmentCategory* EnchantmentCategory::BREAKABLE = new BreakableCategor
 const EnchantmentCategory* EnchantmentCategory::BOW = new BowCategory();
 const EnchantmentCategory* EnchantmentCategory::WEARABLE = new WearableCategory();
 const EnchantmentCategory* EnchantmentCategory::TRIDENT = new TridentCategory();
+const EnchantmentCategory* EnchantmentCategory::CROSSBOW = new CrossbowCategory();
 
 EnchantmentCategory::EnchantmentCategory()
 {

@@ -2,7 +2,6 @@
 #include "game/core/StringIds.hpp"
 #include <cstring>
 
-#include <cstdio>
 #include <vector>
 
 #include "game/core/CConsoleMinecraftApp.hpp"
@@ -633,6 +632,23 @@ UIControl* UIScene_InventoryMenu::getSection(IUIScene_AbstractContainerMenu::ESc
     return control;
 }
 
+void UIScene_InventoryMenu::render(int width, int height, C4JRender::eViewportType viewport)
+{
+    if (m_movie != NULL && !m_reloading && m_hasTicked)
+    {
+        FJ_InventoryMenu* document = static_cast<FJ_InventoryMenu*>(m_movie->getRootNode()->getFuiNode());
+        // The empty-slot artwork is drawn before the item callbacks in this frame.
+        auto showEmptyIcon = [this](int id) {
+            Slot* slot = m_menu->getSlot(id);
+            return !slot->hasItem() && m_menu->GetQuickCraftItem(m_playerId, slot->mIndex)->isEmpty();
+        };
+        for (int id = InventoryMenu::ARMOR_SLOT_START; id < InventoryMenu::ARMOR_SLOT_END; ++id)
+            document->ShowArmorSlot(id - InventoryMenu::ARMOR_SLOT_START, showEmptyIcon(id));
+        document->ShowOffhandSlotIcon(showEmptyIcon(InventoryMenu::USE_ROW_SLOT_END));
+    }
+    UIScene_AbstractContainerMenu::render(width, height, viewport);
+}
+
 void UIScene_InventoryMenu::customDraw(const char* name, fuiRect* rect)
 {
     Minecraft* minecraft = Minecraft::GetInstance();
@@ -646,17 +662,6 @@ void UIScene_InventoryMenu::customDraw(const char* name, fuiRect* rect)
     }
 
     UIScene_AbstractContainerMenu::customDraw(name, rect);
-
-    not_null_ptr<ItemInstance> item = ItemInstance::EMPTY;
-    int slotId = -1;
-    std::sscanf(name, "slot_%d", &slotId);
-    if (slotId >= InventoryMenu::ARMOR_SLOT_START && slotId < InventoryMenu::ARMOR_SLOT_END)
-    {
-        item = m_menu->getSlot(slotId)->getItem();
-        bool empty = item->isEmpty();
-        static_cast<FJ_InventoryMenu*>(m_movie->getRootNode()->getFuiNode())
-            ->ShowArmorSlot(slotId - InventoryMenu::ARMOR_SLOT_START, empty);
-    }
 }
 
 void UIScene_InventoryMenu::handleTimerComplete(int timerId)

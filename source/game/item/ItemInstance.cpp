@@ -580,6 +580,19 @@ void ItemInstance::onCraftedBy(Level* level, boost::shared_ptr<Player> player, i
 
     if (craftSlots != NULL)
     {
+        if (!level->mIsClientSide && getItem() == Items::banner)
+        {
+            for (int slot = 0; slot < craftSlots->getContainerSize(); ++slot)
+            {
+                not_null_ptr<ItemInstance> ingredient = craftSlots->getItem(slot);
+                if (!ingredient->isEmpty() && ingredient->getItem() == Items::goldenApple
+                    && ingredient->getAuxValue() == 1)
+                {
+                    player->awardStat(GenericStats::achievement(eAward_FruitOnTheLoom), GenericStats::param_noArgs());
+                    break;
+                }
+            }
+        }
         Recipes* recipes = Recipes::getInstance();
         if (recipes->hasAchievementAttachedToRecipe(craftSlots, player->mLevel, NULL, Recipes::eRecipeCategory_Crafting)
             == eAward_ChangeOfSheets)

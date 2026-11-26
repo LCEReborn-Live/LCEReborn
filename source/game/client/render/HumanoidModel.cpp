@@ -155,6 +155,7 @@ void HumanoidModel::_init(float scale, float yOffset, int texWidth, int texHeigh
     mUseItemRemainingTicks = 0.0f;
     mSwimming = false;
     mSpearThrowProgress = 0.0f;
+    mCrossbowChargeProgress = 0.0f;
     mSitting = false;
     mIsArmourModel = armourModel;
     mLeftArmPose = eArmPose_Empty;
@@ -285,6 +286,7 @@ void HumanoidModel::copyPropertiesFrom(Model* model)
         mCrouching = humanoidModel->mCrouching;
         mSwimming = humanoidModel->mSwimming;
         mSpearThrowProgress = humanoidModel->mSpearThrowProgress;
+        mCrossbowChargeProgress = humanoidModel->mCrossbowChargeProgress;
         mSitting = humanoidModel->mSitting;
         mEating = humanoidModel->mEating;
         mUseItemRemainingTicks = humanoidModel->mUseItemRemainingTicks;
@@ -940,7 +942,31 @@ void HumanoidModel::setupAnim(float limbSwing, float limbSwingAmount, float ageI
         mLeftLeg->mXRot += Mth::sin(ageInTicks * 0.067f) * 0.05f;
     }
 
-    if (mRightArmPose == eArmPose_BowAndArrow)
+    const bool chargeCrossbow = mRightArmPose == eArmPose_CrossbowCharge || mLeftArmPose == eArmPose_CrossbowCharge;
+    const bool holdCrossbow = mRightArmPose == eArmPose_CrossbowHold || mLeftArmPose == eArmPose_CrossbowHold;
+    if (chargeCrossbow || holdCrossbow)
+    {
+        const eArmPose pose = chargeCrossbow ? eArmPose_CrossbowCharge : eArmPose_CrossbowHold;
+        const bool rightHanded = mRightArmPose == pose;
+        ModelPart* weapon = rightHanded ? mRightArm : mLeftArm;
+        ModelPart* support = rightHanded ? mLeftArm : mRightArm;
+        const float side = rightHanded ? 1.0f : -1.0f;
+        if (chargeCrossbow)
+        {
+            weapon->mXRot = -0.95f;
+            weapon->mYRot = -0.8f * side;
+            support->mXRot = Mth::Lerp(-0.95f, -1.57f, mCrossbowChargeProgress);
+            support->mYRot = Mth::Lerp(0.4f, 0.85f, mCrossbowChargeProgress) * side;
+        }
+        else
+        {
+            weapon->mXRot = mHead->mXRot - 1.47f;
+            weapon->mYRot = mHead->mYRot - 0.3f * side;
+            support->mXRot = mHead->mXRot - 1.50f;
+            support->mYRot = mHead->mYRot + 0.6f * side;
+        }
+    }
+    else if (mRightArmPose == eArmPose_BowAndArrow)
     {
         mRightArm->mYRot = mHead->mYRot + -0.1f;
         mLeftArm->mYRot = mHead->mYRot + 0.5f;

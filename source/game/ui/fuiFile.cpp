@@ -126,6 +126,16 @@ unsigned int fuiFile::load(arrayWithLength<unsigned char> bytes, int value)
     importAssetData = (fuiImportAsset*)addDataRegion(header.importAssetCount, 0x40, &cursor,
                                                      fuiImportAsset::EndianSwap);
     bitmaps = (fuiBitmap*)addDataRegion(header.bitmapCount, 0x20, &cursor, fuiBitmap::EndianSwap);
+    bitmapCoordinateScales.assign(header.bitmapCount, 1.0f);
+    for (unsigned int i = 0; i < header.bitmapCount; ++i)
+    {
+        const unsigned int type = static_cast<unsigned int>(bitmaps[i].type);
+        if ((type & 0x80000000u) != 0)
+        {
+            bitmapCoordinateScales[i] = 2.0f / 3.0f;
+            bitmaps[i].type = static_cast<eFuiBitmapType>(type & ~0x80000000u);
+        }
+    }
     imageData = cursor;
     rootNode = NULL;
     return 1;
@@ -168,6 +178,11 @@ void fuiFile::dumpUnresolvedReferences()
         return;
     if (header.referenceCount == 0)
         return;
+}
+
+float fuiFile::getBitmapCoordinateScale(const fuiBitmap* bitmap) const
+{
+    return bitmapCoordinateScales[bitmap - bitmaps];
 }
 
 void fuiFile::initialiseRenderTexture(fuiBitmap* bitmap, bool force)

@@ -266,6 +266,7 @@ not_null_ptr<ItemInstance> BucketItem::collectFish(boost::shared_ptr<Player> pla
             std::vector<boost::shared_ptr<Entity> > removed;
             removed.push_back(entity);
             player->mLevel->removeEntities(&removed);
+            player->awardStat(GenericStats::achievement(eAward_MarineBiologist), GenericStats::param_noArgs());
         }
         player->playSound(SoundEvents::BUCKET_FILL_FISH, 1.0f, 1.0f);
         return createResultItem(itemInstance, player, resultItem, entity);

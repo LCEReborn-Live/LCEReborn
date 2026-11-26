@@ -774,6 +774,11 @@ void ServerChunkCache::recreateLogicStructuresForChunk(LevelChunk*, int, int)
 {
 }
 
+bool ServerChunkCache::isPosInFeature(Level* level, const std::wstring& feature, const BlockPos& pos)
+{
+    return m_source != NULL && m_source->isPosInFeature(level, feature, pos);
+}
+
 LevelChunk* ServerChunkCache::getChunkAt(const BlockPos& pos)
 {
     return getChunk(pos.x >> 4, pos.z >> 4);

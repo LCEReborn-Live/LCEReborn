@@ -17,6 +17,7 @@
 #include "game/core/Mth.hpp"
 #include "game/entity/mob/Entity.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
+#include "game/item/CrossbowItem.hpp"
 #include "game/item/Item.hpp"
 #include "game/item/ItemInstance.hpp"
 #include "game/item/Items.hpp"
@@ -152,6 +153,23 @@ void PlayerRenderer::setModelProperties(boost::shared_ptr<Player> player, float 
                     offhandPose = HumanoidModel::eArmPose_Block;
                 }
             }
+        }
+        if (player->isUsingItem() && player->getUseItem()->getItem() == Items::crossbow)
+        {
+            if (player->getUsedItemHand() == InteractionHand::eInteractionHand_MainHand)
+                mainHandPose = HumanoidModel::eArmPose_CrossbowCharge;
+            else
+                offhandPose = HumanoidModel::eArmPose_CrossbowCharge;
+            model->mCrossbowChargeProgress = Mth::clamp(
+                (player->getTicksUsingItem() + partialTicks) / CrossbowItem::getChargeDuration(player->getUseItem()),
+                0.0f, 1.0f);
+        }
+        else if (!player->isUsingItem() && !player->mSwinging)
+        {
+            if (mainHandItem->getItem() == Items::crossbow && CrossbowItem::isCharged(mainHandItem))
+                mainHandPose = HumanoidModel::eArmPose_CrossbowHold;
+            else if (offhandItem->getItem() == Items::crossbow && CrossbowItem::isCharged(offhandItem))
+                offhandPose = HumanoidModel::eArmPose_CrossbowHold;
         }
         if (player->getMainArm() == HumanoidArm::RIGHT)
         {

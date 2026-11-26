@@ -24,6 +24,7 @@
 #include "game/core/HumanoidArm.hpp"
 #include "game/client/render/TextureAtlasSprite.hpp"
 #include "game/item/BowItem.hpp"
+#include "game/item/CrossbowItem.hpp"
 #include "game/item/ItemInstance.hpp"
 #include "game/item/Items.hpp"
 #include "game/item/MapItem.hpp"
@@ -321,7 +322,7 @@ ItemInHandRenderer::ItemInHandRenderer(Minecraft* minecraft)
     }
 }
 
-unsigned long long ItemInHandRenderer::renderItem3D(Tesselator*, float x, float y, float, float, int, int, float,
+unsigned long long ItemInHandRenderer::renderItem3D(Tesselator*, float x, float y, float u1, float v1, int, int, float,
                                                     eItemRenderMode mode)
 {
     int listId = -1;
@@ -351,6 +352,10 @@ unsigned long long ItemInHandRenderer::renderItem3D(Tesselator*, float x, float 
     GlStateManager::matrixMode(2);
     GlStateManager::loadIdentity();
     GlStateManager::translatef(x, y, 0.0f);
+    const bool terrain = mode == ITEM_RENDER_MODE_NONE || mode == ITEM_RENDER_MODE_GUI;
+    const bool extruded = mode == ITEM_RENDER_MODE_EXTRUDED || mode == ITEM_RENDER_MODE_EXTRUDED_HIGH_RES;
+    GlStateManager::scalef((u1 - x) * 16.0f,
+                          (v1 - y) * (extruded ? 16.0f : (terrain ? 34.0f : 17.0f)), 1.0f);
     GlStateManager::callList(listId);
     GlStateManager::loadIdentity();
     GlStateManager::matrixMode(0);
@@ -649,6 +654,12 @@ void ItemInHandRenderer::renderArmWithItem(boost::shared_ptr<LocalPlayer> player
     }
 
     bool rightArm = arm == HumanoidArm::RIGHT;
+    const bool crossbow = item->getItem() == Items::crossbow;
+    if (crossbow)
+    {
+        const float side = rightArm ? 1.0f : -1.0f;
+        GlStateManager::translatef(-0.12f * side, 0.10f, -0.06f);
+    }
     if (player->isUsingItem() && player->getUsedItemHand() == hand)
     {
         int side = rightArm ? 1 : -1;
@@ -720,9 +731,23 @@ void ItemInHandRenderer::renderArmWithItem(boost::shared_ptr<LocalPlayer> player
             }
             break;
         }
+        case UseAnim_crossbow:
+        {
+            applyItemArmTransform(arm, equipProgress);
+            const float drawTime = player->getTicksUsingItem() + partialTick;
+            const float draw = Mth::clamp(drawTime / CrossbowItem::getChargeDuration(item), 0.0f, 1.0f);
+            GlStateManager::translatef(side * (-0.10f - draw * 0.34f), offsetY - draw * 0.15f, draw * 0.05f);
+            break;
+        }
         default:
             break;
         }
+    }
+    else if (crossbow && mainHand && CrossbowItem::isCharged(item) && swingProgress == 0.0f)
+    {
+        applyItemArmTransform(arm, equipProgress);
+        const float side = rightArm ? 1.0f : -1.0f;
+        GlStateManager::translatef(side * -0.44f, offsetY - 0.15f, 0.05f);
     }
     else if (player->getDamageNearbyMobs())
     {
@@ -766,7 +791,7 @@ void ItemInHandRenderer::render(float partialTick)
     if (player->isUsingItem())
     {
         not_null_ptr<ItemInstance> useItem = player->getUseItem();
-        if (useItem->getItem() == Items::bow)
+        if (useItem->getItem() == Items::bow || useItem->getItem() == Items::crossbow)
         {
             InteractionHand::EInteractionHand usedHand = player->getUsedItemHand();
             bool usedMainHand = usedHand == InteractionHand::eInteractionHand_MainHand;

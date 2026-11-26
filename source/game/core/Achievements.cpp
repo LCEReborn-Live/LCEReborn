@@ -104,6 +104,7 @@ Achievement* Achievements::moskstraumen = NULL;
 Achievement* Achievements::castaway = NULL;
 Achievement* Achievements::sleepWithTheFishes = NULL;
 Achievement* Achievements::echolocation = NULL;
+Achievement* Achievements::tu80[Achievements::TU80_COUNT] = {};
 
 void Achievements::staticCtor()
 {
@@ -406,6 +407,15 @@ void Achievements::staticCtor()
         (new Achievement(95, L"sleepWithTheFishes", 0, 0, Blocks::log, NULL))->postConstruct(true)->setExtended();
 
     echolocation = (new Achievement(96, L"echolocation", 0, 0, Blocks::log, NULL))->postConstruct(true)->setExtended();
+
+    const wchar_t* names[TU80_COUNT] = {
+        L"doABarrelRoll", L"marineBiologist", L"ahoy", L"topOfTheWorld", L"whereHaveYouBeen", L"zoologist",
+        L"atlantis", L"organizationalWizard", L"fruitOnTheLoom", L"plethoraOfCats", L"sailThe7Seas",
+        L"buyLowSellHigh", L"disenchanted", L"badFeeling", L"killTheBeast", L"soundTheAlarm", L"wereBeingAttacked"
+    };
+    for (int i = 0; i < TU80_COUNT; ++i)
+        tu80[i] = (new Achievement(TU80_FIRST + i, names[i], 0, 0, Items::book, NULL))
+                      ->postConstruct(true)->setExtended();
 }
 
 void Achievements::init()

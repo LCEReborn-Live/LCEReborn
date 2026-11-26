@@ -22,9 +22,10 @@ const int UIScene_AchievementsMenu::sDisplayList[UIScene_AchievementsMenu::DISPL
     27, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
     52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75,
     76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96,
+    97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113,
 };
 
-static const AchievementInfo s_achievementInfo[97] = {
+static const AchievementInfo s_achievementInfo[114] = {
     {0, L"MCTrophy_00", 1, (int)0xf28ac13d, (int)0x2d7b8efc},
     {1, L"MCTrophy_01", 2, (int)0x2ba9a566, (int)0x251faf0f},
     {2, L"MCTrophy_02", 3, (int)0xd5d0ceef, (int)0xaad1343e},
@@ -122,6 +123,24 @@ static const AchievementInfo s_achievementInfo[97] = {
     {94, L"MCTrophy_90", 94, (int)0x230988f9, (int)0xd075e4d8},
     {95, L"MCTrophy_91", 95, (int)0x39dc97b0, (int)0x4c6662e9},
     {96, L"MCTrophy_92", 97, (int)0x1ad380ab, (int)0x155d709a},
+    // Stable appended IDs keep all existing profile award bits unchanged.
+    {97, L"TU80_TROP094", 98, 0x7f008000, 0x7f008001},
+    {98, L"TU80_TROP095", 99, 0x7f008002, 0x7f008003},
+    {99, L"TU80_TROP096", 100, 0x7f008004, 0x7f008005},
+    {100, L"TU80_TROP097", 101, 0x7f008006, 0x7f008007},
+    {101, L"TU80_TROP098", 102, 0x7f008008, 0x7f008009},
+    {102, L"TU80_TROP099", 103, 0x7f00800a, 0x7f00800b},
+    {103, L"TU80_TROP100", 104, 0x7f00800c, 0x7f00800d},
+    {104, L"TU80_TROP101", 105, 0x7f00800e, 0x7f00800f},
+    {105, L"TU80_TROP102", 106, 0x7f008010, 0x7f008011},
+    {106, L"TU80_TROP103", 107, 0x7f008012, 0x7f008013},
+    {107, L"TU80_TROP104", 108, 0x7f008014, 0x7f008015},
+    {108, L"TU80_TROP105", 109, 0x7f008016, 0x7f008017},
+    {109, L"TU80_TROP106", 110, 0x7f008018, 0x7f008019},
+    {110, L"TU80_TROP107", 111, 0x7f00801a, 0x7f00801b},
+    {111, L"TU80_TROP108", 112, 0x7f00801c, 0x7f00801d},
+    {112, L"TU80_TROP109", 113, 0x7f00801e, 0x7f00801f},
+    {113, L"TU80_TROP110", 114, 0x7f008020, 0x7f008021},
 };
 
 const AchievementInfo* UIScene_AchievementsMenu::GetInfo(int achievement)

@@ -1,4 +1,7 @@
 #include "game/entity/projectile/Arrow.hpp"
+
+#include <algorithm>
+#include <cmath>
 #include "game/core/Difficulty.hpp"
 #include "game/network/ServerGamePacketListenerImpl.hpp"
 #include "game/network/ClientboundGameEventPacket.hpp"
@@ -13,10 +16,19 @@
 #include "game/data/CompoundTag.hpp"
 #include "game/entity/mob/Entity.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
+#include "game/entity/mob/SynchedEntityData.hpp"
 #include "game/item/Enchantments.hpp"
 #include "game/item/EnchantmentHelper.hpp"
 #include "game/minigame/MiniGameDef.hpp"
 #include "game/world/Level.hpp"
+#include "game/world/generation/Player.hpp"
+
+namespace
+{
+const int PIERCE_SHIFT = 2;
+const unsigned char PIERCE_MASK = 7 << PIERCE_SHIFT;
+const unsigned char CROSSBOW_FLAG = 1 << 5;
+}
 
 Arrow::Arrow(Level* level) : AbstractRotatedItemProjectile(level)
 {
@@ -52,6 +64,11 @@ void Arrow::addAdditonalSaveData(CompoundTag* tag)
     AbstractRotatedItemProjectile::addAdditonalSaveData(tag);
     tag->putInt(L"enchantPower", mEnchantPower);
     tag->putInt(L"knockback", mKnockback);
+    if ((mEntityData->get(DATA_FLAGS) & CROSSBOW_FLAG) != 0)
+    {
+        tag->putBoolean(L"ShotFromCrossbow", true);
+        tag->putByte(L"PierceLevel", static_cast<unsigned char>(getPierceLevel()));
+    }
 }
 
 void Arrow::readAdditionalSaveData(CompoundTag* tag)
@@ -61,6 +78,50 @@ void Arrow::readAdditionalSaveData(CompoundTag* tag)
         mEnchantPower = tag->getInt(L"enchantPower");
     if (tag->contains(L"knockback", Tag::TAG_ANY_NUMERIC))
         mKnockback = tag->getInt(L"knockback");
+    if (tag->getBoolean(L"ShotFromCrossbow"))
+        setCrossbowShot(tag->getByte(L"PierceLevel"));
+}
+
+void Arrow::setCrossbowShot(int piercing)
+{
+    const auto level = static_cast<unsigned char>(Mth::clamp(piercing, 0, 4));
+    const auto flags = static_cast<unsigned char>((mEntityData->get(DATA_FLAGS) & ~PIERCE_MASK)
+        | (level << PIERCE_SHIFT) | CROSSBOW_FLAG);
+    mEntityData->set(DATA_FLAGS, flags, true);
+}
+
+int Arrow::getPierceLevel() const
+{
+    return (mEntityData->get(DATA_FLAGS) & PIERCE_MASK) >> PIERCE_SHIFT;
+}
+
+bool Arrow::canPierceEntities() const
+{
+    return getPierceLevel() > 0;
+}
+
+bool Arrow::canHitEntity(const boost::shared_ptr<Entity>& entity)
+{
+    if (!AbstractRotatedItemProjectile::canHitEntity(entity))
+        return false;
+    if (!canPierceEntities())
+        return true;
+    if (std::find(mPiercedEntityIds.begin(), mPiercedEntityIds.end(), entity->getId()) != mPiercedEntityIds.end())
+        return false;
+    auto target = boost::dynamic_pointer_cast<Player>(entity);
+    auto shooter = boost::dynamic_pointer_cast<Player>(mOwner);
+    return !target || !shooter || shooter->canHarmPlayer(target);
+}
+
+bool Arrow::onHit(const HitResult* result)
+{
+    const bool hit = AbstractRotatedItemProjectile::onHit(result);
+    if (result->mEntity == nullptr && canPierceEntities())
+    {
+        setFlag(PIERCE_MASK, false);
+        mPiercedEntityIds.clear();
+    }
+    return hit;
 }
 
 void Arrow::setKnockback(int knockback)
@@ -93,6 +154,16 @@ void Arrow::setEnchantmentEffectsFromEntity(const boost::shared_ptr<LivingEntity
 void Arrow::onHitEntity(const HitResult* result)
 {
     boost::shared_ptr<Entity> entity = result->mEntity;
+    const int piercing = getPierceLevel();
+    if (piercing > 0)
+    {
+        if (mPiercedEntityIds.size() >= static_cast<unsigned int>(piercing + 1))
+        {
+            remove();
+            return;
+        }
+        mPiercedEntityIds.push_back(entity->getId());
+    }
     const float speed = Mth::sqrt(mXd * mXd + mYd * mYd + mZd * mZd);
     float damage = mRandom->nextFloat(1.0f, 5.0f)
                    + (speed * 0.97f
@@ -103,6 +174,12 @@ void Arrow::onHitEntity(const HitResult* result)
     if (mEnchantPower > 0)
         damage = damage * (static_cast<float>(mEnchantPower) * 0.25f + 1.25f);
     int wholeDamage = static_cast<int>(damage);
+    if ((mEntityData->get(DATA_FLAGS) & CROSSBOW_FLAG) != 0)
+    {
+        wholeDamage = static_cast<int>(std::ceil(speed * 2.0f));
+        if (isCritArrow())
+            wholeDamage += mRandom->nextInt(wholeDamage / 2 + 2);
+    }
 
     bool fire = false;
     if (isOnFire())
@@ -139,7 +216,7 @@ void Arrow::onHitEntity(const HitResult* result)
         if (eTYPE_DERIVED_FROM(EntityType::LIVING_ENTITY, result->mEntity->GetType()))
         {
             boost::shared_ptr<LivingEntity> living = boost::static_pointer_cast<LivingEntity>(entity);
-            if (!mLevel->mIsClientSide)
+            if (!mLevel->mIsClientSide && piercing == 0)
                 living->setArrowCount(living->getArrowCount() + 1);
             if (mKnockback > 0)
             {
@@ -163,7 +240,7 @@ void Arrow::onHitEntity(const HitResult* result)
         }
 
         playSound(SoundEvents::ARROW_HIT, 1.0f, 1.2f / (mRandom->nextFloat() * 0.2f + 0.9f));
-        if (result->mEntity->GetType() != EntityType::ENDER_DRAGON)
+        if (piercing == 0 && result->mEntity->GetType() != EntityType::ENDER_DRAGON)
             remove();
     }
     else

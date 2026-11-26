@@ -63,6 +63,7 @@
 #include "game/entity/mob/SynchedEntityData.hpp"
 #include "game/entity/projectile/Arrow.hpp"
 #include "game/item/ArmorItem.hpp"
+#include "game/item/CrossbowItem.hpp"
 #include "game/item/ElytraItem.hpp"
 #include "game/item/EnchantmentHelper.hpp"
 #include "game/item/Enchantments.hpp"
@@ -1621,7 +1622,10 @@ bool LivingEntity::checkTotemDeathProtection(const DamageSource* source)
 
 bool LivingEntity::isDamageSourceBlocked(const DamageSource* source)
 {
-    return !source->isBypassArmor() && isBlocking();
+    if (source->isBypassArmor() || !isBlocking())
+        return false;
+    auto arrow = boost::dynamic_pointer_cast<Arrow>(source->getDirectEntity());
+    return !arrow || arrow->getPierceLevel() == 0;
 }
 
 void LivingEntity::breakItem(not_null_ptr<ItemInstance> itemInstance)
@@ -4111,6 +4115,11 @@ void LivingEntity::updatingUsingItem()
 
         int remaining = getUseItemRemainingTicks();
 
+        if (!mLevel->mIsClientSide && mUseItem->getItem() == Items::crossbow)
+        {
+            CrossbowItem::playLoadingSound(mLevel, boost::static_pointer_cast<LivingEntity>(shared_from_this()),
+                                           mUseItem, getTicksUsingItem());
+        }
         if (remaining < 26 && (remaining & 3) == 0)
         {
             spawnItemUseParticles(mUseItem, 5);

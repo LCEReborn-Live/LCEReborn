@@ -211,6 +211,7 @@ const int TROPICAL_BUCKET = 462;
 const int NAUTILUS_CORE = 463;
 const int NAUTILUS = 464;
 const int PHANTOM_MEMBRANE = 465;
+const int CROSSBOW = 466;
 const int DEBUG_FOURJ_ITEM = 2255;
 const int RECORD_13 = 2256;
 const int RECORD_CAT = 2257;

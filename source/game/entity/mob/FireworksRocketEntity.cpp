@@ -23,9 +23,11 @@
 #include "game/data/ListTag.hpp"
 #include "game/data/DataFixerUpper.hpp"
 #include "game/entity/mob/EntityDamageSource.hpp"
+#include "game/entity/mob/IndirectEntityDamageSource.hpp"
 #include "game/entity/mob/EntityDataSerializers.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
 #include "game/entity/mob/SynchedEntityData.hpp"
+#include "game/entity/projectile/ProjectileUtil.hpp"
 #include "game/item/FireworksItem.hpp"
 #include "game/item/ItemDataWalker.hpp"
 #include "game/item/ItemInstance.hpp"
@@ -39,6 +41,7 @@
 
 const EntityDataAccessor<not_null_ptr<ItemInstance> >* FireworksRocketEntity::DATA_ITEM = NULL;
 const EntityDataAccessor<int>* FireworksRocketEntity::DATA_ATTACHED_TO_ENTITY = NULL;
+const EntityDataAccessor<bool>* FireworksRocketEntity::DATA_SHOT_FROM_CROSSBOW = NULL;
 
 FireworksRocketEntity::FireworksRocketEntity(Level* level, const boost::shared_ptr<Player>& player,
                                              const not_null_ptr<ItemInstance>& item)
@@ -83,6 +86,10 @@ FireworksRocketEntity::FireworksRocketEntity(Level* level)
       mLifetime(0),
       mAttachedToEntity(),
       mHasDirectionalData(true),
+      mDirectionalX(0),
+      mDirectionalY(0),
+      mDirectionalZ(0),
+      mDirectionalInitialized(false),
       mOwner()
 {
     fjDerivedCtorCalls();
@@ -135,6 +142,7 @@ void FireworksRocketEntity::_init(double x, double y, double z, const not_null_p
     mDirectionalX = 0;
     mDirectionalZ = 0;
     mDirectionalY = 0;
+    mDirectionalInitialized = false;
 
     if (Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks())
     {
@@ -154,6 +162,31 @@ void FireworksRocketEntity::staticCtor()
                                                                EntityDataSerializers::INT);
     DATA_ITEM = SynchedEntityData::defineId<not_null_ptr<ItemInstance> >(
         EntityType::FIREWORKS_ROCKET_ENTITY, EntityType::ENTITY, EntityDataSerializers::ITEM_INSTANCE);
+    DATA_SHOT_FROM_CROSSBOW = SynchedEntityData::defineId<bool>(
+        EntityType::FIREWORKS_ROCKET_ENTITY, EntityType::ENTITY, EntityDataSerializers::BOOLEAN);
+}
+
+void FireworksRocketEntity::shootFromCrossbow(double x, double y, double z)
+{
+    mEntityData->set(DATA_SHOT_FROM_CROSSBOW, true, true);
+    constexpr double speed = 1.6;
+    constexpr double spread = 0.0075;
+    lerpMotion((x + mRandom->nextGaussian() * spread) * speed,
+               (y + mRandom->nextGaussian() * spread) * speed,
+               (z + mRandom->nextGaussian() * spread) * speed);
+}
+
+bool FireworksRocketEntity::wasShotFromCrossbow() const
+{
+    return mEntityData->get(DATA_SHOT_FROM_CROSSBOW);
+}
+
+bool FireworksRocketEntity::hasExplosions() const
+{
+    auto item = mEntityData->get(DATA_ITEM);
+    auto* fireworks = static_cast<CompoundTag*>(item->getTagElement(FireworksItem::TAG_FIREWORKS));
+    auto* explosions = fireworks ? fireworks->fjSafeGetListTag(FireworksItem::TAG_EXPLOSIONS, Tag::TAG_COMPOUND) : nullptr;
+    return explosions && !explosions->isEmpty();
 }
 
 bool FireworksRocketEntity::isAttachedToEntity()
@@ -228,6 +261,11 @@ void FireworksRocketEntity::dealExplosionDamage()
     }
     if (power > 0.0f)
     {
+        IndirectEntityDamageSource crossbowDamage(ClientboundChatPacket::eChatPacketMessage_DeathExplosionAlternate,
+            ClientboundChatPacket::eChatPacketMessage_DeathExplosionAlternate, shared_from_this(), mOwner,
+            DamageSource::FIREWORKS);
+        crossbowDamage.setExplosion();
+        const DamageSource* source = wasShotFromCrossbow() && mOwner ? &crossbowDamage : DamageSource::FIREWORKS;
         boost::shared_ptr<LivingEntity> attached = mAttachedToEntity.lock();
         if (attached != NULL)
         {
@@ -245,6 +283,12 @@ void FireworksRocketEntity::dealExplosionDamage()
             {
                 continue;
             }
+            if (source == &crossbowDamage)
+            {
+                auto target = boost::dynamic_pointer_cast<Player>(living);
+                if (target && target != mOwner && !mOwner->canHarmPlayer(target))
+                    continue;
+            }
             bool visible = false;
             for (int i = 0; i < 2; ++i)
             {
@@ -259,7 +303,7 @@ void FireworksRocketEntity::dealExplosionDamage()
             if (visible)
             {
                 float damage = power * static_cast<float>(std::sqrt((radius - distanceTo(living)) / radius));
-                living->hurt(DamageSource::FIREWORKS, damage);
+                living->hurt(source, damage);
             }
         }
         delete entities;
@@ -275,6 +319,8 @@ void FireworksRocketEntity::tick()
     mZOld = mZ;
     Entity::tick();
 
+    const bool crossbow = wasShotFromCrossbow();
+    bool crossbowImpact = false;
     if (isAttachedToEntity())
     {
         boost::shared_ptr<LivingEntity> attached = mAttachedToEntity.lock();
@@ -307,7 +353,18 @@ void FireworksRocketEntity::tick()
     }
     else
     {
-        if (!Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks())
+        if (crossbow && !mLevel->mIsClientSide)
+        {
+            const std::vector<boost::shared_ptr<Entity>> ignored = {mOwner};
+            HitResult* hit = ProjectileUtil::forwardsRaycast(shared_from_this(), true, &ignored, nullptr);
+            if (hit && (hit->mType == HitResult::ENTITY || (hit->mType == HitResult::BLOCK && hasExplosions())))
+            {
+                setPos(hit->mLocation->x, hit->mLocation->y, hit->mLocation->z);
+                crossbowImpact = true;
+            }
+            delete hit;
+        }
+        if (!crossbow && !Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks())
         {
             if (mDirectionalX == 0 && mDirectionalY == 0 && mDirectionalZ == 0)
             {
@@ -321,14 +378,15 @@ void FireworksRocketEntity::tick()
             }
         }
 
-        move(eMoverType_Self, mXd, mYd, mZd, false);
+        if (!crossbowImpact)
+            move(eMoverType_Self, mXd, mYd, mZd, false);
     }
 
     double facingX = mXd;
     double facingY = mYd;
     double facingZ = mZd;
 
-    if (!Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks())
+    if (!crossbow && !Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks())
     {
         if (mDirectionalX == 0 && mDirectionalY == 0 && mDirectionalZ == 0)
         {
@@ -394,7 +452,7 @@ void FireworksRocketEntity::tick()
             double vy;
             double vz;
 
-            if (mDirectionalX != 0 || mDirectionalY != 0 || mDirectionalZ != 0
+            if (crossbow || mDirectionalX != 0 || mDirectionalY != 0 || mDirectionalZ != 0
                 || Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks())
             {
                 py = mY;
@@ -436,7 +494,7 @@ void FireworksRocketEntity::tick()
     }
     else
     {
-        if (Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks() && mCollision)
+        if (!crossbow && Minecraft::GetInstance()->GetMiniGame()->HasFeatureDirectionalFireworks() && mCollision)
         {
             if (mOwner != NULL)
             {
@@ -450,7 +508,7 @@ void FireworksRocketEntity::tick()
         }
     }
 
-    if (!mLevel->mIsClientSide && mLife > mLifetime)
+    if (!mLevel->mIsClientSide && (crossbowImpact || mLife > mLifetime))
     {
         dealExplosionDamage();
         remove();
@@ -521,6 +579,8 @@ void FireworksRocketEntity::addAdditonalSaveData(CompoundTag* tag)
 {
     tag->putInt(L"Life", mLife);
     tag->putInt(L"LifeTime", mLifetime);
+    if (wasShotFromCrossbow())
+        tag->putBoolean(L"ShotAtAngle", true);
     not_null_ptr<ItemInstance> item = mEntityData->get(DATA_ITEM);
     if (!item->isEmpty())
     {
@@ -532,6 +592,7 @@ void FireworksRocketEntity::readAdditionalSaveData(CompoundTag* tag)
 {
     mLife = tag->getInt(L"Life");
     mLifetime = tag->getInt(L"LifeTime");
+    mEntityData->set(DATA_SHOT_FROM_CROSSBOW, tag->getBoolean(L"ShotAtAngle"), true);
     CompoundTag* itemTag = tag->getCompound(L"FireworksItem");
     if (itemTag != NULL)
     {
@@ -567,6 +628,7 @@ void FireworksRocketEntity::defineSynchedData()
 {
     mEntityData->define(DATA_ITEM, ItemInstance::EMPTY);
     mEntityData->define(DATA_ATTACHED_TO_ENTITY, -1);
+    mEntityData->define(DATA_SHOT_FROM_CROSSBOW, false);
 }
 
 Entity* FireworksRocketEntity::create(Level* level)

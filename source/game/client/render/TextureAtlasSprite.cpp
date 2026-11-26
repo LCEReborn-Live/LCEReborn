@@ -83,6 +83,8 @@ void TextureAtlasSprite::init(Texture* source, std::vector<Texture*>* frames, in
     mU1 = (float)(x + width) / (float)(int)source->getWidth() - e;
     mV0 = (float)y / (float)(int)source->getHeight() + e;
     mV1 = (float)(y + height) / (float)(int)source->getHeight() - e;
+    mUOffset = 0.0625f / source->getWidth();
+    mVOffset = 0.0625f / source->getHeight();
     mUScale = (float)width * 0.0625f;
     mVScale = (float)height * 0.0625f;
     if (mOwnTexture)

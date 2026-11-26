@@ -10,6 +10,7 @@
 #include "game/entity/mob/Entity.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
 #include "game/item/Item.hpp"
+#include "game/item/ItemId.hpp"
 #include "game/item/ItemInstance.hpp"
 #include "game/item/ItemTransform.hpp"
 #include "game/world/block/Block.hpp"
@@ -389,6 +390,15 @@ ItemTransforms* ItemTransforms::getTransforms(const ItemInstance* item, LivingEn
                 ->set_firstperson_righthand(0.0f, -90.0f, 25.0f, 1.13f, 3.2f, 1.13f, 0.68f, 0.68f, 0.68f)
                 ->set_firstperson_lefthand(0.0f, 90.0f, -25.0f, 1.13f, 3.2f, 1.13f, 0.68f, 0.68f, 0.68f);
         return bow;
+    }
+    case ItemId::CROSSBOW:
+    {
+        static ItemTransforms* crossbow = (new ItemTransforms(*GetDefaultTransforms()))
+            ->set_thirdperson_righthand(-90.0f, 0.0f, -45.0f, 1.5f, 0.0f, -2.5f, 0.85f, 0.85f, 0.85f)
+            ->set_thirdperson_lefthand(-90.0f, 0.0f, 45.0f, 1.5f, 0.0f, -2.5f, 0.85f, 0.85f, 0.85f)
+            ->set_firstperson_righthand(-58.0f, 0.0f, -45.0f, 0.0f, 2.0f, -1.0f, 0.65f, 0.65f, 0.65f)
+            ->set_firstperson_lefthand(-58.0f, 0.0f, 45.0f, 0.0f, 2.0f, -1.0f, 0.65f, 0.65f, 0.65f);
+        return crossbow;
     }
     case 397:
     {

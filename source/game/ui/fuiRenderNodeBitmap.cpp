@@ -13,9 +13,9 @@ fuiRenderNodeBitmap::fuiRenderNodeBitmap(fuiRenderNode* parent, fuiRenderNode* r
 {
     fuiBitmap* bitmap = static_cast<fuiBitmap*>(m_object);
     m_bounds.xMin = 0.0f;
-    m_bounds.xMax = (float)bitmap->width;
+    m_bounds.xMax = (float)bitmap->width * file->getBitmapCoordinateScale(bitmap);
     m_bounds.yMin = 0.0f;
-    m_bounds.yMax = (float)bitmap->height;
+    m_bounds.yMax = (float)bitmap->height * file->getBitmapCoordinateScale(bitmap);
 }
 
 fuiRenderNodeBitmap::~fuiRenderNodeBitmap()
@@ -43,23 +43,25 @@ void fuiRenderNodeBitmap::render(fuiRect* bounds, fuiMatrix* matrix)
 
     {
         fuiBitmap* bitmap = static_cast<fuiBitmap*>(m_object);
+        const float width = bitmap->width * m_file->getBitmapCoordinateScale(bitmap);
+        const float height = bitmap->height * m_file->getBitmapCoordinateScale(bitmap);
         float vertices[12];
         vertices[0] = 0.0f;
         vertices[1] = 0.0f;
-        vertices[2] = (float)bitmap->width;
-        vertices[3] = (float)bitmap->height;
+        vertices[2] = width;
+        vertices[3] = height;
         vertices[4] = 0.0f;
-        vertices[5] = (float)bitmap->height;
+        vertices[5] = height;
         vertices[6] = 0.0f;
         vertices[7] = 0.0f;
-        vertices[8] = (float)bitmap->width;
+        vertices[8] = width;
         vertices[9] = 0.0f;
-        vertices[10] = (float)bitmap->width;
-        vertices[11] = (float)bitmap->height;
+        vertices[10] = width;
+        vertices[11] = height;
 
         m_file->initialiseRenderTexture(bitmap, true);
         gRenderer->TextureBind(bitmap->textureId);
-        gRenderer->StateSetTextureScaleUI(1.0f / (float)bitmap->width, 1.0f / (float)bitmap->height, 0.0f, 0.0f);
+        gRenderer->StateSetTextureScaleUI(1.0f / width, 1.0f / height, 0.0f, 0.0f);
 
         const float redMultiply = gFui->m_colorStack[gFui->m_colorDepth].redMultiply;
         const float greenMultiply = gFui->m_colorStack[gFui->m_colorDepth].greenMultiply;

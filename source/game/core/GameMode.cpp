@@ -400,6 +400,8 @@ void GameMode::UpdateCraftAchievements(boost::shared_ptr<Player> player, not_nul
         break;
     }
 
+    if (award == eAward_FruitOnTheLoom)
+        player->awardStat(GenericStats::achievement(award), GenericStats::param_noArgs());
     if (award != eAward_ChangeOfSheets)
         return;
 

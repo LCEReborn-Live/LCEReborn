@@ -1598,6 +1598,7 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::stoneAxe, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::stoneHoe, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::bow, 1, 0)));
+    builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::crossbow, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::ironHelmet, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::ironChestplate, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::ironLeggings, 1, 0)));

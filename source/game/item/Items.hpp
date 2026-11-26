@@ -19,6 +19,7 @@ public:
     static Item* flintAndSteel;
     static Item* apple;
     static Item* bow;
+    static Item* crossbow;
     static Item* arrow;
     static Item* spectralArrow;
     static Item* tippedArrow;

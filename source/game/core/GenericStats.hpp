@@ -114,7 +114,24 @@ enum eAward
     eAward_Moskstraumen = 93,
     eAward_Castaway = 94,
     eAward_SleepWithTheFishes = 95,
-    eAward_Echolocation = 96
+    eAward_Echolocation = 96,
+    eAward_DoABarrelRoll = 97,
+    eAward_MarineBiologist = 98,
+    eAward_Ahoy = 99,
+    eAward_TopOfTheWorld = 100,
+    eAward_WhereHaveYouBeen = 101,
+    eAward_Zoologist = 102,
+    eAward_Atlantis = 103,
+    eAward_OrganizationalWizard = 104,
+    eAward_FruitOnTheLoom = 105,
+    eAward_PlethoraOfCats = 106,
+    eAward_SailThe7Seas = 107,
+    eAward_BuyLowSellHigh = 108,
+    eAward_Disenchanted = 109,
+    eAward_BadFeeling = 110,
+    eAward_KillTheBeast = 111,
+    eAward_SoundTheAlarm = 112,
+    eAward_WereBeingAttacked = 113
 };
 
 class GenericStats;
@@ -127,6 +144,7 @@ public:
     virtual Stat* get_stat(int id) = 0;
 
     static Stat* openInventory();
+    static Stat* achievement(eAward award) { return gStats->get_achievement(award); }
     static Stat* mineBlock() { return gStats->get_totalBlocksMined(); }
     static Stat* tamedEntity(unsigned long long entityType) { return gStats->get_tamedEntity(entityType); }
     static Stat* shearedEntity(unsigned long long entityType) { return gStats->get_shearedEntity(entityType); }

@@ -76,6 +76,9 @@ public:
     ePickup getPickup() const { return mPickup; }
 
 protected:
+    virtual bool canHitEntity(const boost::shared_ptr<Entity>& entity);
+    virtual bool canPierceEntities() const { return false; }
+
     friend class ArrowRenderer;
     friend class TntBlock;
 

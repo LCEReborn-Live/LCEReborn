@@ -1,10 +1,12 @@
 #include "game/client/render/TextureAtlas.hpp"
+#include "game/client/render/CrossbowSprites.hpp"
 #include "game/core/EntityType.hpp"
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include "game/core/ClockAtlasSprite.hpp"
+#include "game/core/BufferedImage.hpp"
 #include "game/core/CompassAtlasSprite.hpp"
 #include "game/core/Minecraft.hpp"
 #include "game/core/MemSect.hpp"
@@ -18,10 +20,46 @@
 #include "game/world/generation/GlideRingGenerator.hpp"
 #if LCE_PLATFORM_PC
 #include "game/client/render/TextureUtil.hpp"
-#include "game/core/BufferedImage.hpp"
 #endif
 
 static std::wstring MISSING_ICON_NAME(L"missingno");
+
+#if LCE_PLATFORM_PC
+static void applyCrossbowResourceOverrides(BufferedImage& image, int width, int height)
+{
+    const char* const paths[] = {
+        "/vol/resources/crossbow/crossbow_standby.png",
+        "/vol/resources/crossbow/crossbow_pulling_1.png",
+        "/vol/resources/crossbow/crossbow_pulling_2.png",
+        "/vol/resources/crossbow/crossbow_arrow.png",
+        "/vol/resources/crossbow/crossbow_firework.png",
+    };
+    int column = 2;
+    for (const char* path : paths)
+    {
+        int iconWidth = 0;
+        int iconHeight = 0;
+        int* pixels = nullptr;
+        if (TextureUtil::LoadTextureData(path, &iconWidth, &iconHeight, &pixels) == 0
+            && pixels != nullptr && iconWidth > 0 && iconHeight > 0)
+        {
+            for (int mip = 0; mip < 5 && image.getData(mip) != nullptr; ++mip)
+            {
+                const int atlasWidth = width >> mip;
+                const int cellWidth = atlasWidth / 16;
+                const int cellHeight = cellWidth;
+                int* atlas = image.getData(mip);
+                for (int y = 0; y < cellHeight; ++y)
+                    for (int x = 0; x < cellWidth; ++x)
+                        atlas[(16 * cellHeight + y) * atlasWidth + column * cellWidth + x] =
+                            pixels[(y * iconHeight / cellHeight) * iconWidth + x * iconWidth / cellWidth];
+            }
+        }
+        std::free(pixels);
+        ++column;
+    }
+}
+#endif
 
 TextureAtlas::TextureAtlas(int iconType, const std::wstring& name, const std::wstring& path, BufferedImage* image,
                            bool singleImage)
@@ -39,6 +77,7 @@ TextureAtlas::TextureAtlas(int iconType, const std::wstring& name, const std::ws
 
 void TextureAtlas::addIcon(bool singleImage, int x, int y, const std::wstring& name)
 {
+    mSpriteCells[name] = SpriteCell(y, x);
     const float vScale = singleImage ? 0.029411765f : 0.05882353f;
     const float scale = 0.0625f;
     const float vOffset = singleImage ? 544.0f : 272.0f;
@@ -50,6 +89,7 @@ void TextureAtlas::addIcon(bool singleImage, int x, int y, const std::wstring& n
 void TextureAtlas::addIconWithName(bool singleImage, int x, int y, const std::wstring& name,
                                    const std::wstring& spriteName)
 {
+    mSpriteCells[name] = SpriteCell(y, x);
     const float vScale = singleImage ? 0.029411765f : 0.05882353f;
     const float scale = 0.0625f;
     const float vOffset = singleImage ? 544.0f : 272.0f;
@@ -60,6 +100,7 @@ void TextureAtlas::addIconWithName(bool singleImage, int x, int y, const std::ws
 
 void TextureAtlas::addIconSize(bool singleImage, int x, int y, const std::wstring& name, int width, int height)
 {
+    mSpriteCells[name] = SpriteCell(y, x, width, height);
     const float vScale = singleImage ? 0.029411765f : 0.05882353f;
     const float scale = 0.0625f;
     const float vOffset = singleImage ? 544.0f : 272.0f;
@@ -339,6 +380,12 @@ void TextureAtlas::loadUVs()
 #if LCE_PLATFORM_PC
         addIcon(false, 16, 1, L"experimental_shield");
 #endif
+        addIcon(false, 16, 2, L"crossbow");
+        addIcon(false, 16, 2, L"crossbow_pulling_0");
+        addIcon(false, 16, 3, L"crossbow_pulling_1");
+        addIcon(false, 16, 4, L"crossbow_pulling_2");
+        addIcon(false, 16, 5, L"crossbow_arrow");
+        addIcon(false, 16, 6, L"crossbow_rocket");
         addIcon(false, 16, 7, L"kelp");
         addIcon(false, 16, 8, L"dried_kelp");
         addIcon(false, 16, 9, L"sea_pickle");
@@ -1029,10 +1076,20 @@ void TextureAtlas::stitch()
         height = image->getHeight();
         width = image->getWidth();
     }
+    const int cellSize = width / 16;
+    const bool extendedItems = mIconType == 1 && cellSize > 0 && height >= 18 * cellSize;
+    if (mIconType == 1 && !extendedItems)
+    {
+        for (int mip = 0; mip < 5 && image->getData(mip) != nullptr; ++mip)
+            CrossbowSprites::draw(image->getData(mip), width >> mip, height >> mip);
+#if LCE_PLATFORM_PC
+        applyCrossbowResourceOverrides(*image, width, height);
+#endif
+    }
 #if LCE_PLATFORM_PC
     // Place the test icon in an unused cell of the item atlas without changing
     // the user's texture pack. Scale to the selected atlas resolution.
-    if (mIconType == 1 && width >= 256 && height >= 272)
+    if (mIconType == 1 && !extendedItems && width >= 256 && height >= 17 * cellSize)
     {
         int iconWidth = 0, iconHeight = 0;
         int* iconPixels = NULL;
@@ -1041,7 +1098,7 @@ void TextureAtlas::stitch()
             iconPixels != NULL && iconWidth > 0 && iconHeight > 0)
         {
             const int cellWidth = width / 16;
-            const int cellHeight = height / 17;
+            const int cellHeight = cellWidth;
             int* atlas = image->getData();
             for (int y = 0; y < cellHeight; ++y)
                 for (int x = 0; x < cellWidth; ++x)
@@ -1064,11 +1121,20 @@ void TextureAtlas::stitch()
          ++it)
     {
         TextureAtlasSprite* sprite = it->second;
-        int x = (int)(sprite->getU0(false) * mStitchedTexture->getWidth());
-        int y = (int)(sprite->getV0(false) * mStitchedTexture->getHeight());
-        int width = (int)(sprite->getU1(false) * mStitchedTexture->getWidth()) - x;
-        int height = (int)(sprite->getV1(false) * mStitchedTexture->getHeight()) - y;
-        sprite->init(mStitchedTexture, 0, x, y, width, height, false);
+        SpriteCell cell = mSpriteCells[it->first];
+        // Keep grid coordinates independent of UVs so switching between atlas
+        // heights cannot accumulate offsets. TU80 includes native crossbows.
+        if (extendedItems && cell.row == 16 && cell.column >= 2 && cell.column <= 6
+            && it->first.compare(0, 8, L"crossbow") == 0)
+        {
+            const int columns[] = {5, 7, 8, 9, 10};
+            cell.column = columns[cell.column - 2];
+            if (it->first == L"crossbow_pulling_0")
+                cell.column = 6;
+            cell.row = 17;
+        }
+        sprite->init(mStitchedTexture, 0, cell.column * cellSize, cell.row * cellSize,
+                     cell.width * cellSize, cell.height * cellSize, false);
     }
     MemSect(52);
     for (boost::unordered_map<std::wstring, TextureAtlasSprite*>::iterator it = mSprites.begin(); it != mSprites.end();

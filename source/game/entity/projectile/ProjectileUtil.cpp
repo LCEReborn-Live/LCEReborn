@@ -35,6 +35,7 @@ HitResult* ProjectileUtil::forwardsRaycast(const boost::shared_ptr<Entity>& enti
         }
 
         boost::shared_ptr<Entity> hitEntity;
+        Vec3* nearestContact = nullptr;
         double nearestDistance = 0.0;
 
         AABB* searchBox = entity->mBoundingBox->expand(xd, yd, zd)->grow(1.0);
@@ -57,7 +58,7 @@ HitResult* ProjectileUtil::forwardsRaycast(const boost::shared_ptr<Entity>& enti
                 for (std::vector<boost::shared_ptr<Entity> >::const_iterator ignoredIt = ignoredEntities->begin();
                      ignoredIt != ignoredEntities->end(); ++ignoredIt)
                 {
-                    if (candidate->is(*ignoredIt))
+                    if (*ignoredIt && candidate->is(*ignoredIt))
                     {
                         ignored = true;
                         break;
@@ -111,13 +112,16 @@ HitResult* ProjectileUtil::forwardsRaycast(const boost::shared_ptr<Entity>& enti
                 {
                     hitEntity = candidate;
                     nearestDistance = distance;
+                    nearestContact = candidateHit->mLocation;
                 }
+                delete candidateHit;
             }
         }
 
         if (hitEntity)
         {
-            hitResult = new HitResult(hitEntity);
+            delete hitResult;
+            hitResult = new HitResult(hitEntity, nearestContact);
         }
     }
 

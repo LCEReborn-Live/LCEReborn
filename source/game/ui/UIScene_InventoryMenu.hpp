@@ -34,6 +34,7 @@ public:
     virtual std::wstring getMoviePath();
     virtual void handleReload();
     virtual UIControl* getSection(IUIScene_AbstractContainerMenu::ESceneSection section);
+    virtual void render(int width, int height, C4JRender::eViewportType viewport);
     virtual void customDraw(const char* name, fuiRect* rect);
     virtual void handleTimerComplete(int timerId);
     virtual int getSceneType();

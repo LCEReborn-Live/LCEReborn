@@ -83,6 +83,8 @@ void TridentItem::releaseUsing(not_null_ptr<ItemInstance> itemInstance, Level* l
         float speed = 0.25f * ((float)riptide + 1.0f) * 3.0f / length;
 
         player->startSpinAttack();
+        if (!level->mIsClientSide)
+            player->awardStat(GenericStats::achievement(eAward_DoABarrelRoll), GenericStats::param_noArgs());
 
         if (player->mOnGround)
         {

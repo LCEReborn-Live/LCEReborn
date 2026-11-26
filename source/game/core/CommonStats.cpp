@@ -476,6 +476,8 @@ Stat* CommonStats::get_achievement(eAward award)
     case 96:
         return Achievements::echolocation;
     default:
+        if (award >= Achievements::TU80_FIRST && award < Achievements::TU80_FIRST + Achievements::TU80_COUNT)
+            return Achievements::tu80[award - Achievements::TU80_FIRST];
         return NULL;
     }
 }

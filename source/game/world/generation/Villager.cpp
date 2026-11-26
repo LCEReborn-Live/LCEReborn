@@ -368,6 +368,13 @@ void Villager::staticCtor()
         new ItemForEmeralds(Items::bow, PriceRange(2, 3)),
         new ItemAndEmeraldToItem(Item::byBlock(Blocks::gravel), PriceRange(10, 10), Items::flint, PriceRange(6, 10))};
     career.push_back(arrayWithLength<ItemListing*>(fletcherTier2, 2));
+
+    static ItemListing* fletcherTier3[] = {new ItemForEmeralds(Items::crossbow, PriceRange(3, 3))};
+    career.push_back(arrayWithLength<ItemListing*>(fletcherTier3, 1));
+
+    static ItemListing* fletcherTier4[] = {new EnchantedItemForEmeralds(Items::crossbow, PriceRange(7, 22))};
+    career.push_back(arrayWithLength<ItemListing*>(fletcherTier4, 1));
+
     profession.push_back(career);
     career.clear();
 

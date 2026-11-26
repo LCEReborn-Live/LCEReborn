@@ -125,8 +125,9 @@ void fuiRenderNodeShape::render(fuiRect* bounds, fuiMatrix* matrix)
                     }
                     else
                     {
-                        float width = (float)bitmap->width;
-                        float height = (float)bitmap->height;
+                        const float coordinateScale = m_file->getBitmapCoordinateScale(bitmap);
+                        float width = (float)bitmap->width * coordinateScale;
+                        float height = (float)bitmap->height * coordinateScale;
                         gRenderer->StateSetTextureScaleUI(1.0f / width, 1.0f / height,
                                                           -(component->bitmapMatrix.translateX / width),
                                                           -(component->bitmapMatrix.translateY / height));

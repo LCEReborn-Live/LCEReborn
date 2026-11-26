@@ -35,6 +35,8 @@
 #include "game/item/BookItem.hpp"
 #include "game/item/BottleItem.hpp"
 #include "game/item/BowItem.hpp"
+#include "game/item/CrossbowItem.hpp"
+#include "game/item/ItemId.hpp"
 #include "game/item/BowlFoodItem.hpp"
 #include "game/item/BucketItem.hpp"
 #include "game/item/CarrotOnAStickItem.hpp"
@@ -2340,6 +2342,7 @@ void Item::staticCtor()
                  (new FireworksItem())
                      ->setIconName(L"fireworks")
                      ->setBaseItemTypeAndMaterial(44, 0)
+                     ->setAllowOffhand(true)
                      ->setDescriptionId(IDS_FIREWORKS, IDS_DESC_FIREWORKS));
 
     registerItem(402, L"firework_charge",
@@ -2693,6 +2696,8 @@ void Item::staticCtor()
                  (new Item())
                      ->setIconName(L"phantom_membrane")
                      ->setDescriptionId(IDS_ITEM_PHANTOM_MEMBRANE, IDS_DESC_PHANTOM_MEMBRANE));
+
+    registerItem(ItemId::CROSSBOW, L"crossbow", new CrossbowItem());
 
     registerItem(2255, L"debug_fourj_item", (new DebugFourjItem())->setIconName(L"barrier"));
 

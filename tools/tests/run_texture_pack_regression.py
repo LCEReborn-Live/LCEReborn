@@ -20,11 +20,15 @@ def main():
     parser.add_argument("--build-dir", type=Path, default=root / "build/game-ninja")
     parser.add_argument("--resource-dir", type=Path, default=root / "resources/pc")
     parser.add_argument("--packs-dir", type=Path, default=root / "packs")
+    parser.add_argument("--check-header", type=Path, default=root / "tools/tests/texture_pack_runtime_check.hpp")
+    parser.add_argument("--check-function", default="RunTexturePackRegression")
+    parser.add_argument("--completion-marker", default="PASS: Old Textures / 1.14 switching and original cave spider pixels")
+    parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
     if os.name != "nt":
         parser.error("this runner requires a native Windows Ninja/clang-cl build")
     build = args.build_dir.resolve()
-    out = build.parent / "texture-pack-regression"
+    out = args.output_dir.resolve() if args.output_dir else build.parent / "texture-pack-regression"
     out.mkdir(exist_ok=True)
     ninja = (build / "build.ninja").read_text()
     cache = (build / "CMakeCache.txt").read_text()
@@ -43,10 +47,10 @@ def main():
     block = re.search(r"build " + re.escape(key) + r": [^\n]+\n(?:  [^\n]*\n)*", ninja).group(0)
     flags = dict(re.findall(r"^  (\w+) = (.*)$", block, re.M))
     source = (root / "source/platform/pc/Main.cpp").read_text()
-    include = (root / "tools/tests/texture_pack_runtime_check.hpp").as_posix()
+    include = args.check_header.resolve().as_posix()
     source = source.replace("static const Logger sLog", '#include "' + include + '"\n\nstatic const Logger sLog', 1)
     source = source.replace("    Minecraft::main();",
-                            "    Minecraft::main();\n    gApp.InitGameSettings();\n    return RunTexturePackRegression();", 1)
+                            "    Minecraft::main();\n    gApp.InitGameSettings();\n    return " + args.check_function + "();", 1)
     cpp, obj, rsp = (out / name for name in ("main.cpp", "main.obj", "compile.rsp"))
     cpp.write_text(source, encoding="utf-8")
     rsp.write_text("/nologo -TP " + " ".join(flags[name] for name in ("DEFINES", "INCLUDES", "FLAGS"))
@@ -82,7 +86,7 @@ def main():
     print(result.stdout[-4000:] + result.stderr[-1000:])
     # FatalLoadError currently exits with status 0, so require the final
     # assertion marker as well as a successful process exit.
-    completed = "PASS: Old Textures / 1.14 switching and original cave spider pixels" in result.stdout
+    completed = args.completion_marker in result.stdout
     return 0 if result.returncode == 0 and completed and "/FATAL]" not in result.stdout else 1
 
 

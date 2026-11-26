@@ -8,6 +8,9 @@ class Achievements
 public:
     static void staticCtor();
     static void init();
+    static const int TU80_FIRST = 97;
+    static const int TU80_COUNT = 17;
+    static Achievement* tu80[TU80_COUNT];
 
     static Achievement* openInventory;
     static Achievement* mineWood;

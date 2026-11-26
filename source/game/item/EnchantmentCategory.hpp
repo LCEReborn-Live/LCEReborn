@@ -23,6 +23,7 @@ public:
     static const EnchantmentCategory* BOW;
     static const EnchantmentCategory* WEARABLE;
     static const EnchantmentCategory* TRIDENT;
+    static const EnchantmentCategory* CROSSBOW;
 
     EnchantmentCategory();
 

@@ -16,6 +16,26 @@ const wchar_t* ExtraString(int id)
     case IDS_LCE_ITEM_SHIELD:
     case IDS_LCE_DESC_SHIELD:
         return LocalizedShieldString(XGetLanguage(), id == IDS_LCE_DESC_SHIELD);
+    case IDS_LCE_ITEM_CROSSBOW:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Арбалет" : L"Crossbow";
+    case IDS_LCE_DESC_CROSSBOW:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN
+            ? L"Удерживайте кнопку, чтобы натянуть тетиву, затем отпустите. Нажмите ещё раз, чтобы выстрелить."
+            : L"Hold to draw, then release to load. Use again to shoot.";
+    case IDS_LCE_CROSSBOW_DRAW:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Натянуть тетиву" : L"Draw Crossbow";
+    case IDS_LCE_CROSSBOW_LOAD:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Отпустить для зарядки" : L"Release to Load";
+    case IDS_LCE_CROSSBOW_FIRE:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Выстрелить" : L"Fire Crossbow";
+    case IDS_LCE_CROSSBOW_PROJECTILE:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Снаряд:" : L"Projectile:";
+    case IDS_LCE_ENCHANTMENT_MULTISHOT:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Тройной выстрел" : L"Multishot";
+    case IDS_LCE_ENCHANTMENT_QUICK_CHARGE:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Быстрая перезарядка" : L"Quick Charge";
+    case IDS_LCE_ENCHANTMENT_PIERCING:
+        return XGetLanguage() == XC_LANGUAGE_RUSSIAN ? L"Пронзание" : L"Piercing";
     case IDS_LCE_CHAT:
         return L"Chat";
     case IDS_LCE_CHAT_SEND:

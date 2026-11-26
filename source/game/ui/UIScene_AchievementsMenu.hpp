@@ -26,7 +26,7 @@ class UIScene_AchievementsMenu : public UIScene
 public:
     enum
     {
-        DISPLAY_COUNT = 93
+        DISPLAY_COUNT = 110
     };
     static const int sDisplayList[DISPLAY_COUNT];
     UIScene_AchievementsMenu(int type, void* data, UILayer* layer);

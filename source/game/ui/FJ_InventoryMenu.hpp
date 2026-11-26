@@ -21,9 +21,11 @@ public:
     void AddEffect(int effect, const std::wstring& name, int duration);
     unsigned int UpdateEffects(int count, int* effects);
     void ShowArmorSlot(int slot, bool visible);
+    void ShowOffhandSlotIcon(bool visible);
 
 private:
     FJ_FuiNode* m_armorSlots[4];
+    fuiRenderNode* m_offhandSlotIcon;
     FJ_FuiNode* m_effectNodes[27];
     unsigned char m_effectActive[27];
     unsigned char m_effectRefreshed[27];

@@ -25,7 +25,9 @@ public:
         eArmPose_Item = 1,
         eArmPose_Block = 2,
         eArmPose_BowAndArrow = 3,
-        eArmPose_ThrowSpear = 4
+        eArmPose_ThrowSpear = 4,
+        eArmPose_CrossbowCharge,
+        eArmPose_CrossbowHold
     };
 
     enum animbits
@@ -119,6 +121,7 @@ public:
     bool mEating;
     bool mSwimming;
     float mSpearThrowProgress;
+    float mCrossbowChargeProgress;
     float mUseItemRemainingTicks;
     float mUseItemProgress;
     _SkinAdjustments mSkinAdjustments;

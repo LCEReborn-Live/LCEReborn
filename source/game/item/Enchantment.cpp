@@ -1,4 +1,5 @@
 #include "game/item/Enchantment.hpp"
+#include "game/core/ExtraStrings.hpp"
 
 #include <string>
 #include <vector>
@@ -194,6 +195,39 @@ bool Enchantment::isCurse()
     return false;
 }
 
+namespace
+{
+class CrossbowEnchantment : public Enchantment
+{
+public:
+    CrossbowEnchantment(const Rarity* rarity, arrayWithLength<const EquipmentSlot*> slots,
+                        int description, int maxLevel, int baseCost, int costStep)
+        : Enchantment(rarity, EnchantmentCategory::CROSSBOW, slots),
+          mMaxLevel(maxLevel),
+          mBaseCost(baseCost),
+          mCostStep(costStep)
+    {
+        setDescriptionId(description);
+    }
+
+    int getMaxLevel() override { return mMaxLevel; }
+    int getMinCost(int level) override { return mBaseCost + mCostStep * (level - 1); }
+    int getMaxCost(int) override { return 50; }
+
+    bool checkCompatibility(const Enchantment* other) const override
+    {
+        const bool multishotWithPiercing = mDescriptionId == IDS_LCE_ENCHANTMENT_MULTISHOT
+            && other == Enchantment::byName(L"piercing");
+        return !multishotWithPiercing && Enchantment::checkCompatibility(other);
+    }
+
+private:
+    int mMaxLevel;
+    int mBaseCost;
+    int mCostStep;
+};
+}
+
 void Enchantment::staticCtor()
 {
     arrayWithLength<const EquipmentSlot*> armorSlots(4, true);
@@ -297,4 +331,11 @@ void Enchantment::staticCtor()
                                          new TridentLoyaltyEnchantment(Rarity::COMMON, mainHandSlots));
     enchantmentRegistry->registerMapping(83, ResourceLocation(L"channeling"),
                                          new TridentChannelingEnchantment(Rarity::EPIC, mainHandSlots));
+
+    enchantmentRegistry->registerMapping(84, ResourceLocation(L"multishot"),
+        new CrossbowEnchantment(Rarity::RARE, mainHandSlots, IDS_LCE_ENCHANTMENT_MULTISHOT, 1, 20, 0));
+    enchantmentRegistry->registerMapping(85, ResourceLocation(L"quick_charge"),
+        new CrossbowEnchantment(Rarity::UNCOMMON, mainHandSlots, IDS_LCE_ENCHANTMENT_QUICK_CHARGE, 3, 12, 20));
+    enchantmentRegistry->registerMapping(86, ResourceLocation(L"piercing"),
+        new CrossbowEnchantment(Rarity::COMMON, mainHandSlots, IDS_LCE_ENCHANTMENT_PIERCING, 4, 1, 10));
 }

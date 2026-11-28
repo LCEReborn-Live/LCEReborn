@@ -329,14 +329,19 @@ BufferedImage* Textures::readImage(_TEXTURE_NAME textureName, const std::wstring
     bool useBaseLayout = !useSelected || dynamic_cast<DefaultTexturePack*>(pack) != NULL;
     if (useBaseLayout && !IsOriginalImage(textureName, name) && !titleUpdate)
         imageName = L"1_2_2/" + name;
-    if (useBaseLayout && isVillageUpdateTexture(name) && !File(path + L"res/" + imageName + L".png").isFile())
+    if (isVillageUpdateTexture(name)
+        && (!pack->getDLCPack() || !pack->hasFile(L"res/" + imageName, false)))
     {
-        auto* image = new BufferedImage(16, 16, 0);
-        for (int y = 0; y < 16; ++y)
-            for (int x = 0; x < 16; ++x)
-                image->getData()[y * 16 + x] = (x < 8) == (y < 8) ? 0xff000000 : 0xffff00ff;
-        MemSect(0);
-        return image;
+        const std::wstring basePath = path.empty() ? pack->TexturePack::getPath(titleUpdate, nullptr) : path;
+        if (!File(basePath + L"res/" + imageName + L".png").isFile())
+        {
+            auto* image = new BufferedImage(16, 16, 0);
+            for (int y = 0; y < 16; ++y)
+                for (int x = 0; x < 16; ++x)
+                    image->getData()[y * 16 + x] = (x < 8) == (y < 8) ? 0xff000000 : 0xffff00ff;
+            MemSect(0);
+            return image;
+        }
     }
     BufferedImage* image = pack->getImageResource(imageName, false, titleUpdate, path);
     MemSect(0);

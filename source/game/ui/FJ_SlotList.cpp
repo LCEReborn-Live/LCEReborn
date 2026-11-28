@@ -32,6 +32,13 @@ float FJ_SlotList::getHeight()
     return FJ_FuiNode::getHeight();
 }
 
+void FJ_SlotList::configureGrid(int columns, int rows, int slotSize)
+{
+    m_slotSize = slotSize;
+    setWidth(static_cast<float>(columns * slotSize));
+    setHeight(static_cast<float>(rows * slotSize));
+}
+
 void FJ_SlotList::Init()
 {
     if (m_loaded)

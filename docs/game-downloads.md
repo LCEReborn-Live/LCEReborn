@@ -30,6 +30,22 @@ removed from `downloads/game-files` after a successful import; the installed
 `assets` directory and saves are separate. The downloader checks free space for
 both extraction and the subsequent import.
 
+## Village & Pillage resources
+
+The PC packages run with the standard Wii U data installed by the launcher.
+For the PlayStation 4 textures, models, and menus, prepare a separate copy of
+that data and import the `Common` folder from your PS4 1.95 update dump.
+
+```sh
+python tools/import_common_update.py --common /path/to/ps4-update/Common \
+    --assets /path/to/prepared/assets --backup-dir /path/to/tu80-backup
+```
+
+The `tools/import_tu80_ui.py` and `tools/import_tu80_sounds.py` tools adapt
+the PS4 menus and sound bank for PC. Use `--help` for their input paths.
+The client and server can load optional local structure templates from
+`assets/custom-villages`. See [local templates](custom-village-templates.md).
+
 ## Verification
 
 Run `node --test tools/tests/game_download_test.mjs` on Windows or Linux. It

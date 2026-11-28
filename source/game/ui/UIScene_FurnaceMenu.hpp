@@ -50,6 +50,7 @@ private:
     bool mGrindstone = false;
     bool mStonecutter = false;
     bool mLoom = false;
+    bool m_useLoomMovie = false;
     bool m_useStonecutterMovie = false;
     bool m_useWorkstationMovie = false;
     boost::shared_ptr<Container> m_container;

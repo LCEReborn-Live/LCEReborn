@@ -30,6 +30,7 @@ public:
     virtual unsigned int getType();
     float getWidth();
     float getHeight();
+    void configureGrid(int columns, int rows, int slotSize);
     void Init();
     void Clear();
     void addSlot(int slot, bool highlighted, bool visible);

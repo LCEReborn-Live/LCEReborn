@@ -110,7 +110,9 @@ std::vector<Texture*>* TextureManager::createTextures(const std::wstring& path, 
         texturePack = Minecraft::GetInstance()->mTexturePackRepository->defaultTexturePack;
     }
     // Animation frames are optional when the atlas already has a static sprite.
-    if (!texturePack->getDLCPack() && !File(packPath + L"res/" + path + L".png").isFile())
+    const std::wstring basePath = packPath.empty() ? texturePack->TexturePack::getPath(true, nullptr) : packPath;
+    if ((!texturePack->getDLCPack() || !texturePack->hasFile(L"res/" + path, false))
+        && !File(basePath + L"res/" + path + L".png").isFile())
     {
         MemSect(0);
         return textures;

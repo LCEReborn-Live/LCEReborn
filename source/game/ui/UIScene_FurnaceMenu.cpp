@@ -22,6 +22,7 @@
 #include "game/network/ClientboundContainerOpenPacket.hpp"
 #include "game/minigame/Tutorial.hpp"
 #include "game/ui/FurnaceMenu.hpp"
+#include "game/ui/FJ_SlotList.hpp"
 #include "game/ui/CartographyMenu.hpp"
 #include "game/ui/GrindstoneMenu.hpp"
 #include "game/ui/StonecutterMenu.hpp"
@@ -462,7 +463,7 @@ void UIScene_FurnaceMenu::setSectionSelectedSlot(IUIScene_AbstractContainerMenu:
 unsigned int UIScene_FurnaceMenu::mapElementsAndNames()
 {
     UIScene_AbstractContainerMenu::mapElementsAndNames();
-    if (m_useStonecutterMovie || mLoom)
+    if (m_useStonecutterMovie || m_useLoomMovie)
     {
         auto* panel = m_mainPanel.getFuiRenderNode();
         m_ingredientSlot.setupControl(this, panel, mLoom ? "Inputs" : "Material");
@@ -548,6 +549,30 @@ unsigned int UIScene_FurnaceMenu::mapElementsAndNames()
         }
         currentNode = parentNode;
     }
+    if (mLoom)
+    {
+        const bool split = gApp.GetLocalPlayerCount() > 1;
+        const int pitch = split ? 26 : 42;
+        auto* inputs = m_ingredientSlot.getFuiRenderNode()->getFuiNode()->asFJ_SlotList();
+        inputs->configureGrid(LoomMenu::InputCount, 1, pitch);
+        inputs->setX(split ? 15 : 25);
+        inputs->setY(split ? 47 : 67);
+        auto* patterns = m_fuelSlot.getFuiRenderNode()->getFuiNode()->asFJ_SlotList();
+        patterns->configureGrid(LoomMenu::PatternSlotCount, 1, pitch);
+        patterns->setX(inputs->getX());
+        patterns->setY(split ? 100 : 129);
+        auto* result = m_resultSlot.getFuiRenderNode()->getFuiNode();
+        result->setX(split ? 211 : 336);
+        result->setY(split ? 44 : 60);
+        auto* inputLabel = m_ingredientLabel.getFuiRenderNode()->getFuiNode();
+        inputLabel->setX(inputs->getX());
+        inputLabel->setY(split ? 28 : 43);
+        auto* patternLabel = m_fuelLabel.getFuiRenderNode()->getFuiNode();
+        patternLabel->setX(patterns->getX());
+        patternLabel->setY(split ? 82 : 108);
+        m_furnaceFire.setVisible(false);
+        m_furnaceArrow.setVisible(false);
+    }
     return 1;
 }
 
@@ -555,7 +580,11 @@ std::wstring UIScene_FurnaceMenu::getMoviePath()
 {
     const bool split = gApp.GetLocalPlayerCount() > 1;
     if (mLoom)
-        return split ? L"LoomMenuSplit" : L"LoomMenu";
+    {
+        const std::wstring movie = split ? L"LoomMenuSplit" : L"LoomMenu";
+        m_useLoomMovie = gApp.hasArchiveFile(movie + (gRenderer->IsWidescreen() ? L"720.fui" : L"480.fui"), false);
+        return m_useLoomMovie ? movie : split ? L"FurnaceMenuSplit" : L"FurnaceMenu";
+    }
     if (mStonecutter)
     {
         const std::wstring movie = split ? L"StonecutterMenuSplit" : L"StonecutterMenu";

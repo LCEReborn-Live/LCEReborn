@@ -8,7 +8,7 @@ variants, -fimplicit-templates where the Makefiles ask for it), the generic loca
 newlib OS sources configure selects for powerpc-eabi. The EDG runtime has no sized operator delete, so the C++14 and later
 units are built without sized deallocation. RTTI support, operator new/delete and the
 type_info class come from the EDG runtime (source/cafe/libsedg); of libsupc++ only the exception classes,
-the new handler and the nothrow operator new are built; std::uncaught_exception, which libsupc++ reads from
+byte hashing, the new handler and the nothrow operator new are built; std::uncaught_exception, which libsupc++ reads from
 the Itanium unwinder's globals, comes from tools/redhills/runtime (no exception is ever in flight). The string ABI default comes from c++config.h, as in GCC's build, so units such as locale-inst.cc
 that select the COW ABI when nothing else did still do.
 
@@ -154,6 +154,7 @@ UNITS = [
     ('wstring-inst', C11 + 'wstring-inst.cc', 'gnu++11', []),
     ('wstring-io-inst', C11 + 'wstring-io-inst.cc', 'gnu++11', []),
     ('eh_exception', 'libsupc++/eh_exception.cc', SUPC, []),
+    ('hash_bytes', 'libsupc++/hash_bytes.cc', SUPC, []),
     ('bad_alloc', 'libsupc++/bad_alloc.cc', SUPC, []),
     ('bad_array_length', 'libsupc++/bad_array_length.cc', SUPC, []),
     ('bad_array_new', 'libsupc++/bad_array_new.cc', SUPC, []),

@@ -317,7 +317,7 @@ int SendConsoleRequest(const char* url, bool post, const std::string& body,
         wire.append(buffer, static_cast<size_t>(count));
         const auto parsed = lcenet::ParseHttpResponse(wire, kMaxSkinResponse, responseStatus, response);
         if (parsed == lcenet::HttpParse::Complete) { curlResult = CURLE_OK; return 0; }
-        if (parsed == lcenet::HttpParse::Invalid) { curlResult = CURLE_WEIRD_SERVER_REPLY; return 0; }
+        if (parsed == lcenet::HttpParse::Invalid) { curlResult = CURLE_FTP_WEIRD_SERVER_REPLY; return 0; }
     }
     curlResult = CURLE_OPERATION_TIMEDOUT;
     return 0;

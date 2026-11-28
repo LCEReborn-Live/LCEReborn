@@ -135,9 +135,11 @@ class Build:
                          '-I' + str(third_party.stb), '-I' + str(third_party.zlib),
                          '-I' + str(third_party.libpng_wiiu), '-I' + str(third_party.libpng),
                          '-I' + str(third_party.rapidxml), '-I' + str(third_party.bearssl / 'inc')]
-        # The semantic flags of the original game build plus the wut toolchain macros.
+        # Match the shared game's C++14 requirement while retaining the Cafe runtime ABI.
+        # The EDG runtime has no sized operator delete (see build_libstdcxx.py).
         self.game_flags = TARGET + [
-            '-std=gnu++11', '-fshort-wchar', '-fsigned-char', '-frtti', '-fno-exceptions', '-fno-threadsafe-statics',
+            '-std=gnu++14', '-fno-sized-deallocation', '-fshort-wchar', '-fsigned-char', '-frtti',
+            '-fno-exceptions', '-fno-threadsafe-statics',
             '-w', '-Wno-c++11-narrowing', '-nostdinc++', '-nostdlibinc'] + SEMANTIC + game_includes + [
             '-isystem', str(third_party.boost), '-isystem', str(ROOT / 'tools/redhills/include'),
             '-isystem', str(cxx_include), '-isystem', str(cxx_include / 'powerpc-eabi'),

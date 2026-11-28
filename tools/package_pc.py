@@ -585,9 +585,9 @@ def readme_text(source, glibc):
                       source["repository"], source["commit"], disclaimers))
 
 
-def check_names(entries):
+def check_names(entries, verified_assets=()):
     for arcname, _ in entries:
-        if not ALLOWED_NAME.search(os.path.basename(arcname)):
+        if arcname not in verified_assets and not ALLOWED_NAME.search(os.path.basename(arcname)):
             raise PackageError("Refusing to package %s: not a program, library, image or text file" % arcname)
 
 
@@ -671,6 +671,9 @@ def package(build, allow_dirty, appimage=True):
     appimage = appimage and LINUX
     tools = appimage_tools() if appimage else None
     files, qt_files = program_files(build)
+    # program_files has already checked these files against the asset manifest.
+    # Keep the normal extension restriction for everything outside that bundle.
+    verified_assets = {name for _, name in files if name.startswith("assets/")}
     qt = qt_notices(build, qt_files)
     game = game_components(build)
     launcher = launcher_components(qt_files)
@@ -690,7 +693,7 @@ def package(build, allow_dirty, appimage=True):
     common = list(entries)
     entries.append(("third_party/NOTICES.txt", notices_text(source, game, qt, launcher)))
     entries.extend(license_files(game, qt, launcher))
-    check_names(entries)
+    check_names(entries, verified_assets)
 
     stem = os.path.join(OUTPUT_DIR, "LCEReborn-%s-%s%s" % (SYSTEM, source["commit"][:12],
                                                           "-dirty" if source["dirty"] else ""))
@@ -706,7 +709,7 @@ def package(build, allow_dirty, appimage=True):
     if appimage:
         entries = common + [("third_party/NOTICES.txt", notices_text(source, game, qt, launcher, appimage=True))]
         entries.extend(license_files(game, qt, launcher, appimage=True))
-        check_names(entries)
+        check_names(entries, verified_assets)
         outputs.append(stem + ".AppImage")
         write_appimage(outputs[-1], entries, source["date"], tools)
         print("Wrote %s" % os.path.relpath(outputs[-1], ROOT))

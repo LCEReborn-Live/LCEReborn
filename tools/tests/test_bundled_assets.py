@@ -1,6 +1,9 @@
+import datetime
 import sys
+import tarfile
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,12 +19,47 @@ class BundledAssetsTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.assets = self.root / 'assets'
-        for name in ('Common/Media/MediaWiiU.arc', 'music/song.binka',
+        for name in ('Common/Media/MediaWiiU.arc', 'Common/Media/MediaOrbis.arc', 'music/song.binka',
                      'WiiU/Sound/Minecraft.msscmp', 'custom-villages/outpost/watchtower.nbt'):
             path = self.assets / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b'asset\x00\r\n\xff')
         bundled_assets.write_manifest(self.assets)
+
+    def test_final_client_archives_preserve_verified_asset_bytes(self):
+        (self.root / 'LICENSE').write_text('license fixture')
+        files = bundled_assets.verify(self.assets)
+        source = {'commit': '1' * 40, 'dirty': False, 'repository': 'https://example.test/repo',
+                  'date': datetime.datetime(2026, 11, 28, tzinfo=datetime.timezone.utc)}
+        for linux in (False, True):
+            with self.subTest(linux=linux), \
+                 patch.object(package_pc, 'ROOT', str(self.root)), \
+                 patch.object(package_pc, 'OUTPUT_DIR', str(self.root)), \
+                 patch.object(package_pc, 'LINUX', linux), \
+                 patch.object(package_pc, 'SYSTEM', 'linux' if linux else 'pc'), \
+                 patch.object(package_pc, 'source_info', return_value=source), \
+                 patch.object(package_pc, 'program_files', return_value=(files, [])), \
+                 patch.object(package_pc, 'qt_notices', return_value={}), \
+                 patch.object(package_pc, 'game_components', return_value=[]), \
+                 patch.object(package_pc, 'launcher_components', return_value=[]), \
+                 patch.object(package_pc, 'glibc_requirement', return_value='2.35'), \
+                 patch.object(package_pc, 'readme_text', return_value='readme fixture'), \
+                 patch.object(package_pc, 'notices_text', return_value='notices fixture'), \
+                 patch.object(package_pc, 'license_files', return_value=[]):
+                outputs, _ = package_pc.package(str(self.root / 'build'), False, appimage=False)
+            if linux:
+                with tarfile.open(outputs[0]) as archive:
+                    for path, name in files:
+                        self.assertEqual(archive.extractfile(package_pc.TOP + '/' + name).read(), Path(path).read_bytes())
+            else:
+                with zipfile.ZipFile(outputs[0]) as archive:
+                    for path, name in files:
+                        self.assertEqual(archive.read(name), Path(path).read_bytes())
+
+    def test_unverified_game_archive_is_still_rejected(self):
+        for name in ('assets/unlisted.arc', 'outside/MediaOrbis.arc'):
+            with self.subTest(name=name), self.assertRaises(package_pc.PackageError):
+                package_pc.check_names([(name, b'archive')], {'assets/Common/Media/MediaOrbis.arc'})
 
     def test_all_assets_are_in_client_and_server_packages(self):
         build = self.root / 'build'

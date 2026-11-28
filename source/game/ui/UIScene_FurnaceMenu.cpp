@@ -49,7 +49,8 @@ constexpr const char* LoomHints[][HintSize] = {
     {"............", "............", "....######..", "...##...##..", "...#....#...", "...#.#..#...",
      "...#.##.#...", "...#.#..#...", "...#...##...", "..######....", "............", "............"},
 };
-static_assert(std::size(LoomHints) == LoomMenu::InputCount && std::size(LoomHintNames) == LoomMenu::InputCount);
+static_assert(sizeof(LoomHints) / sizeof(*LoomHints) == LoomMenu::InputCount
+    && sizeof(LoomHintNames) / sizeof(*LoomHintNames) == LoomMenu::InputCount, "Expected one hint per loom input");
 
 void drawLoomHint(const fuiRect& rect, int slot)
 {

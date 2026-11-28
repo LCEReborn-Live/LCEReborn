@@ -6,6 +6,7 @@
 
 #include "game/core/BufferedImage.hpp"
 #include "game/core/ByteBuffer.hpp"
+#include "game/core/File.hpp"
 #include "game/core/Options.hpp"
 #include "game/core/FoliageColor.hpp"
 #include "game/core/GlStateManager.hpp"
@@ -301,6 +302,17 @@ bool Textures::IsOriginalImage(_TEXTURE_NAME textureName, const std::wstring& na
     return false;
 }
 
+static bool isVillageUpdateTexture(const std::wstring& name)
+{
+    return name.rfind(L"mob/panda/", 0) == 0 || name.rfind(L"mob/cat/", 0) == 0
+        || name.rfind(L"mob/villager/levels/", 0) == 0
+        || name == L"mob/wandering_trader" || name == L"mob/llama/decor/trader_llama_decor"
+        || name == L"mob/pillager" || name == L"mob/illager/ravager" || name == L"item/bell"
+        || name == L"textures/blocks/campfire_smoke" || name == L"item/banner/banner_pattern_illager"
+        || name == L"misc/village_hero_effect" || name == L"misc/bad_omen_effect"
+        || name.rfind(L"item/sign_", 0) == 0;
+}
+
 BufferedImage* Textures::readImage(_TEXTURE_NAME textureName, const std::wstring& name)
 {
     MemSect(32);
@@ -317,6 +329,15 @@ BufferedImage* Textures::readImage(_TEXTURE_NAME textureName, const std::wstring
     bool useBaseLayout = !useSelected || dynamic_cast<DefaultTexturePack*>(pack) != NULL;
     if (useBaseLayout && !IsOriginalImage(textureName, name) && !titleUpdate)
         imageName = L"1_2_2/" + name;
+    if (useBaseLayout && isVillageUpdateTexture(name) && !File(path + L"res/" + imageName + L".png").isFile())
+    {
+        auto* image = new BufferedImage(16, 16, 0);
+        for (int y = 0; y < 16; ++y)
+            for (int x = 0; x < 16; ++x)
+                image->getData()[y * 16 + x] = (x < 8) == (y < 8) ? 0xff000000 : 0xffff00ff;
+        MemSect(0);
+        return image;
+    }
     BufferedImage* image = pack->getImageResource(imageName, false, titleUpdate, path);
     MemSect(0);
     return image;

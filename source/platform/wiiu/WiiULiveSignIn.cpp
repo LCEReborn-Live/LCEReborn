@@ -2,6 +2,8 @@
 #include "game/core/CriticalSection.hpp"
 #include "game/core/System.hpp"
 #include "platform/wiiu/WiiURelayTls.hpp"
+#include "net/HttpResponse.hpp"
+#include "net/NetLink.hpp"
 #if LCE_PLATFORM_SWITCH
 #include "platform/pc/PcPaths.hpp"
 #include "platform/switch/SwitchLiveWorker.hpp"
@@ -17,6 +19,7 @@
 #endif
 #include <curl/curl.h>
 #include <cstring>
+#include <algorithm>
 #include <cwchar>
 #include <deque>
 #include <utility>
@@ -37,7 +40,6 @@ const size_t kTokenLength = 64;
 const size_t kUuidLength = 32;
 #if !LCE_PLATFORM_SWITCH
 // Cafe nlibcurl uses an NSSL verification bitmask in place of standard curl's TLS options.
-const CURLoption kNsslContext = static_cast<CURLoption>(210);
 const CURLoption kNsslVerifyOptions = static_cast<CURLoption>(211);
 const long kVerifyPeerHostnameAndDate = 7;
 #endif
@@ -87,6 +89,7 @@ long responseStatus = 0;
 CURLcode curlResult = CURLE_OK;
 int failedOption = -1;
 bool workerFailed = false;
+std::wstring transportError;
 long long expiresAt = 0;
 long long pollAfter = 0;
 long long pollInterval = 0;
@@ -228,54 +231,96 @@ CURLcode SetNativeTrustRoots(CURL*, void* context, void*)
     return R_SUCCEEDED(x1) && R_SUCCEEDED(x2) ? CURLE_OK : CURLE_SSL_CACERT_BADFILE;
 }
 #else
-NSSLContextHandle CreateNativeTrustContext()
+bool IsNativeConsole()
 {
-    OSDynLoad_Module module = NULL;
-    if (OSDynLoad_Acquire("nsysnet.rpl", &module) != OS_DYNLOAD_OK)
-        return -1;
-    decltype(&NSSLInit) initialise = NULL;
-    decltype(&NSSLFinish) finish = NULL;
-    decltype(&NSSLCreateContext) create = NULL;
-    decltype(&NSSLDestroyContext) destroy = NULL;
-    decltype(&NSSLAddServerPKIExternal) addRoot = NULL;
-    if (OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLInit", reinterpret_cast<void**>(&initialise)) != OS_DYNLOAD_OK
-        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLFinish", reinterpret_cast<void**>(&finish)) != OS_DYNLOAD_OK
-        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLCreateContext", reinterpret_cast<void**>(&create)) != OS_DYNLOAD_OK
-        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLDestroyContext", reinterpret_cast<void**>(&destroy)) != OS_DYNLOAD_OK
-        || OSDynLoad_FindExport(module, OS_DYNLOAD_EXPORT_FUNC, "NSSLAddServerPKIExternal", reinterpret_cast<void**>(&addRoot)) != OS_DYNLOAD_OK)
-    {
-        OSDynLoad_Release(module);
-        return -1;
-    }
-
-    // The native IOS service is required. Cemu should use its host trust store
-    // because its emulated custom NSSL context can accept invalid chains.
+    // Cemu implements nlibcurl through its host TLS stack, but not this IOS device.
     const IOSHandle service = IOS_Open("/dev/nsec/nssl", IOS_OPEN_READWRITE);
-    if (service < 0)
-    {
-        OSDynLoad_Release(module);
-        return -1;
-    }
+    if (service < 0) return false;
     IOS_Close(service);
-    if (initialise() != NSSL_ERROR_OK)
-    {
-        OSDynLoad_Release(module);
-        return -1;
-    }
+    return true;
+}
 
-    const NSSLContextHandle context = create(0);
-    if (context >= 0)
+int SendConsoleRequest(const char* url, bool post, const std::string& body,
+                       const std::string& authorization)
+{
+    const std::string prefix = "https://api.lcereborn.xyz";
+    const std::string target(url);
+    if (target.compare(0, prefix.size(), prefix) != 0 || target.size() <= prefix.size()
+        || target[prefix.size()] != '/' || target.find_first_of("\r\n") != std::string::npos
+        || authorization.find_first_of("\r\n") != std::string::npos)
     {
-        alignas(64) static const unsigned char root[] = {
-#include "wiiu_live_root_ca.inc"
-        };
-        if (addRoot(context, root, sizeof(root), 0) == NSSL_ERROR_OK)
-            return context;
-        destroy(context);
+        curlResult = CURLE_URL_MALFORMAT;
+        return 0;
     }
-    finish();
-    OSDynLoad_Release(module);
-    return -1;
+    // IOS-CRYPTO's GenerateRand (0x15) supplies fresh entropy before sign-in,
+    // when no session token exists yet. Never seed TLS from clocks or identifiers.
+    alignas(64) unsigned char random[32] = {};
+    const IOSHandle crypto = IOS_Open("/dev/crypto", IOS_OPEN_READWRITE);
+    if (crypto < 0)
+    {
+        transportError = L"Could not open the console's secure random service.";
+        curlResult = CURLE_FAILED_INIT;
+        return 0;
+    }
+    const IOSError generated = IOS_Ioctl(crypto, 0x15, NULL, 0, random, sizeof(random));
+    IOS_Close(crypto);
+    if (generated < 0)
+    {
+        transportError = L"Could not obtain secure random data from the console.";
+        curlResult = CURLE_FAILED_INIT;
+        return 0;
+    }
+    std::string seed(reinterpret_cast<const char*>(random), sizeof(random));
+    std::memset(random, 0, sizeof(random));
+    struct Deadline : lcenet::CancelFlag
+    {
+        long long until;
+        Deadline() : until(lcenet::NowMs() + 15000) {}
+        bool Cancelled() const override { return lcenet::NowMs() >= until; }
+    } deadline;
+    lcenet::Address address;
+    std::string error;
+    lcenet::TcpSocket socket;
+    if (!lcenet::Resolve("api.lcereborn.xyz:443", address, error)
+        || !socket.Connect(address, 5000, deadline, error))
+    {
+        curlResult = CURLE_COULDNT_CONNECT;
+        return 0;
+    }
+    const bool connected = socket.EnableRelayTls("api.lcereborn.xyz", seed, 8000, deadline);
+    std::fill(seed.begin(), seed.end(), 0);
+    if (!connected)
+    {
+        transportError = L"Secure connection failed. Check the console date and time.";
+        curlResult = CURLE_SSL_CONNECT_ERROR;
+        return 0;
+    }
+    std::string message = std::string(post ? "POST " : "GET ") + target.substr(prefix.size())
+        + " HTTP/1.1\r\nHost: api.lcereborn.xyz\r\nConnection: close\r\n"
+          "Accept-Encoding: identity\r\nContent-Type: application/json\r\n";
+    if (!authorization.empty()) message += authorization + "\r\n";
+    if (post) message += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+    message += "\r\n";
+    if (post) message += body;
+    if (!socket.SendAll(message.data(), message.size()))
+    {
+        curlResult = CURLE_SEND_ERROR;
+        return 0;
+    }
+    std::string wire;
+    char buffer[8192];
+    while (!deadline.Cancelled())
+    {
+        const int count = socket.Receive(buffer, sizeof(buffer), 100);
+        if (count < 0) { curlResult = CURLE_RECV_ERROR; return 0; }
+        if (!count) continue;
+        wire.append(buffer, static_cast<size_t>(count));
+        const auto parsed = lcenet::ParseHttpResponse(wire, kMaxSkinResponse, responseStatus, response);
+        if (parsed == lcenet::HttpParse::Complete) { curlResult = CURLE_OK; return 0; }
+        if (parsed == lcenet::HttpParse::Invalid) { curlResult = CURLE_WEIRD_SERVER_REPLY; return 0; }
+    }
+    curlResult = CURLE_OPERATION_TIMEDOUT;
+    return 0;
 }
 
 #endif
@@ -312,7 +357,7 @@ int SendRequest(int, const char**)
         return 0;
     }
 #if !LCE_PLATFORM_SWITCH
-    static const NSSLContextHandle nativeTrust = CreateNativeTrustContext();
+    static const bool nativeConsole = IsNativeConsole();
 #endif
     const char* url = kStartUrl;
     static std::string body;
@@ -369,6 +414,10 @@ int SendRequest(int, const char**)
         authorization.clear();
         bearer.data = NULL;
     }
+#if !LCE_PLATFORM_SWITCH
+    if (nativeConsole)
+        return SendConsoleRequest(url, post, body, authorization);
+#endif
     if (SetOption(curl, CURLOPT_URL, url)
         && SetOption(curl, CURLOPT_HTTPHEADER, &headers)
         && (post ? SetOption(curl, CURLOPT_POST, 1L) && SetOption(curl, CURLOPT_POSTFIELDS, body.c_str())
@@ -383,7 +432,6 @@ int SendRequest(int, const char**)
         && SetOption(curl, CURLOPT_SSL_CTX_FUNCTION, SetNativeTrustRoots)
 #else
         && SetOption(curl, kNsslVerifyOptions, kVerifyPeerHostnameAndDate)
-        && (nativeTrust < 0 || SetOption(curl, kNsslContext, static_cast<long>(nativeTrust)))
 #endif
         && SetOption(curl, CURLOPT_WRITEFUNCTION, WriteResponse)
         && SetOption(curl, CURLOPT_WRITEDATA, &response))
@@ -402,6 +450,7 @@ bool Send(Request next)
     curlResult = CURLE_OK;
     failedOption = -1;
     workerFailed = false;
+    transportError.clear();
     request = next;
 #if LCE_PLATFORM_SWITCH
     if (!thread.Start([] { SendRequest(0, nullptr); }))
@@ -746,6 +795,8 @@ std::wstring ErrorDetail()
 {
     if (workerFailed)
         return L"Could not start the network worker.";
+    if (!transportError.empty())
+        return transportError;
     wchar_t detail[80];
     if (failedOption >= 0)
         std::swprintf(detail, 80, L"Network error %d (option %d).", static_cast<int>(curlResult), failedOption);

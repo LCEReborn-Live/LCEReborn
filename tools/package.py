@@ -72,6 +72,14 @@ def read_file(path):
 
 
 def prepared_content():
+    bundle_manifest = os.path.join(prepare.ASSETS_DIR, ".bundle-manifest.json")
+    if os.path.isfile(bundle_manifest):
+        from bundled_assets import verify
+        try:
+            return {name[len("assets/"):]: path for path, name in verify(prepare.ASSETS_DIR)
+                    if name not in ("assets/" + prepare.MANIFEST, "assets/.bundle-manifest.json")}
+        except (OSError, ValueError) as error:
+            raise PackageError("Bundled game assets are missing or damaged: %s" % error) from error
     files = {}
     for directory, folders, names in os.walk(prepare.ASSETS_DIR):
         folders[:] = [folder for folder in folders if not prepare.is_original_candy_pack(folder)]

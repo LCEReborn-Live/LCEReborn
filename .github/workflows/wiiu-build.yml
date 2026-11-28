@@ -33,6 +33,13 @@ jobs:
       - name: Generate Wii U build inputs
         run: python3 tools/prepare_wiiu_ci.py --dumps-dir "$RUNNER_TEMP/wiiu-dumps"
 
+      - name: Verify bundled game assets and Wii U packaging
+        run: |
+          python3 tools/bundled_assets.py
+          python3 -m unittest discover -s tools/tests -p test_wiiu_package.py
+          g++ -std=c++14 -I source tools/tests/http_response_test.cpp -o /tmp/lce-http-test
+          /tmp/lce-http-test
+
       - name: Restore the RedHills toolchain cache
         id: redhills-cache
         uses: actions/cache/restore@v5
@@ -90,9 +97,8 @@ jobs:
       - name: Package the complete Wii U bundle
         run: |
           dumps="$RUNNER_TEMP/wiiu-dumps/dumps.json"
-          base=$(jq -er '.base' "$dumps")
           update=$(jq -er '.update' "$dumps")
-          python3 tools/package.py --base "$base" --update "$update" --output build/LCEReborn-complete.wuhb
+          python3 tools/package.py --update "$update" --output build/LCEReborn-complete.wuhb
 
       - name: Upload the complete WUHB
         uses: actions/upload-artifact@v7
@@ -117,10 +123,10 @@ jobs:
           name: wiiu-rpx
           path: wiiu-rpx
 
-      - name: Download the Wii U homebrew bundle
+      - name: Download the complete Wii U homebrew bundle
         uses: actions/download-artifact@v7
         with:
-          name: wiiu-wuhb
+          name: wiiu-wuhb-complete
           path: wiiu-wuhb
 
       - name: Attach the experimental build to the existing release
@@ -135,13 +141,13 @@ jobs:
           fi
           gh release view "$RELEASE_TAG" --json body > release.json
           asset="LCEReborn-Live-WiiU-Experimental-$RELEASE_TAG.rpx"
-          bundle="LCEReborn-Live-WiiU-Experimental-$RELEASE_TAG.wuhb"
+          bundle="LCEReborn-WiiU-Full-Beta-$RELEASE_TAG.wuhb"
           cp wiiu-rpx/Minecraft.Client.rpx "$asset"
-          cp wiiu-wuhb/LCEReborn.wuhb "$bundle"
+          cp wiiu-wuhb/LCEReborn-complete.wuhb "$bundle"
           test -s "$asset"
           test -s "$bundle"
           gh release upload "$RELEASE_TAG" "$asset#Experimental Wii U RPX" \
-            "$bundle#Experimental Wii U WUHB" wiiu-wuhb/BearSSL-LICENSE.txt --clobber
+            "$bundle#Complete Wii U WUHB with game assets" wiiu-wuhb/BearSSL-LICENSE.txt --clobber
           python3 - <<'PY'
           import json
           import os
@@ -156,14 +162,15 @@ jobs:
           revision = os.environ['GITHUB_SHA']
           tag = os.environ['RELEASE_TAG']
           notes = f'''{start}
-          ## Experimental Wii U build
+          ## Wii U console build (Beta)
 
-          Download `LCEReborn-Live-WiiU-Experimental-{tag}.wuhb` from Assets. Prepare game content from your own decrypted base game and Update 688 dumps.
+          Download `LCEReborn-WiiU-Full-Beta-{tag}.wuhb` from Assets. It includes the prepared game assets, Village & Pillage resources and structure templates. No separate content download or import is needed.
 
-          1. In a [checkout of this build's source](https://github.com/{repo}/tree/{revision}), run `python tools/prepare.py --base "<base dump>" --update "<Update 688 dump>"`.
-          2. Copy the prepared `assets/` contents into `wiiu/LCEReborn/content/` on the Wii U SD card or in the `sdcard/` directory under Cemu's user data.
-          3. Run `python tools/launch_cemu.py "<path to Cemu>" --bundle "<downloaded WUHB>"` or put the WUHB in `wiiu/apps/` on the Wii U SD card and launch it with Aroma.
-          4. In the game, select **LCE Live**. Enter the code at [lcereborn.xyz/authorize](https://lcereborn.xyz/authorize) on a phone or PC, then confirm the sign-in.
+          1. Copy the WUHB to `wiiu/apps/` on the Wii U SD card and launch it with Aroma.
+          2. For Cemu, use `python tools/launch_cemu.py "<path to Cemu>" --bundle "<downloaded WUHB>"` from this build's source.
+          3. In the game, select **LCE Live**. Enter the code at [lcereborn.xyz/authorize](https://lcereborn.xyz/authorize) on a phone or PC, then confirm the sign-in.
+
+          The RPX is also provided for development and requires external prepared content. This is a beta console build; a successful build does not establish testing on physical Wii U hardware.
 
           See the [Wii U setup guide](https://github.com/{repo}/blob/{revision}/docs/building.md) for details.
           {end}'''

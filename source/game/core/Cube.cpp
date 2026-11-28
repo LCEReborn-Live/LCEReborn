@@ -147,16 +147,16 @@ void Cube::rotate_axis(float angle, double& x, double& y) const
 
 void Cube::rotate(float x, float y, float z)
 {
-    if (x > 0.0f || y > 0.0f)
+    if (x != 0.0f || y != 0.0f || z != 0.0f)
     {
         for (unsigned int i = 0; i < mVertices.length; ++i)
         {
             if (x != 0.0f)
                 rotate_axis(x, mVertices.data[i]->position->y, mVertices.data[i]->position->z);
             if (y != 0.0f)
-                rotate_axis(y, mVertices.data[i]->position->y, mVertices.data[i]->position->z);
+                rotate_axis(y, mVertices.data[i]->position->z, mVertices.data[i]->position->x);
             if (z != 0.0f)
-                rotate_axis(z, mVertices.data[i]->position->y, mVertices.data[i]->position->z);
+                rotate_axis(z, mVertices.data[i]->position->x, mVertices.data[i]->position->y);
         }
     }
 }

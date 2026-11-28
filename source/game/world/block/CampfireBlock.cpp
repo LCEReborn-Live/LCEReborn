@@ -150,13 +150,33 @@ bool CampfireBlockEntity::placeFood(not_null_ptr<ItemInstance> item)
 
 void CampfireBlockEntity::tick()
 {
-    if (!mLevel || mLevel->mIsClientSide)
+    if (!mLevel)
         return;
     const auto* state = mLevel->getBlockState(mPos);
     if (state->getBlock() != Blocks::campfire)
         return;
     const bool wet = mLevel->getExtraBlockState(mPos)->getMaterial() == Material::WATER;
     const bool lit = CampfireBlock::isLit(state);
+    if (mLevel->mIsClientSide)
+    {
+        if (!lit || wet)
+        {
+            mSmokeDelay = 0;
+            return;
+        }
+        // Random block animation ticks can leave seconds-long gaps. Each loaded
+        // campfire keeps its own client-side timer: 40-60 ticks at 20 ticks/sec.
+        if (--mSmokeDelay <= 0)
+        {
+            Random* random = mLevel->mRandom;
+            mSmokeDelay = 40 + random->nextInt(21);
+            const bool signal = mLevel->getBlockState(mPos.below())->getBlock() == Blocks::hay_block;
+            const auto* smoke = signal ? PARTICLE_CAMPFIRE_SIGNAL_SMOKE : PARTICLE_CAMPFIRE_SMOKE;
+            mLevel->addParticle(smoke, true, mPos.x + .27 + random->nextDouble() * .46, mPos.y + .75,
+                                mPos.z + .27 + random->nextDouble() * .46, 0, 0, 0, arrayWithLength<int>());
+        }
+        return;
+    }
     if (lit && wet)
     {
         mLevel->setBlock(mPos, state->setValue(LIT, false), Block::UPDATE_ALL, false);
@@ -280,13 +300,6 @@ void CampfireBlock::animateTick(const BlockState* state, Level* level, const Blo
 {
     if (!isLit(state))
         return;
-    if (random->nextInt(3) == 0)
-    {
-        const bool signal = level->getBlockState(pos.below())->getBlock() == Blocks::hay_block;
-        const auto* smoke = signal ? PARTICLE_CAMPFIRE_SIGNAL_SMOKE : PARTICLE_CAMPFIRE_SMOKE;
-        level->addParticle(smoke, true, pos.x + .27 + random->nextDouble() * .46, pos.y + .75,
-                           pos.z + .27 + random->nextDouble() * .46, 0, 0, 0, arrayWithLength<int>());
-    }
     if (random->nextInt(10) == 0)
         level->playLocalSound(pos.x + .5, pos.y + .5, pos.z + .5, SoundEvents::CAMPFIRE_CRACKLE,
                               SoundSource::eSoundSource_Blocks, .8f, 1.0f, false, 16.0f);

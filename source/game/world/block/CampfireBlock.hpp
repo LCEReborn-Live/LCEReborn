@@ -30,6 +30,7 @@ private:
     void notifyFoodChanged();
     std::array<not_null_ptr<ItemInstance>, SlotCount> mFood;
     std::array<int, SlotCount> mProgress{};
+    int mSmokeDelay = 0;
 };
 
 class CampfireBlock : public BaseEntityBlock

@@ -31,6 +31,8 @@ MapItemSavedData::MapItemSavedData(const std::wstring& id) : SavedData(id)
     mXCenter = 0;
     mDimension = 0;
     mTrackingPosition = true;
+    mUnlimitedTracking = false;
+    mLocked = false;
     mColors = arrayWithLength<unsigned char>(16384, true);
     mLastUpdateTime = 0;
 }
@@ -307,6 +309,8 @@ void MapItemSavedData::tickCarriedBy(boost::shared_ptr<Player> player, not_null_
 
 void MapItemSavedData::mergeInMapData(boost::shared_ptr<MapItemSavedData> data)
 {
+    if (mLocked)
+        return;
     int x;
     int y;
     for (x = 0; x < 128; ++x)
@@ -357,6 +361,7 @@ void MapItemSavedData::load(CompoundTag* tag)
         mTrackingPosition = tag->getBoolean(L"trackingPosition");
     }
     mUnlimitedTracking = tag->getBoolean(L"unlimitedTracking");
+    mLocked = tag->getBoolean(L"locked");
     int width = tag->getShort(L"width");
     int height = tag->getShort(L"height");
     if (width == 128 && height == 128)
@@ -392,6 +397,7 @@ CompoundTag* MapItemSavedData::save(CompoundTag* tag)
     tag->putByteArray(L"colors", colors);
     tag->putBoolean(L"trackingPosition", mTrackingPosition);
     tag->putBoolean(L"unlimitedTracking", mUnlimitedTracking);
+    tag->putBoolean(L"locked", mLocked);
     return tag;
 }
 

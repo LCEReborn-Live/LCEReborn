@@ -44,6 +44,7 @@ static void PrintUsage(std::FILE* stream, PcProgram program)
     {
         std::fputs("Usage: LCERebornServer [options]\n"
                    "  --content-dir <dir>         game content (default: assets in the working folder)\n"
+                   "  --village-templates-dir <dir>  local NBT and village-pools.tsv (default: custom-villages in content)\n"
                    "  --save-dir <dir>            worlds, server.properties and server-icon.png (default: saves in the\n"
                    "                              working folder)\n"
                    "  --packs-dir <dir>           packs to load (default: packs in the working folder)\n"
@@ -56,6 +57,7 @@ static void PrintUsage(std::FILE* stream, PcProgram program)
                "  --username <name>           player name\n"
                "  --uuid <uuid>               player identity, 32 hex digits (default: made from the name)\n"
                "  --content-dir <dir>         game content (default: assets in the working folder)\n"
+               "  --village-templates-dir <dir>  local NBT and village-pools.tsv (default: custom-villages in content)\n"
                "  --save-dir <dir>            saves and settings (default: saves in the working folder)\n"
                "  --packs-dir <dir>           packs to load (default: packs in the working folder)\n"
                "  --resource-dir <dir>        PC interface art (default: resources in the working folder)\n"
@@ -106,7 +108,7 @@ bool PcParseLaunchOptions(int argc, char** argv, int& exitCode, PcProgram progra
         }
 
         if (program == PcProgram::Server && name != "--content-dir" && name != "--save-dir" && name != "--packs-dir"
-            && name != "--log-dir")
+            && name != "--log-dir" && name != "--village-templates-dir")
         {
             std::fprintf(stderr, "Unknown option: %s\n", arguments[index].c_str());
             PrintUsage(stderr, program);
@@ -129,6 +131,8 @@ bool PcParseLaunchOptions(int argc, char** argv, int& exitCode, PcProgram progra
             target = &sOptions.username;
         else if (name == "--content-dir")
             target = &sOptions.contentDir;
+        else if (name == "--village-templates-dir")
+            target = &sOptions.villageTemplatesDir;
         else if (name == "--save-dir")
             target = &sOptions.saveDir;
         else if (name == "--packs-dir")

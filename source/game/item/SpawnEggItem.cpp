@@ -146,7 +146,7 @@ boost::shared_ptr<Entity> SpawnEggItem::canSpawn(const ResourceLocation& entityT
             return boost::shared_ptr<Entity>();
         }
     }
-    else if (type == EntityType::VILLAGER)
+    else if (type == EntityType::WANDERING_TRADER || type == EntityType::VILLAGER)
     {
         if (!level->canCreateMore(type, Level::eSpawnType_Egg))
         {

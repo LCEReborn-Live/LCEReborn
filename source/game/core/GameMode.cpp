@@ -302,6 +302,9 @@ void GameMode::RemoveRecipeItemsFromInventory(Recipe::INGREDIENTS_REQUIRED& ingr
             int auxValue = ingredients.auxValues[ingredient];
             if (auxValue == 0 && item->getMaxDamage() > 0)
                 auxValue = -1;
+            if (item == Items::dye && auxValue >= DyeColor::BlackDye && auxValue < DyeColor::DyeItemDataCount
+                && inventory->getResourceItem(item, auxValue)->isEmpty())
+                auxValue = DyeColor::colorItemData(auxValue);
 
             CompoundTag* tag = ingredients.itemTags[ingredient];
             Item* consumedItem = NULL;

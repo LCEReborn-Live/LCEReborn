@@ -22,6 +22,7 @@ public:
     static const std::wstring BURIED_TREASURE;
     static const std::wstring SHIPWRECK;
     static const std::wstring RUIN;
+    static const std::wstring PILLAGER_OUTPOST;
 
     LargeFeature();
     virtual ~LargeFeature();

@@ -21,12 +21,22 @@ public:
     void _init(not_null_ptr<ItemInstance> buyA, not_null_ptr<ItemInstance> buyB, not_null_ptr<ItemInstance> sell);
     void load(CompoundTag* tag);
     not_null_ptr<ItemInstance> getBuyAItem();
+    void setHeroDiscount(int amplifier);
+    void setVillageReputation(int standing);
+    int getTradeLevel() const { return mTradeLevel; }
+    int getTradeExperience() const { return mTradeExperience; }
+    void setTradeProgress(int level, int experience)
+    {
+        mTradeLevel = level;
+        mTradeExperience = experience;
+    }
     not_null_ptr<ItemInstance> getBuyBItem();
     bool hasSecondaryBuyItem();
     not_null_ptr<ItemInstance> getSellItem();
     bool isSame(MerchantRecipe* other);
     bool isSameSameButBetter(MerchantRecipe* other);
     int getUses();
+    void restock();
     int getMaxUses();
     void increaseUses();
     void increaseMaxUses(int amount);
@@ -42,6 +52,10 @@ private:
     int mUses;
     int mMaxUses;
     bool mRewardExp;
+    int mHeroDiscount = 0;
+    int mReputationDiscount = 0;
+    int mTradeLevel = 0;
+    int mTradeExperience = 0;
 };
 
 #endif

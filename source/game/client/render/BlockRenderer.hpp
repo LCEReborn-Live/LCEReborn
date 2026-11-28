@@ -101,6 +101,7 @@ public:
     float tesselateAnvilPiece(const BlockState* state, const BlockPos& pos, int part, float bottom, float width,
                               float height, float length, bool rotate, bool inventory);
     bool tesselateAnvilInWorld(const BlockState* state, const BlockPos& pos, bool inventory);
+    bool tesselateCuboidBlock(const BlockState* state, const BlockPos& pos, bool inventory);
     void setFixedTexture(TextureAtlasSprite* texture);
     void clearFixedTexture();
     bool tesselateHopperInWorld(const BlockState* state, const BlockPos& pos, bool inventory);

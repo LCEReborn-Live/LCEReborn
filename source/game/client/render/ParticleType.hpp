@@ -59,6 +59,8 @@ enum ePARTICLE_TYPE
     ePARTICLE_BUBBLE_POP = 0x34,
     ePARTICLE_CURRENT_DOWN = 0x35,
     ePARTICLE_CONDUIT = 0x36,
+    ePARTICLE_CAMPFIRE_SMOKE = 0x37,
+    ePARTICLE_CAMPFIRE_SIGNAL_SMOKE = 0x38,
     ePARTICLE_BLOCK_CRACK = 0x200000,
     ePARTICLE_CHEST_REFILL = 0x300000,
     ePARTICLE_WINNING_INSTANT_SPELL = 0x300001
@@ -98,6 +100,8 @@ extern const ParticleType* PARTICLE_CRIT;
 extern const ParticleType* PARTICLE_MAGIC_CRIT;
 extern const ParticleType* PARTICLE_SMOKE;
 extern const ParticleType* PARTICLE_LARGE_SMOKE;
+extern const ParticleType* PARTICLE_CAMPFIRE_SMOKE;
+extern const ParticleType* PARTICLE_CAMPFIRE_SIGNAL_SMOKE;
 extern const ParticleType* PARTICLE_SPELL;
 extern const ParticleType* PARTICLE_INSTANT_SPELL;
 extern const ParticleType* PARTICLE_MOB_SPELL;

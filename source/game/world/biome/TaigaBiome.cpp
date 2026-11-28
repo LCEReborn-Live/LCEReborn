@@ -99,6 +99,16 @@ void TaigaBiome::decorate(Level* level, Random& random, const BlockPos& pos)
     }
 
     Biome::decorate(level, random, pos);
+    if (mType != eType_MegaTaiga && mType != eType_Mutated && !isSnowCovered() && random.nextInt(3) == 0)
+    {
+        const BlockPos center = pos.offset(random.nextInt(16) + 8, 0, random.nextInt(16) + 8);
+        for (int i = 0; i < 6; ++i)
+        {
+            const BlockPos plant = level->getHeightmapPos(center.offset(random.nextInt(5) - 2, 0, random.nextInt(5) - 2));
+            if (level->isEmptyBlock(plant) && Blocks::sweet_berry_bush->mayPlace(level, plant))
+                level->setBlock(plant, Blocks::sweet_berry_bush->getBlockState(2), Block::UPDATE_CLIENTS, false);
+        }
+    }
 }
 
 void TaigaBiome::buildSurfaceAt(Level* level, Random& random, ChunkPrimer* primer, int x, int z, double noise)

@@ -1,6 +1,7 @@
 #include "game/ui/FJ_HorseInventoryMenu.hpp"
 
 #include "game/ui/FJ_FuiNodeStage.hpp"
+#include "game/ui/fuiRenderNode.hpp"
 
 FJ_HorseInventoryMenu::FJ_HorseInventoryMenu(fuiRenderNode* renderNode) : FJ_AbstractContainerDocument(renderNode)
 {
@@ -66,6 +67,17 @@ void FJ_HorseInventoryMenu::SetCanHaveSaddle(bool canHaveSaddle)
         saddleType->setVisible(false);
         mainPanel->removeChild(saddleSlot, true);
     }
+}
+
+void FJ_HorseInventoryMenu::SetEquipmentHints(bool saddle, bool armor, bool carpet)
+{
+    auto* panel = getChildByName("MainPanel");
+    if (auto* saddleSlot = panel->getChildByName("SlotTypes.SlotSaddle"); saddleSlot && saddleSlot->getNumChildren() > 1)
+        saddleSlot->getRenderNodeChildAt(1)->setVisibility(saddle);
+    if (auto* armorIcon = panel->getChildByName("SlotTypes.SlotArmour.HorseArmorIcon"))
+        armorIcon->setVisible(armor);
+    if (auto* carpetIcon = panel->getChildByName("SlotTypes.SlotArmour.CarpetIcon"))
+        carpetIcon->setVisible(carpet);
 }
 
 void FJ_HorseInventoryMenu::SetSafeZone(int top, int bottom, int left, int right)

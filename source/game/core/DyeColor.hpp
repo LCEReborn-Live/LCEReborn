@@ -39,6 +39,10 @@ public:
 
     static const DyeColor* byBlockData(int blockData);
     static const DyeColor* byItemData(int itemData);
+    enum PigmentData { BlackDye = 16, BrownDye, BlueDye, WhiteDye, DyeItemDataCount };
+    static int colorItemData(int itemData);
+    static int dyeItemData(int colorData);
+    static bool matchesDyeIngredient(int expected, int actual);
 
     int getBlockData() const;
     int getItemData() const;

@@ -3,18 +3,50 @@
 #include "game/core/FurnaceFuelSlot.hpp"
 #include "game/core/FurnaceResultSlot.hpp"
 #include "game/core/GenericStats.hpp"
+#include "game/core/InteractionObject.hpp"
 #include "game/entity/mob/Entity.hpp"
 #include "game/item/FurnaceRecipes.hpp"
 #include "game/item/Inventory.hpp"
 #include "game/item/ItemInstance.hpp"
 #include "game/item/Items.hpp"
+#include "game/network/ClientboundContainerOpenPacket.hpp"
 #include "game/world/block/Block.hpp"
 #include "game/world/block/Blocks.hpp"
 #include "game/world/block/FurnaceBlockEntity.hpp"
 #include "game/world/generation/Player.hpp"
 
+namespace
+{
+class CookingInputSlot : public Slot
+{
+public:
+    CookingInputSlot(const boost::shared_ptr<Container>& container, FurnaceKind kind)
+        : Slot(container, 0, 56, 17), mKind(kind) {}
+
+    bool mayPlace(not_null_ptr<ItemInstance> item) override
+    {
+        return !FurnaceRecipes::getInstance()->getCookingResult(item, mKind)->isEmpty();
+    }
+
+private:
+    FurnaceKind mKind;
+};
+}
+
+FurnaceKind FurnaceMenu::getKind(const boost::shared_ptr<Container>& container)
+{
+    auto* interaction = dynamic_cast<InteractionObject*>(container.get());
+    const int type = interaction ? interaction->getTypeId(false) : ClientboundContainerOpenPacket::FURNACE;
+    switch (type)
+    {
+    case ClientboundContainerOpenPacket::SMOKER: return FurnaceKind::Smoker;
+    case ClientboundContainerOpenPacket::BLAST_FURNACE: return FurnaceKind::BlastFurnace;
+    default: return FurnaceKind::Furnace;
+    }
+}
+
 FurnaceMenu::FurnaceMenu(boost::shared_ptr<Inventory> inventory, boost::shared_ptr<Container> container)
-    : AbstractContainerMenu()
+    : AbstractContainerMenu(), mKind(getKind(container))
 {
     mLitDuration = 0;
     mLitTime = 0;
@@ -22,7 +54,10 @@ FurnaceMenu::FurnaceMenu(boost::shared_ptr<Inventory> inventory, boost::shared_p
     mCookingProgress = 0;
     mContainer = container;
     container->startOpen(boost::static_pointer_cast<Player>(inventory->m_player->shared_from_this()));
-    addSlot(new Slot(container, 0, 56, 17));
+    if (mKind != FurnaceKind::Furnace)
+        addSlot(new CookingInputSlot(container, mKind));
+    else
+        addSlot(new Slot(container, 0, 56, 17));
     addSlot(new FurnaceFuelSlot(container, 1, 56, 53));
     addSlot(new FurnaceResultSlot(boost::static_pointer_cast<Player>(inventory->m_player->shared_from_this()),
                                   container, 2, 116, 35));
@@ -131,7 +166,7 @@ not_null_ptr<ItemInstance> FurnaceMenu::quickMoveStack(boost::shared_ptr<Player>
                 return ItemInstance::EMPTY;
             }
         }
-        else if (!FurnaceRecipes::getInstance()->getResult(item)->isEmpty())
+        else if (!FurnaceRecipes::getInstance()->getCookingResult(item, mKind)->isEmpty())
         {
             if (!moveItemStackTo(item, 0, 1, false, true, true))
             {

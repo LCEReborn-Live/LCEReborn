@@ -1553,7 +1553,10 @@ void Entity::move(MoverType type, double x, double y, double z, bool pushedByPis
         double walkedY = 0.0;
         double walkedZ = mZ - startZ;
 
-        if (landingBlock == Blocks::ladder)
+        const BlockPos feet(landingX, Mth::floor(mBoundingBox->mMinY), landingZ);
+        const bool climbingScaffolding = !mOnGround && mY != startY
+            && mLevel->getBlockState(mTickCache, feet)->getBlock() == Blocks::scaffolding;
+        if (landingBlock == Blocks::ladder || climbingScaffolding)
         {
             walkedY = mY - startY;
         }
@@ -1566,13 +1569,17 @@ void Entity::move(MoverType type, double x, double y, double z, bool pushedByPis
         mWalkDist += Mth::sqrt(walkedX * walkedX + walkedZ * walkedZ) * 0.6f;
         mMoveDist += Mth::sqrt(walkedX * walkedX + walkedY * walkedY + walkedZ * walkedZ) * 0.6f;
 
-        if (mMoveDist > (float)mNextStep && landingBlock->mMaterial != Material::AIR)
+        if (mMoveDist > (float)mNextStep && (landingBlock->mMaterial != Material::AIR || climbingScaffolding))
         {
             mNextStep = (int)mMoveDist + 1;
 
             if (isInWater())
             {
                 playUnderwaterSound(landingPos, landingBlock);
+            }
+            else if (climbingScaffolding)
+            {
+                playSound(SoundEvents::SCAFFOLDING_CLIMB, 0.15f, 1.0f);
             }
             else
             {

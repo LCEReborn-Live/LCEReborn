@@ -64,12 +64,18 @@ public:
     virtual unsigned int GetInteractTooltip(const EntityTooltipDataHolder& tooltipData);
     virtual void reassessTameGoals();
     virtual unsigned long long GetType();
+    bool isTrusting() const;
+    void setTrusting(bool trusting);
 
+protected:
+    Ocelot(Level* level, bool deferInitialization);
+    bool canAcceptFish(const boost::shared_ptr<Player>& player);
 private:
     static const EntityDataAccessor<int>* DATA_CAT_TYPE;
     static const EntityDataAccessor<bool>* DATA_IS_TEMPTED;
-    AvoidEntityGoal* mAvoidPlayersGoal;
-    TemptGoal* mTemptGoal;
+    static const EntityDataAccessor<bool>* DATA_TRUSTING;
+    AvoidEntityGoal* mAvoidPlayersGoal = nullptr;
+    TemptGoal* mTemptGoal = nullptr;
 };
 
 #endif

@@ -14,7 +14,7 @@ class MerchantRecipe;
 class MerchantRecipeList;
 class ItemInstance;
 class Player;
-class Villager;
+class Entity;
 
 class ClientSideMerchant : public Merchant, public boost::enable_shared_from_this<ClientSideMerchant>
 {
@@ -30,7 +30,7 @@ public:
     virtual void notifyTrade(MerchantRecipe* recipe);
     virtual void notifyTradeUpdated(const not_null_ptr<ItemInstance>& item);
     virtual std::wstring getDisplayName();
-    void setVillager(boost::shared_ptr<Villager> villager);
+    void setMerchantEntity(const boost::shared_ptr<Entity>& entity);
     virtual bool isAvailableToTrade();
     virtual Level* getLevel();
     virtual BlockPos getPosition();
@@ -41,7 +41,7 @@ private:
     boost::shared_ptr<Player> mTradingPlayer;
     MerchantRecipeList* mOffers;
     std::wstring mName;
-    boost::weak_ptr<Villager> mVillager;
+    boost::weak_ptr<Entity> mMerchantEntity;
 };
 
 #endif

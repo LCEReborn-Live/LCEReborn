@@ -8,6 +8,7 @@
 #include "game/client/audio/SoundEvents.hpp"
 #include "game/core/AttributeInstance.hpp"
 #include "game/core/BuiltInLootTables.hpp"
+#include "game/core/Cat.hpp"
 #include "game/core/Chicken.hpp"
 #include "game/core/DamageSource.hpp"
 #include "game/core/DifficultyInstance.hpp"
@@ -59,18 +60,25 @@
 
 const EntityDataAccessor<int>* Ocelot::DATA_CAT_TYPE = NULL;
 const EntityDataAccessor<bool>* Ocelot::DATA_IS_TEMPTED = NULL;
+const EntityDataAccessor<bool>* Ocelot::DATA_TRUSTING = NULL;
 
-static const int OCELOT_SPAWN_EGG_AUX = 98;
-
-Ocelot::Ocelot(Level* level) : TamableAnimal(level), mAvoidPlayersGoal(NULL)
+Ocelot::Ocelot(Level* level) : Ocelot(level, false)
 {
-    fjDerivedCtorCalls();
-    setSize(0.6f, 0.8f);
+}
+
+Ocelot::Ocelot(Level* level, bool deferInitialization) : TamableAnimal(level)
+{
+    if (!deferInitialization)
+    {
+        fjDerivedCtorCalls();
+        setSize(0.6f, 0.8f);
+    }
 }
 
 Ocelot::~Ocelot()
 {
     delete mTemptGoal;
+    delete mAvoidPlayersGoal;
 }
 
 Entity* Ocelot::create(Level* level)
@@ -84,11 +92,14 @@ void Ocelot::staticCtor()
                                                      EntityDataSerializers::INT);
     DATA_IS_TEMPTED = SynchedEntityData::defineId<bool>(EntityType::OCELOT, EntityType::TAMABLE_ANIMAL,
                                                         EntityDataSerializers::BOOLEAN);
+    DATA_TRUSTING = SynchedEntityData::defineId(EntityType::OCELOT, EntityType::TAMABLE_ANIMAL,
+                                              EntityDataSerializers::BOOLEAN);
 }
 
 void Ocelot::addDataWalkers(DataFixerUpper* fixer)
 {
     Mob::addDataWalkers(fixer, EntityType::OCELOT);
+    Mob::addDataWalkers(fixer, EntityType::CAT);
 }
 
 void Ocelot::setSittingOnBlock(bool sitting)
@@ -110,8 +121,9 @@ void Ocelot::SetIsTempted(bool tempted)
 
 void Ocelot::registerGoals()
 {
-    delete mSitGoal;
-    mSitGoal = new SitGoal(this);
+    const bool cat = GetType() == EntityType::CAT;
+    if (cat)
+        mSitGoal = new SitGoal(this);
 
     static Item* temptItems[2] = {Items::fish, Items::fish};
     static int temptAuxValues[2] = {static_cast<int>(FishFoodItem::Type::COD->getId()),
@@ -128,10 +140,13 @@ void Ocelot::registerGoals()
     mTemptGoal = new TemptGoal(this, 0.6, items, true, auxValues);
 
     mGoalSelector.addGoal(1, new FloatGoal(this), true);
-    mGoalSelector.addGoal(2, mSitGoal, false);
+    if (cat)
+    {
+        mGoalSelector.addGoal(2, mSitGoal, false);
+        mGoalSelector.addGoal(5, new FollowOwnerGoal(this, 1.0, 10.0f, 5.0f), true);
+        mGoalSelector.addGoal(6, new OcelotSitOnBlockGoal(this, 0.8), true);
+    }
     mGoalSelector.addGoal(3, mTemptGoal, false);
-    mGoalSelector.addGoal(5, new FollowOwnerGoal(this, 1.0, 10.0f, 5.0f), true);
-    mGoalSelector.addGoal(6, new OcelotSitOnBlockGoal(this, 0.8), true);
     mGoalSelector.addGoal(7, new LeapAtTargetGoal(this, 0.3f), true);
     mGoalSelector.addGoal(8, new OcelotAttackGoal(this), true);
     mGoalSelector.addGoal(9, new BreedGoal(this, 0.8), true);
@@ -147,10 +162,11 @@ void Ocelot::registerGoals()
 void Ocelot::defineSynchedData()
 {
     TamableAnimal::defineSynchedData();
-    int catType = 0;
+    int catType = GetType() == EntityType::CAT ? Cat::Tabby : 0;
     mEntityData->createDateItem(DATA_CAT_TYPE, catType);
     bool tempted = false;
     mEntityData->createDateItem(DATA_IS_TEMPTED, tempted);
+    mEntityData->createDateItem(DATA_TRUSTING, false);
 }
 
 void Ocelot::customServerAiStep()
@@ -185,7 +201,7 @@ void Ocelot::customServerAiStep()
 
 bool Ocelot::removeWhenFarAway()
 {
-    return Animal::removeWhenFarAway() && !isTame() && mTickCount > 2400;
+    return Animal::removeWhenFarAway() && !isTame() && !isTrusting() && mTickCount > 2400;
 }
 
 void Ocelot::registerAttributes()
@@ -202,16 +218,22 @@ void Ocelot::causeFallDamage(float, float)
 void Ocelot::addAdditonalSaveData(CompoundTag* tag)
 {
     TamableAnimal::addAdditonalSaveData(tag);
-    tag->putInt(L"CatType", getCatType());
+    if (GetType() == EntityType::CAT)
+        tag->putInt(L"CatType", getCatType());
+    else
+        tag->putBoolean(L"Trusting", isTrusting());
 }
 
 void Ocelot::readAdditionalSaveData(CompoundTag* tag)
 {
     TamableAnimal::readAdditionalSaveData(tag);
-    if (isTame())
-        setCatType(tag->getInt(L"CatType"));
+    if (GetType() == EntityType::CAT)
+    {
+        const int type = tag->getInt(L"CatType");
+        setCatType(type >= Cat::Tuxedo && type <= Cat::AllBlack ? type : Cat::Tabby);
+    }
     else
-        setCatType(0);
+        setTrusting(tag->getBoolean(L"Trusting"));
 }
 
 const SoundEvent* Ocelot::getAmbientSound()
@@ -224,7 +246,9 @@ const SoundEvent* Ocelot::getAmbientSound()
             return SoundEvents::CAT_PURREOW;
         return SoundEvents::CAT_AMBIENT;
     }
-    return NULL;
+    if (GetType() == EntityType::CAT)
+        return mEntityData->get(DATA_IS_TEMPTED) ? SoundEvents::CAT_BEG : SoundEvents::CAT_STRAY_MEOW;
+    return SoundEvents::OCELOT_IDLE;
 }
 
 const SoundEvent* Ocelot::getHurtSound(const DamageSource*)
@@ -234,7 +258,7 @@ const SoundEvent* Ocelot::getHurtSound(const DamageSource*)
 
 const SoundEvent* Ocelot::getDeathSound()
 {
-    return SoundEvents::CAT_DEATH;
+    return GetType() == EntityType::CAT ? SoundEvents::CAT_DEATH : SoundEvents::OCELOT_DEATH;
 }
 
 float Ocelot::getSoundVolume()
@@ -255,7 +279,8 @@ bool Ocelot::hurt(const DamageSource* source, float damage)
     if (isInvulnerableTo(source))
         return false;
 
-    mSitGoal->wantToSit(false);
+    if (mSitGoal)
+        mSitGoal->wantToSit(false);
     return Animal::hurt(source, damage);
 }
 
@@ -267,35 +292,30 @@ ResourceLocation* Ocelot::getDefaultLootTable()
 bool Ocelot::mobInteract(const boost::shared_ptr<Player>& player, InteractionHand::EInteractionHand hand)
 {
     not_null_ptr<ItemInstance> item = player->getItemInHand(hand);
+    const bool cat = GetType() == EntityType::CAT;
+
+    if (!cat && isTrusting())
+        return Animal::mobInteract(player, hand);
 
     if (!isTame())
     {
-        bool canTame = false;
-        if ((mEntityData->get(DATA_IS_TEMPTED) || (!isBaby() && player->mAbilities.mInstabuild)) && isFood(item)
-            && player->distanceToSqr(shared_from_this()) < 9.0)
-            canTame = true;
-
-        if (canTame)
+        if (isFood(item) && canAcceptFish(player))
         {
-            if (!player->mAbilities.mInstabuild)
-                item->shrink(1);
-
             if (!mLevel->mIsClientSide)
             {
-                if (mRandom->nextInt(3) == 0)
+                usePlayerItem(player, item);
+                const bool success = mRandom->nextInt(3) == 0;
+                if (success && cat)
                 {
                     tame(player);
-                    player->awardStat(GenericStats::tamedEntity(EntityType::OCELOT),
-                                      GenericStats::param_tamedEntity(EntityType::OCELOT));
-                    setCatType(mLevel->mRandom->nextInt(3) + 1);
-                    spawnTamingParticles(true);
-                    mLevel->broadcastEntityEvent(shared_from_this(), EntityEvent::TAMING_SUCCEEDED, 0);
+                    mSitGoal->wantToSit(true);
+                    player->awardStat(GenericStats::tamedEntity(EntityType::CAT),
+                                      GenericStats::param_tamedEntity(EntityType::CAT));
                 }
-                else
-                {
-                    spawnTamingParticles(false);
-                    mLevel->broadcastEntityEvent(shared_from_this(), EntityEvent::TAMING_FAILED, 0);
-                }
+                else if (success)
+                    setTrusting(true);
+                mLevel->broadcastEntityEvent(shared_from_this(),
+                    success ? EntityEvent::TAMING_SUCCEEDED : EntityEvent::TAMING_FAILED, 0);
             }
 
             return true;
@@ -317,14 +337,18 @@ bool Ocelot::mobInteract(const boost::shared_ptr<Player>& player, InteractionHan
 
         bool toggleSitting = true;
         if (!item->isEmpty()
-            && ((item->getItem() == Items::spawnEgg && item->getAuxValue() == OCELOT_SPAWN_EGG_AUX) || renaming
+            && ((item->getItem() == Items::spawnEgg && SpawnEggItem::fjGetType(item) == GetType()) || renaming
                 || item->getItem() == Items::lead))
         {
             toggleSitting = false;
         }
 
-        if (!mLevel->mIsClientSide && !isLeashedToPlayer(player) && !isFood(item) && toggleSitting)
-            mSitGoal->wantToSit(!isSitting());
+        if (!isLeashedToPlayer(player) && !isFood(item) && toggleSitting)
+        {
+            if (!mLevel->mIsClientSide)
+                mSitGoal->wantToSit(!isSitting());
+            return true;
+        }
     }
 
     return Animal::mobInteract(player, hand);
@@ -332,15 +356,8 @@ bool Ocelot::mobInteract(const boost::shared_ptr<Player>& player, InteractionHan
 
 boost::shared_ptr<AgableMob> Ocelot::getBreedOffspring(boost::shared_ptr<AgableMob>)
 {
-    boost::shared_ptr<Ocelot> offspring(new Ocelot(mLevel));
-
-    if (isTame())
-    {
-        offspring->setOwnerUUID(getOwnerUUID());
-        offspring->setTame(true);
-        offspring->setCatType(getCatType());
-    }
-
+    auto offspring = boost::shared_ptr<Ocelot>(new Ocelot(mLevel));
+    offspring->setTrusting(true);
     return offspring;
 }
 
@@ -359,18 +376,28 @@ bool Ocelot::isFood(const not_null_ptr<ItemInstance>& item)
 
 bool Ocelot::canMate(const boost::shared_ptr<Animal>& other)
 {
-    if (other == shared_from_this())
-        return false;
-    if (!isTame())
+    if (!Animal::canMate(other))
         return false;
 
-    boost::shared_ptr<Ocelot> ocelot = boost::dynamic_pointer_cast<Ocelot>(other);
-    if (ocelot == NULL)
-        return false;
-    if (!ocelot->isTame())
-        return false;
+    const auto ocelot = boost::static_pointer_cast<Ocelot>(other);
+    return GetType() == EntityType::CAT ? isTame() && ocelot->isTame() : isTrusting() && ocelot->isTrusting();
+}
 
-    return isInLove() && ocelot->isInLove();
+bool Ocelot::canAcceptFish(const boost::shared_ptr<Player>& player)
+{
+    return (mEntityData->get(DATA_IS_TEMPTED) || player->mAbilities.mInstabuild)
+        && player->distanceToSqr(shared_from_this()) < 9.0;
+}
+
+bool Ocelot::isTrusting() const
+{
+    return mEntityData->get(DATA_TRUSTING);
+}
+
+void Ocelot::setTrusting(bool trusting)
+{
+    mEntityData->set(DATA_TRUSTING, trusting, true);
+    reassessTameGoals();
 }
 
 int Ocelot::getCatType()
@@ -417,7 +444,7 @@ MobGroupData* Ocelot::finalizeMobSpawn(const DifficultyInstance& difficulty, Mob
 {
     data = Mob::finalizeMobSpawn(difficulty, data, std::wstring(L""));
 
-    if (getCatType() == 0 && mLevel->mRandom->nextInt(7) == 0)
+    if (GetType() == EntityType::OCELOT && mLevel->mRandom->nextInt(7) == 0)
     {
         for (int i = 0; i < 2; ++i)
         {
@@ -447,7 +474,7 @@ unsigned int Ocelot::GetInteractTooltip(const EntityTooltipDataHolder& tooltipDa
 {
     int itemId = Item::getId(tooltipData.m_pItemInstance->getItem());
 
-    if (itemId == ItemId::SPAWN_EGG && SpawnEggItem::fjGetType(tooltipData.m_pItemInstance) == EntityType::OCELOT)
+    if (itemId == ItemId::SPAWN_EGG && SpawnEggItem::fjGetType(tooltipData.m_pItemInstance) == GetType())
         return IDS_TOOLTIPS_PLACE;
 
     if (isLeashedToPlayer(tooltipData.m_pPlayer))
@@ -488,11 +515,12 @@ unsigned int Ocelot::GetInteractTooltip(const EntityTooltipDataHolder& tooltipDa
 
     if (isFood(tooltipData.m_pItemInstance))
     {
-        if ((mEntityData->get(DATA_IS_TEMPTED) || (!isBaby() && tooltipData.m_pPlayer->mAbilities.mInstabuild))
-            && tooltipData.m_pPlayer->distanceToSqr(shared_from_this()) < 9.0)
+        if (isTrusting())
+            return Animal::GetInteractTooltip(tooltipData);
+        if (canAcceptFish(tooltipData.m_pPlayer))
         {
             if (getPassengers()->empty())
-                return IDS_TOOLTIPS_TAME;
+                return GetType() == EntityType::CAT ? IDS_TOOLTIPS_TAME : IDS_TOOLTIPS_FEED;
         }
         else if (isBaby())
         {
@@ -510,8 +538,8 @@ void Ocelot::reassessTameGoals()
 
     mGoalSelector.removeGoal(mAvoidPlayersGoal);
 
-    if (!isTame())
-        mGoalSelector.addGoal(4, mAvoidPlayersGoal, true);
+    if (!isTame() && !isTrusting())
+        mGoalSelector.addGoal(4, mAvoidPlayersGoal, false);
 }
 
 unsigned long long Ocelot::GetType()

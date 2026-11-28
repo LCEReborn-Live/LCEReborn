@@ -164,11 +164,18 @@ void EndCityPieces::EndCityPiece::loadTemplate(StructureManager* structureManage
 void EndCityPieces::EndCityPiece::addAdditionalSaveData(DataOutputStream* output)
 {
     TemplateStructurePiece::addAdditionalSaveData(output);
+    output->writeVarInt(mTemplateType);
+    output->writeByte(mRotation->getType());
+    output->writeBoolean(mOverwrite);
 }
 
 void EndCityPieces::EndCityPiece::readAdditionalSaveData(DataInputStream* input, StructureManager* structureManager)
 {
     TemplateStructurePiece::readAdditionalSaveData(input, structureManager);
+    mTemplateType = static_cast<eMinecraftStructureTemplate>(input->readVarInt());
+    mRotation = Rotation::byType(static_cast<Rotation::eTYPE>(input->readByte()));
+    mOverwrite = input->readBoolean();
+    loadTemplate(structureManager);
 }
 
 void EndCityPieces::EndCityPiece::handleDataMarker(const std::wstring& marker, const BlockPos& position, Level* level,

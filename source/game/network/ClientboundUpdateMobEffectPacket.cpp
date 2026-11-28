@@ -4,6 +4,7 @@
 #include "game/core/DataOutputStream.hpp"
 #include "game/entity/mob/MobEffect.hpp"
 #include "game/entity/mob/MobEffectInstance.hpp"
+#include "game/entity/mob/MobEffects.hpp"
 #include "game/network/PacketListener.hpp"
 
 ClientboundUpdateMobEffectPacket::ClientboundUpdateMobEffectPacket()
@@ -20,7 +21,9 @@ ClientboundUpdateMobEffectPacket::ClientboundUpdateMobEffectPacket(int entityId,
     this->entityId = entityId;
     effectId = (unsigned char)MobEffect::getId(effect->getEffect());
     effectAmplifier = (unsigned char)effect->getAmplifier();
-    effectDurationTicks = effect->getDuration() <= 32767 ? (short)effect->getDuration() : 32767;
+    const bool raidEffect = effect->getEffect() == MobEffects::BAD_OMEN
+        || effect->getEffect() == MobEffects::HERO_OF_THE_VILLAGE;
+    effectDurationTicks = raidEffect || effect->getDuration() < 32767 ? effect->getDuration() : 32767;
 
     effectFlags = 0;
 
@@ -113,5 +116,6 @@ int ClientboundUpdateMobEffectPacket::getPacketId()
 
 bool ClientboundUpdateMobEffectPacket::isSuperLongDuration()
 {
-    return effectDurationTicks == 32767;
+    return effectDurationTicks == 32767 && MobEffect::byId(effectId) != MobEffects::BAD_OMEN
+        && MobEffect::byId(effectId) != MobEffects::HERO_OF_THE_VILLAGE;
 }

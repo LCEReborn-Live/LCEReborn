@@ -20,6 +20,8 @@
 #include "game/world/Level.hpp"
 #include "game/world/block/BlockState.hpp"
 #include "game/world/block/ChestBlock.hpp"
+#include "game/world/block/Blocks.hpp"
+#include "game/world/block/ComposterBlock.hpp"
 #include "game/world/block/ChestBlockEntity.hpp"
 #include "game/world/block/HopperBlock.hpp"
 
@@ -206,13 +208,16 @@ boost::shared_ptr<Container> HopperBlockEntity::getContainerAt(Level* level, dou
     int blockY = Mth::floor(y);
     int blockZ = Mth::floor(z);
     BlockPos pos(blockX, blockY, blockZ);
+    const auto* state = level->getBlockState(pos);
+    if (state->getBlock() == Blocks::composter)
+        return static_cast<ComposterBlock*>(Blocks::composter)->hopperContainer(level, pos, state);
     boost::shared_ptr<BlockEntity> blockEntity = level->getBlockEntity(pos);
     container = boost::dynamic_pointer_cast<Container>(blockEntity);
     if (container)
     {
         if (boost::dynamic_pointer_cast<ChestBlockEntity>(container))
         {
-            Block* block = level->getBlockState(pos)->getBlock();
+            Block* block = state->getBlock();
             if (block != NULL && dynamic_cast<ChestBlock*>(block) != NULL)
                 container = static_cast<ChestBlock*>(block)->getContainer(level, pos, true);
         }

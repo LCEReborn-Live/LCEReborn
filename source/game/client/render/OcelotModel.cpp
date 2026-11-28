@@ -7,31 +7,29 @@
 #include "game/client/render/TexturePack.hpp"
 #include "game/client/render/TexturePackRepository.hpp"
 #include "game/core/BufferBuilder.hpp"
+#include "game/core/Cat.hpp"
 #include "game/core/GlStateManager.hpp"
 #include "game/core/Minecraft.hpp"
 #include "game/core/Mth.hpp"
 #include "game/core/Ocelot.hpp"
 
-static float OCELOT_HEAD_Y = 15.0f;
-static float OCELOT_HEAD_Z = -9.0f;
-static float OCELOT_BODY_Y = 12.0f;
-static float OCELOT_BODY_Z = -10.0f;
-static float OCELOT_TAIL1_Y = 15.0f;
-static float OCELOT_TAIL1_Z = 8.0f;
-static float OCELOT_TAIL2_Y = 20.0f;
-static float OCELOT_TAIL2_Z = 14.0f;
-static float OCELOT_BACK_LEG_Y = 18.0f;
-static float OCELOT_BACK_LEG_Z = 5.0f;
-static float OCELOT_FRONT_LEG_Y = 13.8f;
-static float OCELOT_FRONT_LEG_Z = -5.0f;
-
-OcelotModel::OcelotModel()
+namespace
 {
-    TexturePack* texturePack = Minecraft::GetInstance()->mTexturePackRepository->defaultTexturePack;
-    LoadOcelotModelDefinition(*texturePack->GetCustomModel(L"ocelot"));
+constexpr float KittenHeadScale = 0.75f;
+constexpr float KittenBodyScale = 0.5f;
+constexpr float KittenHeadOffsetY = 10.0f;
+constexpr float KittenHeadOffsetZ = 4.0f;
+constexpr float KittenBodyOffsetY = 24.0f;
 }
 
-OcelotModel::OcelotModel(const ModelDefinition& modelDefinition)
+OcelotModel::OcelotModel(const std::wstring& modelName) : mModelName(modelName)
+{
+    TexturePack* texturePack = Minecraft::GetInstance()->mTexturePackRepository->defaultTexturePack;
+    const auto& name = texturePack->HasCustomModel(modelName) ? modelName : std::wstring(L"ocelot");
+    LoadOcelotModelDefinition(*texturePack->GetCustomModel(name));
+}
+
+OcelotModel::OcelotModel(const ModelDefinition& modelDefinition, const std::wstring& modelName) : mModelName(modelName)
 {
     LoadOcelotModelDefinition(modelDefinition);
 }
@@ -62,16 +60,25 @@ void OcelotModel::render(boost::shared_ptr<Entity>& entity, float limbSwing, flo
 {
     setupAnim(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, scale, entity, _SkinAdjustments());
 
+    if (mRelaxing > 0.0f)
+    {
+        const float belly = (mYoung ? 18.5f : mBody->mWorldY) * scale;
+        GlStateManager::pushMatrix();
+        GlStateManager::translatef(0.0f, belly + (20.4f * scale - belly) * mRelaxing, 0.0f);
+        GlStateManager::rotatef(90.0f * mRelaxing, 0.0f, 0.0f, 1.0f);
+        GlStateManager::translatef(0.0f, -belly, 0.0f);
+    }
+
     if (mYoung)
     {
         GlStateManager::pushMatrix();
-        GlStateManager::scalef(0.75f, 0.75f, 0.75f);
-        GlStateManager::translatef(0.0f, 10.0f * scale, 4.0f * scale);
+        GlStateManager::scalef(KittenHeadScale, KittenHeadScale, KittenHeadScale);
+        GlStateManager::translatef(0.0f, KittenHeadOffsetY * scale, KittenHeadOffsetZ * scale);
         mHead->render(scale, useDisplayList, false);
         GlStateManager::popMatrix();
         GlStateManager::pushMatrix();
-        GlStateManager::scalef(0.5f, 0.5f, 0.5f);
-        GlStateManager::translatef(0.0f, 24.0f * scale, 0.0f);
+        GlStateManager::scalef(KittenBodyScale, KittenBodyScale, KittenBodyScale);
+        GlStateManager::translatef(0.0f, KittenBodyOffsetY * scale, 0.0f);
         mBody->render(scale, useDisplayList, false);
         mBackLegL->render(scale, useDisplayList, false);
         mBackLegR->render(scale, useDisplayList, false);
@@ -94,6 +101,7 @@ void OcelotModel::render(boost::shared_ptr<Entity>& entity, float limbSwing, flo
         mFrontLegR->render(scale, useDisplayList, false);
         callSkinnedDrawlist();
     }
+    if (mRelaxing > 0.0f) GlStateManager::popMatrix();
 }
 
 void OcelotModel::render(OcelotModel* model, float scale, bool useDisplayList)
@@ -139,39 +147,65 @@ void OcelotModel::setupAnim(float limbSwing, float limbSwingAmount, float ageInT
             mBackLegR->mXRot = Mth::cos(limbSwing * 0.6662f + 0.3f) * 1.0f * limbSwingAmount;
             mFrontLegL->mXRot = Mth::cos(limbSwing * 0.6662f + 3.4415927f) * 1.0f * limbSwingAmount;
             mFrontLegR->mXRot = Mth::cos(limbSwing * 0.6662f + 3.1415927f) * 1.0f * limbSwingAmount;
-            mTail2->mXRot = 0.31415927f * Mth::cos(limbSwing) * limbSwingAmount + 1.7278761f;
+            mTail2->mXRot = 0.20f + 0.25f * Mth::cos(limbSwing) * limbSwingAmount;
         }
         else
         {
             mBackLegR->mXRot = Mth::cos(limbSwing * 0.6662f + 3.1415927f) * 1.0f * limbSwingAmount;
             mFrontLegL->mXRot = Mth::cos(limbSwing * 0.6662f + 3.1415927f) * 1.0f * limbSwingAmount;
             mFrontLegR->mXRot = Mth::cos(limbSwing * 0.6662f) * 1.0f * limbSwingAmount;
-            if (mPose == 1)
-                mTail2->mXRot = 0.7853982f * Mth::cos(limbSwing) * limbSwingAmount + 1.7278761f;
-            else
-                mTail2->mXRot = 0.47123894f * Mth::cos(limbSwing) * limbSwingAmount + 1.7278761f;
+            mTail2->mXRot = mTail1->mXRot + 0.32f + 0.3f * Mth::cos(limbSwing) * limbSwingAmount;
         }
     }
+
+    if (mRelaxing > 0.0f)
+    {
+        mHead->mXRot += (0.1f - mHead->mXRot) * mRelaxing;
+        mHead->mYRot += (-0.23f - mHead->mYRot) * mRelaxing;
+        mFrontLegL->mXRot += (-1.28f - mFrontLegL->mXRot) * mRelaxing;
+        mFrontLegR->mXRot += (-1.12f - mFrontLegR->mXRot) * mRelaxing;
+        mBackLegL->mXRot += (-1.15f - mBackLegL->mXRot) * mRelaxing;
+        mBackLegR->mXRot += (-1.02f - mBackLegR->mXRot) * mRelaxing;
+        mTail1->mXRot += (-0.18f - mTail1->mXRot) * mRelaxing;
+        mTail2->mXRot += (0.08f - mTail2->mXRot) * mRelaxing;
+    }
+
+    if (pose == 3)
+    {
+        mHead->mXRot = Mth::clamp(mHead->mXRot, -50.0f * Mth::DEG_TO_RAD, 35.0f * Mth::DEG_TO_RAD);
+        // Keep the back of the head at the front of the tilted body as it turns.
+        const float bodyFront = -8.0f;
+        float neckY = mBody->mY - Mth::sin(mBody->mXRot) * bodyFront - 0.8f;
+        float neckZ = mBody->mZ + Mth::cos(mBody->mXRot) * bodyFront;
+        if (mYoung)
+        {
+            neckY = (neckY + KittenBodyOffsetY) * KittenBodyScale / KittenHeadScale - KittenHeadOffsetY;
+            neckZ = neckZ * KittenBodyScale / KittenHeadScale - KittenHeadOffsetZ;
+        }
+        const float headBack = 1.5f;
+        const float depth = Mth::cos(mHead->mXRot) * headBack;
+        mHead->setPos(mHead->mWorldX - Mth::sin(mHead->mYRot) * depth,
+                      neckY + Mth::sin(mHead->mXRot) * headBack,
+                      neckZ - Mth::cos(mHead->mYRot) * depth);
+    }
+
+    // TU80 encodes the tail boxes along Z. Keep the tip attached as the base swings.
+    const float tailLength = mTail2->mWorldZ - mTail1->mWorldZ;
+    mTail2->mY = mTail1->mY - Mth::sin(mTail1->mXRot) * tailLength;
+    mTail2->mZ = mTail1->mZ + Mth::cos(mTail1->mXRot) * tailLength;
 }
 
 void OcelotModel::prepareMobModel(boost::shared_ptr<LivingEntity>& entity, float limbSwing, float limbSwingAmount,
                                   float partialTicks)
 {
     boost::shared_ptr<Ocelot> ocelot = boost::dynamic_pointer_cast<Ocelot>(entity);
+    const auto cat = boost::dynamic_pointer_cast<Cat>(entity);
+    mRelaxing = cat ? cat->getRelaxingProgress(partialTicks) : 0.0f;
+    mRelaxing = mRelaxing * mRelaxing * (3.0f - 2.0f * mRelaxing);
 
-    mBody->mY = OCELOT_BODY_Y;
-    mBody->mZ = OCELOT_BODY_Z;
-    mHead->mY = OCELOT_HEAD_Y;
-    mHead->mZ = OCELOT_HEAD_Z;
-    mTail1->mY = OCELOT_TAIL1_Y;
-    mTail1->mZ = OCELOT_TAIL1_Z;
-    mTail2->mY = OCELOT_TAIL2_Y;
-    mTail2->mZ = OCELOT_TAIL2_Z;
-    mFrontLegL->mY = mFrontLegR->mY = OCELOT_FRONT_LEG_Y;
-    mFrontLegL->mZ = mFrontLegR->mZ = OCELOT_FRONT_LEG_Z;
-    mBackLegL->mY = mBackLegR->mY = OCELOT_BACK_LEG_Y;
-    mBackLegL->mZ = mBackLegR->mZ = OCELOT_BACK_LEG_Z;
-    mTail1->mXRot = 0.9f;
+    for (ModelPart* part : {mBody, mHead, mTail1, mTail2, mFrontLegL, mFrontLegR, mBackLegL, mBackLegR})
+        part->setPos(part->mWorldX, part->mWorldY, part->mWorldZ);
+    mTail1->mXRot = 0.35f;
     mBody->mXRot = 0.0f;
 
     if (ocelot->isSneaking())
@@ -179,45 +213,33 @@ void OcelotModel::prepareMobModel(boost::shared_ptr<LivingEntity>& entity, float
         mBody->mY += 1.0f;
         mHead->mY += 2.0f;
         mTail1->mY += 1.0f;
-        mTail2->mY += -4.0f;
-        mTail2->mZ += 2.0f;
-        mTail1->mXRot = 1.5707964f;
-        mTail2->mXRot = 1.5707964f;
+        mTail1->mXRot = 0.16f;
         mPose = 0;
     }
     else if (ocelot->isSprinting())
     {
-        mTail2->mY = mTail1->mY;
-        mTail2->mZ += 2.0f;
-        mTail1->mXRot = 1.5707964f;
-        mTail2->mXRot = 1.5707964f;
+        mTail1->mXRot = 0.05f;
         mPose = 2;
     }
     else if (ocelot->isSitting())
     {
-        mBody->mXRot = -45.0f * Mth::DEG_TO_RAD;
-        mBody->mY += -4.0f;
-        mBody->mZ += 5.0f;
-        mHead->mY += -3.3f;
-        mHead->mZ += 1.0f;
-        mTail1->mY += 8.0f;
-        mTail1->mZ += -2.0f;
-        mTail2->mY += 2.0f;
-        mTail2->mZ += -0.8f;
-        mTail1->mXRot = 1.7278761f;
-        mTail2->mXRot = 2.670354f;
-        mFrontLegL->mXRot = -0.15707964f;
-        mFrontLegL->mY = OCELOT_FRONT_LEG_Y + 2.0f;
-        mFrontLegL->mZ = -7.0f;
-        mFrontLegR->mXRot = -0.15707964f;
-        mFrontLegR->mY = OCELOT_FRONT_LEG_Y + 2.0f;
-        mFrontLegR->mZ = -7.0f;
+        mBody->mXRot = -0.78f;
+        mBody->mY -= 0.6f;
+        mBody->mZ += 1.0f;
+        mTail1->mY += 7.5f;
+        mTail1->mZ -= 0.5f;
+        mTail1->mXRot = 0.08f;
+        mTail2->mXRot = 0.17f;
+        mFrontLegL->mXRot = 0.0f;
+        mFrontLegL->mZ += 0.25f;
+        mFrontLegR->mXRot = 0.0f;
+        mFrontLegR->mZ += 0.25f;
         mBackLegL->mXRot = -1.5707964f;
-        mBackLegL->mY = OCELOT_BACK_LEG_Y + 3.0f;
-        mBackLegL->mZ = OCELOT_BACK_LEG_Z - 4.0f;
+        mBackLegL->mY += 5.0f;
+        mBackLegL->mZ -= 1.0f;
         mBackLegR->mXRot = -1.5707964f;
-        mBackLegR->mY = OCELOT_BACK_LEG_Y + 3.0f;
-        mBackLegR->mZ = OCELOT_BACK_LEG_Z - 4.0f;
+        mBackLegR->mY += 5.0f;
+        mBackLegR->mZ -= 1.0f;
         mPose = 3;
     }
     else

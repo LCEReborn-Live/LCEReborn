@@ -1,6 +1,7 @@
 #include "game/entity/mob/SharedMonsterAttributes.hpp"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <boost/unordered_set.hpp>
@@ -86,6 +87,8 @@ ListTag* SharedMonsterAttributes::saveAttributes(BaseAttributeMap* attributes)
 
 AttributeModifier* SharedMonsterAttributes::loadAttributeModifier(CompoundTag* tag)
 {
+    if (!tag->contains(L"UUID", Tag::TAG_ANY_NUMERIC))
+        return nullptr;
     eMODIFIER_ID id = (eMODIFIER_ID)tag->getInt(std::wstring(L"UUID"));
 
     return new AttributeModifier(id, tag->getDouble(std::wstring(L"Amount")), tag->getInt(std::wstring(L"Operation")));
@@ -120,12 +123,45 @@ void SharedMonsterAttributes::loadAttribute(AttributeInstance* instance, Compoun
 
 void SharedMonsterAttributes::loadAttributes(BaseAttributeMap* attributes, ListTag* tags)
 {
+    static const std::pair<const wchar_t*, eATTRIBUTE_ID> namedAttributes[] = {
+        {L"generic.maxHealth", eATTRIBUTE_ID_MaxHealth},
+        {L"generic.followRange", eATTRIBUTE_ID_FollowRange},
+        {L"generic.knockbackResistance", eATTRIBUTE_ID_KnockbackResistance},
+        {L"generic.movementSpeed", eATTRIBUTE_ID_MovementSpeed},
+        {L"generic.attackDamage", eATTRIBUTE_ID_AttackDamage},
+        {L"horse.jumpStrength", eATTRIBUTE_ID_HorseJumpStrength},
+        {L"zombie.spawnReinforcements", eATTRIBUTE_ID_ZombieSpawnReinforcements},
+        {L"generic.attackSpeed", eATTRIBUTE_ID_AttackSpeed},
+        {L"generic.armor", eATTRIBUTE_ID_Armor},
+        {L"generic.armorToughness", eATTRIBUTE_ID_ArmorToughness},
+        {L"generic.luck", eATTRIBUTE_ID_Luck},
+        {L"generic.flyingSpeed", eATTRIBUTE_ID_FlyingSpeed},
+    };
     for (int i = 0; i < tags->size(); ++i)
     {
         CompoundTag* tag = tags->getCompound(i);
+        if (!tag->contains(L"Base", Tag::TAG_ANY_NUMERIC))
+            continue;
 
-        AttributeInstance* instance = attributes->getInstance((eATTRIBUTE_ID)tag->getInt(std::wstring(L"ID")));
+        int id = eATTRIBUTE_ID_Count;
+        if (tag->contains(L"ID", Tag::TAG_ANY_NUMERIC))
+            id = tag->getInt(L"ID");
+        else
+        {
+            const auto name = tag->getString(L"Name");
+            for (const auto& attribute : namedAttributes)
+            {
+                if (name == attribute.first)
+                {
+                    id = attribute.second;
+                    break;
+                }
+            }
+        }
+        if (id < 0 || id >= eATTRIBUTE_ID_Count)
+            continue;
 
+        auto* instance = attributes->getInstance(static_cast<eATTRIBUTE_ID>(id));
         if (instance != NULL)
         {
             loadAttribute(instance, tag);

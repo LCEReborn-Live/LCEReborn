@@ -10,7 +10,7 @@ class Mob;
 class BreakDoorGoal : public DoorInteractGoal
 {
 public:
-    BreakDoorGoal(Mob* mob);
+    BreakDoorGoal(Mob* mob, int duration = 240, int minimumDifficulty = 3);
     virtual ~BreakDoorGoal();
     virtual bool canUse();
     virtual void start();
@@ -22,6 +22,8 @@ public:
 protected:
     int mBreakingTime;
     int mLastBreakProgress;
+    int mDuration;
+    int mMinimumDifficulty;
 };
 
 #endif

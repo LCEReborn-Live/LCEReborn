@@ -16,6 +16,7 @@ struct PcLaunchOptions
 {
     std::string username;
     std::string contentDir;
+    std::string villageTemplatesDir;
     std::string saveDir;
     std::string packsDir;
     std::string resourceDir;

@@ -1,4 +1,7 @@
 #include "game/world/block/BlockEntity.hpp"
+#include "game/world/block/CampfireBlock.hpp"
+#include "game/world/block/BellBlock.hpp"
+#include "game/world/block/LecternBlock.hpp"
 #include "game/core/EntityType.hpp"
 
 #include <map>
@@ -11,6 +14,7 @@
 #include "game/world/block/MappedRegistry.hpp"
 #include "game/world/block/FurnaceBlockEntity.hpp"
 #include "game/world/block/ChestBlockEntity.hpp"
+#include "game/world/block/BarrelBlockEntity.hpp"
 #include "game/world/block/EnderChestBlockEntity.hpp"
 #include "game/world/block/JukeboxBlock.hpp"
 #include "game/world/block/DispenserBlockEntity.hpp"
@@ -282,6 +286,10 @@ void BlockEntity::staticCtor()
     Register(25, BedBlockEntity::create, BlockEntityType::BED, L"bed");
     Register(26, CauldronBlockEntity::create, BlockEntityType::CAULDRON, L"cauldron");
     Register(27, ConduitBlockEntity::create, BlockEntityType::CONDUIT, L"conduit");
+    Register(28, BarrelBlockEntity::create, BlockEntityType::BARREL, L"barrel");
+    Register(29, CampfireBlockEntity::create, BlockEntityType::CAMPFIRE, L"campfire");
+    Register(30, BellBlockEntity::create, BlockEntityType::BELL, L"bell");
+    Register(31, LecternBlockEntity::create, BlockEntityType::LECTERN, L"lectern");
 }
 
 void BlockEntity::Register(int id, Creator creator, unsigned long long type, std::wstring name)

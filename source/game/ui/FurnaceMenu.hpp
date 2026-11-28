@@ -4,6 +4,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "game/ui/AbstractContainerMenu.hpp"
+#include "game/item/FurnaceKind.hpp"
 
 class Container;
 class Inventory;
@@ -13,6 +14,7 @@ class FurnaceMenu : public AbstractContainerMenu
 {
 public:
     FurnaceMenu(boost::shared_ptr<Inventory> inventory, boost::shared_ptr<Container> container);
+    static FurnaceKind getKind(const boost::shared_ptr<Container>& container);
 
     virtual void addSlotListener(net_minecraft_world_inventory::ContainerListener* listener);
     virtual void broadcastChanges();
@@ -27,6 +29,7 @@ public:
 
 private:
     boost::shared_ptr<Container> mContainer;
+    FurnaceKind mKind;
     int mCookingProgress;
     int mCookingTotalTime;
     int mLitTime;

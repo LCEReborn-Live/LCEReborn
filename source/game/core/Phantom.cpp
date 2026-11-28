@@ -1,4 +1,6 @@
 #include "game/core/Phantom.hpp"
+#include "game/core/Cat.hpp"
+#include "game/entity/ai/AvoidEntityGoal.hpp"
 #include "game/core/EntityType.hpp"
 
 #include <cmath>
@@ -125,6 +127,7 @@ bool Phantom::canFly()
 
 void Phantom::registerGoals()
 {
+    mGoalSelector.addGoal(0, new AvoidEntityGoal(this, typeid(Cat), 16.0f, 1.15, 1.35), true);
     mGoalSelector.addGoal(1, new SwoopAttackGoal(this, 1.0f, Goal::FloatRange(10.0f, 20.0f)), true);
     mGoalSelector.addGoal(2,
                           new CircleAroundAnchorGoal(this, 1.0f, Goal::FloatRange(12.0f, 18.0f), 250,

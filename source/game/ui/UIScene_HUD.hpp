@@ -30,7 +30,7 @@ public:
     static bool SORTBYTIMELEFT(MobEffectInstance* first, MobEffectInstance* second);
     void updateEffectsDisplay();
     void SetNumBossBars(int count);
-    void SetBossBar(int index, float progress, const std::wstring& name);
+    void SetBossBar(int index, float progress, const std::wstring& name, int color, int overlay);
     void HideSelectedLabel();
     virtual void tick();
     virtual void updateSafeZone();

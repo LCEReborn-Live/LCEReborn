@@ -34,14 +34,16 @@ public:
             FLOWER_ORANGE_TULIP = 6,
             FLOWER_WHITE_TULIP = 7,
             FLOWER_PINK_TULIP = 8,
-            FLOWER_OXEYE_DAISY = 9
+            FLOWER_OXEYE_DAISY = 9,
+            FLOWER_LILY_OF_THE_VALLEY,
+            FLOWER_CORNFLOWER
         };
 
         enum
         {
-            FLOWER_COUNT = 10,
+            FLOWER_COUNT = 12,
             YELLOW_FLOWER_COUNT = 1,
-            RED_FLOWER_COUNT = 9
+            RED_FLOWER_COUNT = 11
         };
 
         Flower(FlowerCategory* category, int data, const std::wstring& name, int nameId, int descriptionId,
@@ -76,6 +78,8 @@ public:
         static Flower* WHITE_TULIP;
         static Flower* PINK_TULIP;
         static Flower* OXEYE_DAISY;
+        static Flower* LILY_OF_THE_VALLEY;
+        static Flower* CORNFLOWER;
 
         FlowerCategory* mCategory;
         int mData;

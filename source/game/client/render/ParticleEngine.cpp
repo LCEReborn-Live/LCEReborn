@@ -35,6 +35,7 @@
 #include "game/client/render/CritParticle.hpp"
 #include "game/client/render/SmokeParticle.hpp"
 #include "game/client/render/LargeSmokeParticle.hpp"
+#include "game/client/render/CampfireSmokeParticle.hpp"
 #include "game/client/render/SpellParticle.hpp"
 #include "game/client/render/DripParticle.hpp"
 #include "game/client/render/HeartParticle.hpp"
@@ -148,6 +149,8 @@ void ParticleEngine::registerProviders()
     registerParticle(PARTICLE_MAGIC_CRIT->getId(), new CritParticle::MagicProvider());
     registerParticle(PARTICLE_SMOKE->getId(), new SmokeParticle::Provider());
     registerParticle(PARTICLE_LARGE_SMOKE->getId(), new LargeSmokeParticle::Provider());
+    registerParticle(PARTICLE_CAMPFIRE_SMOKE->getId(), new CampfireSmokeParticle::Provider());
+    registerParticle(PARTICLE_CAMPFIRE_SIGNAL_SMOKE->getId(), new CampfireSmokeParticle::Provider());
     registerParticle(PARTICLE_SPELL->getId(), new SpellParticle::Provider());
     registerParticle(PARTICLE_INSTANT_SPELL->getId(), new SpellParticle::InstantProvider());
     registerParticle(PARTICLE_MOB_SPELL->getId(), new SpellParticle::MobProvider());
@@ -345,7 +348,7 @@ void ParticleEngine::tickTextureType(int textureType)
 
 void ParticleEngine::tick()
 {
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < TextureTypeCount; ++i)
     {
         tickTextureType(i);
     }
@@ -407,7 +410,7 @@ void ParticleEngine::render(boost::shared_ptr<Entity>& entity, float partialTick
         GlStateManager::alphaFunc(4, 0.003921569f);
     }
 
-    for (int textureType = 0; textureType < 5; ++textureType)
+    for (int textureType = 0; textureType < TextureTypeCount; ++textureType)
     {
         if (textureType == 3)
         {
@@ -438,6 +441,13 @@ void ParticleEngine::render(boost::shared_ptr<Entity>& entity, float partialTick
             else if (textureType == 2)
             {
                 textures->bindTexture(&ITEM_LOCATION);
+            }
+            else if (textureType == CampfireSmokeTexture)
+            {
+                textures->bindTexture(L"textures/blocks/campfire_smoke");
+                GlStateManager::enableBlend();
+                GlStateManager::blendFunc(4, 5);
+                GlStateManager::alphaFunc(4, 0.003921569f);
             }
             MemSect(0);
 
@@ -593,7 +603,7 @@ void ParticleEngine::setLevel(Level* newLevel)
     {
         for (int dimension = 0; dimension < 3; ++dimension)
         {
-            for (int textureType = 0; textureType < 5; ++textureType)
+            for (int textureType = 0; textureType < TextureTypeCount; ++textureType)
             {
                 for (int list = 0; list < 2; ++list)
                 {
@@ -625,7 +635,7 @@ std::wstring ParticleEngine::countParticles()
         }
     }
     int count = 0;
-    for (int textureType = 0; textureType < 5; ++textureType)
+    for (int textureType = 0; textureType < TextureTypeCount; ++textureType)
     {
         for (int list = 0; list < 2; ++list)
         {

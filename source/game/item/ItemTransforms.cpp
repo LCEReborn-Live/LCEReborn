@@ -641,7 +641,9 @@ ItemTransforms* ItemTransforms::getTransforms(const ItemInstance* item, LivingEn
 
         if (block == Blocks::pumpkin || block == Blocks::carved_pumpkin || block == Blocks::lit_pumpkin
             || block == Blocks::dropper || block == Blocks::dispenser || block == Blocks::furnace
-            || block == Blocks::lit_furnace || block == Blocks::white_glazed_terracotta
+            || block == Blocks::lit_furnace || block == Blocks::smoker || block == Blocks::lit_smoker
+            || block == Blocks::blast_furnace || block == Blocks::lit_blast_furnace
+            || block == Blocks::white_glazed_terracotta
             || block == Blocks::orange_glazed_terracotta || block == Blocks::magenta_glazed_terracotta
             || block == Blocks::light_blue_glazed_terracotta || block == Blocks::yellow_glazed_terracotta
             || block == Blocks::lime_glazed_terracotta || block == Blocks::pink_glazed_terracotta

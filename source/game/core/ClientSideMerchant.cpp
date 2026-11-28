@@ -2,11 +2,11 @@
 
 #include <stdint.h>
 
+#include "game/entity/mob/Entity.hpp"
 #include "game/item/MerchantContainer.hpp"
 #include "game/item/MerchantRecipe.hpp"
 #include "game/item/MerchantRecipeList.hpp"
 #include "game/world/generation/Player.hpp"
-#include "game/world/generation/Villager.hpp"
 
 ClientSideMerchant::ClientSideMerchant(boost::shared_ptr<Player> player, const std::wstring& name)
 {
@@ -14,7 +14,6 @@ ClientSideMerchant::ClientSideMerchant(boost::shared_ptr<Player> player, const s
     mContainer = NULL;
     mOffers = NULL;
     mName = name;
-    mVillager = boost::weak_ptr<Villager>();
 }
 
 ClientSideMerchant::~ClientSideMerchant()
@@ -62,15 +61,15 @@ std::wstring ClientSideMerchant::getDisplayName()
     return mName;
 }
 
-void ClientSideMerchant::setVillager(boost::shared_ptr<Villager> villager)
+void ClientSideMerchant::setMerchantEntity(const boost::shared_ptr<Entity>& entity)
 {
-    mVillager = villager;
+    mMerchantEntity = entity;
 }
 
 bool ClientSideMerchant::isAvailableToTrade()
 {
-    boost::shared_ptr<Villager> villager = mVillager.lock();
-    if (villager && villager->mRemoved)
+    const auto entity = mMerchantEntity.lock();
+    if (entity && entity->mRemoved)
         return false;
     return true;
 }

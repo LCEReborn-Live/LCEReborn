@@ -1,4 +1,7 @@
 #include "game/item/MerchantRecipeList.hpp"
+#include "game/core/Mth.hpp"
+
+#include <algorithm>
 
 #include "game/core/DataInputStream.hpp"
 #include "game/core/DataOutputStream.hpp"
@@ -41,12 +44,12 @@ bool MerchantRecipeList::isRequiredItem(not_null_ptr<ItemInstance> supplied, not
 MerchantRecipe* MerchantRecipeList::getRecipeFor(not_null_ptr<ItemInstance> first, not_null_ptr<ItemInstance> second,
                                                  int hint)
 {
-    if (hint > 0 && hint < std::vector<MerchantRecipe*>::size())
+    if (hint >= 0 && hint < size())
     {
         MerchantRecipe* recipe = std::vector<MerchantRecipe*>::at(hint);
-        if (isRequiredItem(first, recipe->getBuyAItem())
+        if (!isLocked(recipe) && !recipe->isDeprecated() && isRequiredItem(first, recipe->getBuyAItem())
             && ((second->isEmpty() && !recipe->hasSecondaryBuyItem())
-                || (recipe->hasSecondaryBuyItem() && isRequiredItem(second, recipe->getBuyAItem()))))
+                || (recipe->hasSecondaryBuyItem() && isRequiredItem(second, recipe->getBuyBItem()))))
         {
             if (first->getCount() >= recipe->getBuyAItem()->getCount()
                 && (!recipe->hasSecondaryBuyItem() || second->getCount() >= recipe->getBuyBItem()->getCount()))
@@ -60,7 +63,8 @@ MerchantRecipe* MerchantRecipeList::getRecipeFor(not_null_ptr<ItemInstance> firs
     for (unsigned int index = 0; index < std::vector<MerchantRecipe*>::size(); ++index)
     {
         MerchantRecipe* recipe = std::vector<MerchantRecipe*>::at(index);
-        if (isRequiredItem(first, recipe->getBuyAItem()) && first->getCount() >= recipe->getBuyAItem()->getCount()
+        if (!isLocked(recipe) && !recipe->isDeprecated() && isRequiredItem(first, recipe->getBuyAItem())
+            && first->getCount() >= recipe->getBuyAItem()->getCount()
             && ((!recipe->hasSecondaryBuyItem() && second->isEmpty())
                 || (recipe->hasSecondaryBuyItem() && isRequiredItem(second, recipe->getBuyBItem())
                     && second->getCount() >= recipe->getBuyBItem()->getCount())))
@@ -99,7 +103,7 @@ MerchantRecipe* MerchantRecipeList::getMatchingRecipeFor(not_null_ptr<ItemInstan
     for (unsigned int index = 0; index < std::vector<MerchantRecipe*>::size(); ++index)
     {
         MerchantRecipe* recipe = std::vector<MerchantRecipe*>::at(index);
-        if (first->getItem() == recipe->getBuyAItem()->getItem()
+        if (!isLocked(recipe) && !recipe->isDeprecated() && first->getItem() == recipe->getBuyAItem()->getItem()
             && first->getCount() >= recipe->getBuyAItem()->getCount()
             && result->getItem() == recipe->getSellItem()->getItem())
         {
@@ -128,9 +132,20 @@ void MerchantRecipeList::writeToStream(DataOutputStream* stream)
         {
             stream->writeItem(buyB);
         }
-        stream->writeBoolean(recipe->isDeprecated());
+        stream->writeBoolean(recipe->isDeprecated() || isLocked(recipe));
         stream->writeInt(recipe->getUses());
         stream->writeInt(recipe->getMaxUses());
+    }
+    // Legacy readers stop after the item list. Keep the progression in an optional trailer.
+    if (mTradeLevel > 0)
+    {
+        stream->writeByte(static_cast<unsigned char>(mTradeLevel));
+        stream->writeShort(static_cast<short>(mTradeExperience));
+        for (const auto* recipe : *this)
+        {
+            stream->writeByte(static_cast<unsigned char>(recipe->getTradeLevel()));
+            stream->writeByte(static_cast<unsigned char>(recipe->getTradeExperience()));
+        }
     }
 }
 
@@ -152,17 +167,41 @@ MerchantRecipeList* MerchantRecipeList::createFromStream(DataInputStream* stream
         {
             buyB = stream->readItem();
         }
-        bool deprecated = stream->readBoolean();
+        stream->readBoolean();
         int uses = stream->readInt();
         int maxUses = stream->readInt();
         MerchantRecipe* recipe = new MerchantRecipe(buyA, buyB, sell, uses, maxUses);
-        if (deprecated)
-        {
-            recipe->enforceDeprecated();
-        }
         result->push_back(recipe);
     }
+    const int level = stream->read();
+    if (level >= 1 && level <= 5)
+    {
+        result->setTradeProgress(level, stream->readUnsignedShort());
+        for (auto* recipe : *result)
+        {
+            const int requiredLevel = stream->readUnsignedByte();
+            const int experience = stream->readUnsignedByte();
+            recipe->setTradeProgress(requiredLevel, experience);
+        }
+    }
     return result;
+}
+
+int MerchantRecipeList::experienceForLevel(int level)
+{
+    constexpr int thresholds[] = {0, 20, 70, 150, 250};
+    return thresholds[Mth::clamp(level, 1, 5) - 1];
+}
+
+void MerchantRecipeList::setTradeProgress(int level, int experience)
+{
+    mTradeLevel = Mth::clamp(level, 0, 5);
+    mTradeExperience = Mth::clamp(experience, 0, experienceForLevel(5));
+}
+
+bool MerchantRecipeList::isLocked(const MerchantRecipe* recipe) const
+{
+    return recipe->getTradeLevel() > mTradeLevel;
 }
 
 CompoundTag* MerchantRecipeList::createTag()

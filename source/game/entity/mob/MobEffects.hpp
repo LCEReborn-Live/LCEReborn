@@ -8,6 +8,8 @@ class MobEffect;
 class MobEffects
 {
 public:
+    static MobEffect* BAD_OMEN;
+    static MobEffect* HERO_OF_THE_VILLAGE;
     static void staticCtor();
 
     static MobEffect* MOVEMENT_SPEED;

@@ -22,6 +22,7 @@
 #include "game/world/biome/HellBiome.hpp"
 #include "game/world/biome/IceBiome.hpp"
 #include "game/world/biome/JungleBiome.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/world/biome/MesaBiome.hpp"
 #include "game/world/biome/MushroomIslandBiome.hpp"
 #include "game/world/biome/MutatedForestBiome.hpp"
@@ -550,6 +551,12 @@ void Biome::staticCtor()
     JUNGLE_EDGE->setPreviewColor(eMinecraftColour_Preview_JungleEdge)
         ->setNameAndDescription(IDS_BIOME_JUNGLE, IDS_BIOME_DESC_JUNGLE)
         ->setWaterSkyColor(eMinecraftColour_Water_JungleEdge, eMinecraftColour_Sky_JungleEdge);
+
+    (new JungleBiome(eBiomeIDs_BambooJungle, false,
+                     (new BiomeProperties(L"bamboo_jungle"))->setTemperatureAndDownfall(0.95F, 0.9F)))
+        ->setPreviewColor(eMinecraftColour_Preview_Jungle_Mutated)
+        ->setNameAndDescription(IDS_LCE_BIOME_BAMBOO_JUNGLE, IDS_LCE_DESC_BAMBOO_JUNGLE)
+        ->setWaterSkyColor(eMinecraftColour_Water_Jungle, eMinecraftColour_Sky_Jungle);
 
     STONE_BEACH = new StoneBeachBiome(
         eBiomeIDs_StoneBeach,

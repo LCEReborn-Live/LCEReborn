@@ -14,6 +14,7 @@ const SoundType* SoundType::SNOW = NULL;
 const SoundType* SoundType::LADDER = NULL;
 const SoundType* SoundType::ANVIL = NULL;
 const SoundType* SoundType::SLIME = NULL;
+const SoundType* SoundType::SCAFFOLDING = NULL;
 
 SoundType::SoundType(float volume, float pitch, const SoundEvent* breakSound, const SoundEvent* stepSound,
                      const SoundEvent* placeSound, const SoundEvent* hitSound, const SoundEvent* fallSound)
@@ -53,6 +54,8 @@ void SoundType::StaticCtor()
                           SoundEvents::ANVIL_HIT, SoundEvents::ANVIL_FALL);
     SLIME = new SoundType(1.0f, 1.0f, SoundEvents::SLIME_BREAK, SoundEvents::SLIME_STEP, SoundEvents::SLIME_PLACE,
                           SoundEvents::SLIME_HIT, SoundEvents::SLIME_FALL);
+    SCAFFOLDING = new SoundType(1.0f, 1.0f, SoundEvents::SCAFFOLDING_BREAK, SoundEvents::SCAFFOLDING_STEP,
+                               SoundEvents::SCAFFOLDING_PLACE, SoundEvents::SCAFFOLDING_HIT, SoundEvents::SCAFFOLDING_FALL);
 }
 
 float SoundType::getVolume() const

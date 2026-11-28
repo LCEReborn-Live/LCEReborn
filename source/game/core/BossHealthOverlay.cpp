@@ -14,7 +14,9 @@ void BossHealthOverlay::update(boost::shared_ptr<ClientboundBossEventPacket> pac
 {
     if (packet->getOperation() == ClientboundBossEventPacket::ADD)
     {
-        mBossEvents[packet->getId()] = new LerpingBossEvent(packet);
+        auto& event = mBossEvents[packet->getId()];
+        delete event;
+        event = new LerpingBossEvent(packet);
     }
     else if (packet->getOperation() == ClientboundBossEventPacket::REMOVE)
     {
@@ -22,6 +24,7 @@ void BossHealthOverlay::update(boost::shared_ptr<ClientboundBossEventPacket> pac
             packet->getId());
         if (iterator != mBossEvents.end())
         {
+            delete iterator->second;
             mBossEvents.erase(iterator);
         }
     }
@@ -36,6 +39,7 @@ void BossHealthOverlay::update(boost::shared_ptr<ClientboundBossEventPacket> pac
 
 void BossHealthOverlay::reset()
 {
+    for (auto& entry : mBossEvents) delete entry.second;
     mBossEvents.clear();
 }
 

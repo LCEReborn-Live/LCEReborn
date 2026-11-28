@@ -1,6 +1,7 @@
 #include "game/core/Achievements.hpp"
 
 #include "game/core/Achievement.hpp"
+#include "game/core/GenericStats.hpp"
 #include "game/item/Items.hpp"
 #include "game/world/block/Blocks.hpp"
 
@@ -414,8 +415,12 @@ void Achievements::staticCtor()
         L"buyLowSellHigh", L"disenchanted", L"badFeeling", L"killTheBeast", L"soundTheAlarm", L"wereBeingAttacked"
     };
     for (int i = 0; i < TU80_COUNT; ++i)
-        tu80[i] = (new Achievement(TU80_FIRST + i, names[i], 0, 0, Items::book, NULL))
-                      ->postConstruct(true)->setExtended();
+    {
+        auto* achievement = new Achievement(TU80_FIRST + i, names[i], 0, 0, Items::book, NULL);
+        if (TU80_FIRST + i == eAward_PlethoraOfCats)
+            achievement->setAwardLocallyOnly();
+        tu80[i] = achievement->postConstruct(true)->setExtended();
+    }
 }
 
 void Achievements::init()

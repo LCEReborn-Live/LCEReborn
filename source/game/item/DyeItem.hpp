@@ -2,6 +2,7 @@
 #define GAME_ITEM_DYEITEM_HPP
 
 #include "game/item/Item.hpp"
+#include "game/core/DyeColor.hpp"
 
 class BlockPos;
 class Direction;
@@ -30,7 +31,7 @@ public:
     virtual void registerIcons(IconRegister* iconRegister);
 
 private:
-    TextureAtlasSprite* mIcons[16];
+    TextureAtlasSprite* mIcons[DyeColor::DyeItemDataCount];
 };
 
 #endif

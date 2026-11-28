@@ -1,25 +1,10 @@
-"""Port a TU80 inventory menu and its split-screen variant onto the PC's 720p UI."""
+"""Port TU80 container menus and their split-screen variants to the 720p UI."""
 import argparse
 from pathlib import Path
 import struct
 
 from import_common_update import read_archive, write_archive
-from import_tu80_ui import Movie, cstr
-
-
-def single_shape_dimensions(library, timeline):
-    """The shared panel symbols are single-frame, single-shape wrappers."""
-    first, count = struct.unpack_from('<HH', library.regions['timeline'][timeline], 4)
-    start, events = struct.unpack_from('<II', library.regions['frame'][first], 64)
-    event = library.regions['event'][start]
-    if count != 1 or events != 1 or event[2] != 1:
-        raise ValueError('Unexpected shared panel structure')
-    index, = struct.unpack_from('<H', event, 6)
-    left, right, top, bottom = struct.unpack_from('<4f', library.regions['shape'][index], 12)
-    xx, xy, yx, yy = struct.unpack_from('<4f', event, 12)
-    if xy or yx:
-        raise ValueError('Unexpected rotated panel')
-    return (right - left) * xx, (bottom - top) * yy
+from import_tu80_ui import Movie, cstr, single_shape_dimensions
 
 
 def embedded_bitmap(movie, donor, index):
@@ -47,7 +32,7 @@ def port_movie(movie, donor_graphics, pc_graphics):
             placements[index] = (3, bitmap, 1., 1.)
             continue
         sx = sy = 1.
-        if name in donor:
+        if name in ('FJ_Panel9Grid', 'FJ_panel9Grid_16', 'FJ_SquareRecessedPanel') and name in donor:
             width, height = single_shape_dimensions(donor_graphics, donor[name][1])
             pc_width, pc_height = single_shape_dimensions(pc_graphics, pc[name][1])
             sx, sy = width / pc_width, height / pc_height
@@ -85,13 +70,15 @@ def main():
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--current', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--menu', choices=('player', 'creative'), default='player')
+    menus = {'creative': 'CreativeMenu', 'player': 'InventoryMenu',
+             'cartography': 'CartographyMenu', 'grindstone': 'GrindstoneMenu'}
+    parser.add_argument('--menu', choices=menus, default='player')
     args = parser.parse_args()
     source = read_archive(args.source.read_bytes())
     current = read_archive(args.current.read_bytes())
     donor_graphics = Movie(source[b'skinHDGraphicsInGame.fui']).normalize()
     pc_graphics = Movie(current[b'skinGraphicsInGame.fui'])
-    base = 'CreativeMenu' if args.menu == 'creative' else 'InventoryMenu'
+    base = menus[args.menu]
     for name in (base, base + 'Split'):
         movie = Movie(source[(name + '1080.fui').encode()])
         current[(name + '720.fui').encode()] = port_movie(movie, donor_graphics, pc_graphics)

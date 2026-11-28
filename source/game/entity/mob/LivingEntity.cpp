@@ -1337,7 +1337,8 @@ bool LivingEntity::hurt(const DamageSource* source, float damage)
                     && !source->isExplosion()
                     && eTYPE_DERIVED_FROM(EntityType::LIVING_ENTITY, shieldAttacker->GetType()))
                 {
-                    blockUsingShield(boost::static_pointer_cast<LivingEntity>(shieldAttacker));
+                    boost::static_pointer_cast<LivingEntity>(shieldAttacker)->blockedByShield(
+                        boost::static_pointer_cast<LivingEntity>(shared_from_this()));
                 }
                 else if (directAttacker && source->isProjectile()
                          && eTYPE_DERIVED_FROM(EntityType::ARROW, directAttacker->GetType()))
@@ -1573,6 +1574,11 @@ void LivingEntity::blockUsingShield(const boost::shared_ptr<LivingEntity>& attac
     }
 }
 
+void LivingEntity::blockedByShield(const boost::shared_ptr<LivingEntity>& defender)
+{
+    defender->blockUsingShield(boost::static_pointer_cast<LivingEntity>(shared_from_this()));
+}
+
 void LivingEntity::playHurtSound(const DamageSource* source)
 {
     const SoundEvent* sound = getHurtSound(source);
@@ -1803,7 +1809,7 @@ bool LivingEntity::onLadder()
     const BlockState* state = mLevel->getBlockState(mTickCache, pos);
     Block* block = state->getBlock();
 
-    if (block != Blocks::ladder && block != Blocks::vine)
+    if (block != Blocks::ladder && block != Blocks::vine && block != Blocks::scaffolding)
     {
         return typeid(*block) == typeid(TrapDoorBlock) && trapdoorUsableAsLadder(pos, state);
     }
@@ -3000,6 +3006,8 @@ void LivingEntity::travel(float xxa, float yya, float zza)
 
             if (onLadder())
             {
+                const BlockPos feet(Mth::floor(mX), Mth::floor(mBoundingBox->mMinY), Mth::floor(mZ));
+                const bool inScaffolding = mLevel->getBlockState(mTickCache, feet)->getBlock() == Blocks::scaffolding;
                 mXd = (double)Mth::clamp((float)mXd, -0.15f, 0.15f);
                 mZd = (double)Mth::clamp((float)mZd, -0.15f, 0.15f);
                 mFallDistance = 0.0f;
@@ -3009,7 +3017,11 @@ void LivingEntity::travel(float xxa, float yya, float zza)
                     mYd = -0.15;
                 }
 
-                if (isSneaking() && eTYPE_DERIVED_FROM(EntityType::PLAYER, GetType()) && mYd < 0.0)
+                if (inScaffolding && mJumping)
+                {
+                    mYd = 0.2;
+                }
+                else if (!inScaffolding && isSneaking() && eTYPE_DERIVED_FROM(EntityType::PLAYER, GetType()) && mYd < 0.0)
                 {
                     mYd = 0.0;
                 }
@@ -4097,6 +4109,16 @@ void LivingEntity::updatingUsingItem()
     }
 
     not_null_ptr<ItemInstance> itemInHand = getItemInHand(getUsedItemHand());
+
+    // Spawn metadata can announce active use before the equipment packet.
+    // Bind the item when it arrives instead of leaving the client use empty.
+    if (mLevel->mIsClientSide && mUseItem->isEmpty())
+    {
+        if (itemInHand->isEmpty())
+            return;
+        mUseItem = itemInHand;
+        mUseItemRemaining = itemInHand->getUseDuration();
+    }
 
     const bool sameShieldStack = !itemInHand->isEmpty() && !mUseItem->isEmpty()
                                  && Item::getId(itemInHand->getItem()) == 442

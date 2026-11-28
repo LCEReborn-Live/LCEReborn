@@ -16,8 +16,8 @@ class ModelPart;
 class OcelotModel : public Model
 {
 public:
-    OcelotModel();
-    OcelotModel(const ModelDefinition& modelDefinition);
+    explicit OcelotModel(const std::wstring& modelName = L"ocelot");
+    OcelotModel(const ModelDefinition& modelDefinition, const std::wstring& modelName);
 
     void LoadOcelotModelDefinition(const ModelDefinition& modelDefinition);
     virtual void render(boost::shared_ptr<Entity>& entity, float limbSwing, float limbSwingAmount, float ageInTicks,
@@ -27,7 +27,7 @@ public:
                            float scale, boost::shared_ptr<Entity> entity, _SkinAdjustments skinAdjustments);
     virtual void prepareMobModel(boost::shared_ptr<LivingEntity>& entity, float limbSwing, float limbSwingAmount,
                                  float partialTicks);
-    virtual std::wstring getName() { return L"ocelot"; }
+    virtual std::wstring getName() { return mModelName; }
 
     ModelPart* mBackLegL;
     ModelPart* mBackLegR;
@@ -38,6 +38,10 @@ public:
     ModelPart* mHead;
     ModelPart* mBody;
     int mPose;
+
+private:
+    std::wstring mModelName;
+    float mRelaxing = 0.0f;
 };
 
 #endif

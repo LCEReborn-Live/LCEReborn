@@ -2,14 +2,14 @@
 #define GAME_CORE_WITCH_HPP
 #include <boost/shared_ptr.hpp>
 #include "game/core/EntityType.hpp"
-#include "game/entity/mob/Monster.hpp"
+#include "game/entity/mob/Raider.hpp"
 #include "game/entity/mob/RangedAttackMob.hpp"
 class DamageSource;
 class DataFixerUpper;
 class Level;
 class LivingEntity;
 class SoundEvent;
-class Witch : public Monster, public RangedAttackMob
+class Witch : public Raider, public RangedAttackMob
 {
 public:
     explicit Witch(Level* level);
@@ -34,6 +34,7 @@ public:
     virtual float getEyeHeight();
     virtual unsigned long long GetType();
     static void DEATH_LOOT();
+    int mHealCooldown = 0;
 
 private:
     static const EntityDataAccessor<bool>* DATA_USING_ITEM;

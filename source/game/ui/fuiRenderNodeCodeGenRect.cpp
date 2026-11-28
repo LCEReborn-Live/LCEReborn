@@ -100,7 +100,7 @@ void fuiRenderNodeCodeGenRect::render(fuiRect* bounds, fuiMatrix* matrix)
     if (mTextureId == -1)
     {
         gRenderer->TextureBind(-1);
-        gRenderer->StateSetColour(1.0f, 0.0f, 0.0f, 0.0f);
+        gRenderer->StateSetColour(mSolidRed, mSolidGreen, mSolidBlue, mSolidAlpha);
         gRenderer->DrawVertices(C4JRender::ePrimitiveType_Triangles, 6, vertices, C4JRender::eVertexType_UI,
                                 C4JRender::ePixelShaderType_UIColourAdd, NULL);
     }

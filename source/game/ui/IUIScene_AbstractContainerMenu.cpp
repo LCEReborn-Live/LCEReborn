@@ -1,4 +1,5 @@
 #include "game/ui/IUIScene_AbstractContainerMenu.hpp"
+#include "game/ui/TwoInputMenu.hpp"
 #include "game/core/StringIds.hpp"
 
 #include <algorithm>
@@ -871,7 +872,8 @@ void IUIScene_AbstractContainerMenu::onMouseTick()
                 break;
             }
         }
-        else if (section == ESceneSection_FurnaceHotbar || section == ESceneSection_FurnaceInventory)
+        else if ((section == ESceneSection_FurnaceHotbar || section == ESceneSection_FurnaceInventory)
+                 && dynamic_cast<TwoInputMenu*>(m_menu) == nullptr)
         {
             not_null_ptr<ItemInstance> item = getSlotItem(section, slotIndex);
             bool isFuel = FurnaceBlockEntity::isFuel(item);

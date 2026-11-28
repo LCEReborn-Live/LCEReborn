@@ -91,6 +91,8 @@ CrossbowItem::CrossbowItem()
     setMaxStackSize(1);
     setMaxDamage(465);
     setAllowOffhand(true);
+    // Display the existing crossbow recipe alongside the bow on the Tools tab.
+    setBaseItemTypeAndMaterial(24, 17);
     setDescriptionId(IDS_LCE_ITEM_CROSSBOW, IDS_LCE_DESC_CROSSBOW);
     setIconName(L"crossbow");
 }
@@ -106,6 +108,28 @@ bool CrossbowItem::isCharged(not_null_ptr<ItemInstance> item)
     auto* tag = item->getTag();
     auto* projectiles = getProjectiles(item);
     return tag && tag->getBoolean(CHARGED) && projectiles && !projectiles->isEmpty();
+}
+
+void CrossbowItem::loadProjectile(not_null_ptr<ItemInstance> crossbow, not_null_ptr<ItemInstance> ammo, int count)
+{
+    auto loaded = ammo->copy();
+    loaded->setCount(1);
+    auto* list = new ListTag(Tag::TAG_COMPOUND);
+    for (int shot = 0; shot < count; ++shot)
+        list->add(loaded->save(new CompoundTag()));
+    crossbow->addTagElement(PROJECTILES, list);
+    crossbow->getTag()->putBoolean(CHARGED, true);
+}
+
+void CrossbowItem::clearProjectiles(not_null_ptr<ItemInstance> crossbow)
+{
+    auto* tag = crossbow->getTag();
+    if (!tag)
+        return;
+    tag->remove(PROJECTILES);
+    tag->remove(CHARGED);
+    if (tag->isEmpty())
+        crossbow->setTag(nullptr);
 }
 
 InteractionResultHolder CrossbowItem::use(Level* level, boost::shared_ptr<Player> player,
@@ -158,14 +182,8 @@ void CrossbowItem::releaseUsing(not_null_ptr<ItemInstance> item, Level* level,
         ammo = not_null_ptr<ItemInstance>(new ItemInstance(Items::arrow));
     }
 
-    auto loaded = ammo->copy();
-    loaded->setCount(1);
-    auto* list = new ListTag(Tag::TAG_COMPOUND);
     const int count = EnchantmentHelper::getItemEnchantmentLevel(Enchantments::MULTISHOT, item) > 0 ? 3 : 1;
-    for (int shot = 0; shot < count; ++shot)
-        list->add(loaded->save(new CompoundTag()));
-    item->addTagElement(PROJECTILES, list);
-    item->getTag()->putBoolean(CHARGED, true);
+    loadProjectile(item, ammo, count);
 
     if (!player->mAbilities.mInstabuild)
     {
@@ -173,8 +191,10 @@ void CrossbowItem::releaseUsing(not_null_ptr<ItemInstance> item, Level* level,
         if (ammo->isEmpty())
             player->mInventory->removeItem(ammo);
     }
-    level->playSound({}, player->mX, player->mY, player->mZ, SoundEvents::LEVER_CLICK,
-                     SoundSource::eSoundSource_Players, 0.8f, 1.3f, 16.0f);
+    const bool quickCharge = EnchantmentHelper::getItemEnchantmentLevel(Enchantments::QUICK_CHARGE, item) > 0;
+    const auto* sound = quickCharge ? SoundEvents::CROSSBOW_QUICK_CHARGE_END : SoundEvents::CROSSBOW_LOADING_END;
+    level->playSound({}, player->mX, player->mY, player->mZ, sound,
+                     SoundSource::eSoundSource_Players, 1.0f, 1.0f, 16.0f);
 }
 
 void CrossbowItem::shoot(Level* level, const boost::shared_ptr<Player>& player, not_null_ptr<ItemInstance> item)
@@ -228,13 +248,10 @@ void CrossbowItem::shoot(Level* level, const boost::shared_ptr<Player>& player, 
             continue;
         }
         const float soundPitch = shot == 0 ? 1.0f : (shot == 1 ? 0.8f : 1.2f);
-        level->playSound({}, player->mX, player->mY, player->mZ, SoundEvents::ARROW_SHOOT,
+        level->playSound({}, player->mX, player->mY, player->mZ, SoundEvents::CROSSBOW_SHOOT,
                          SoundSource::eSoundSource_Players, 1.0f, soundPitch, 16.0f);
     }
-    item->getTag()->remove(PROJECTILES);
-    item->getTag()->remove(CHARGED);
-    if (item->getTag()->isEmpty())
-        item->setTag(nullptr);
+    clearProjectiles(item);
     if (durability > 0)
     {
         player->awardStat(GenericStats::itemsUsed(this), GenericStats::param_itemsUsed(player, item));
@@ -246,11 +263,15 @@ void CrossbowItem::playLoadingSound(Level* level, const boost::shared_ptr<Living
                                     not_null_ptr<ItemInstance> item, int ticks)
 {
     const int duration = getChargeDuration(item);
-    if (ticks == (duration + 4) / 5 || ticks == (duration + 1) / 2)
-    {
-        level->playSound({}, entity->mX, entity->mY, entity->mZ, SoundEvents::LEVER_CLICK,
-                         SoundSource::eSoundSource_Players, 0.5f, ticks < duration / 2 ? 0.7f : 0.95f, 16.0f);
-    }
+    const bool start = ticks == (duration + 4) / 5;
+    if (!start && ticks != (duration + 1) / 2)
+        return;
+    const bool quickCharge = EnchantmentHelper::getItemEnchantmentLevel(Enchantments::QUICK_CHARGE, item) > 0;
+    const auto* sound = quickCharge
+        ? (start ? SoundEvents::CROSSBOW_QUICK_CHARGE_START : SoundEvents::CROSSBOW_QUICK_CHARGE_MIDDLE)
+        : (start ? SoundEvents::CROSSBOW_LOADING_START : SoundEvents::CROSSBOW_LOADING_MIDDLE);
+    level->playSound({}, entity->mX, entity->mY, entity->mZ, sound,
+                     SoundSource::eSoundSource_Players, 0.5f, 1.0f, 16.0f);
 }
 
 void CrossbowItem::appendHoverText(not_null_ptr<ItemInstance> item, boost::shared_ptr<Player> player,

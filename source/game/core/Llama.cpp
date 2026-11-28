@@ -83,14 +83,11 @@ Llama::LlamaHurtByTargetGoal::LlamaHurtByTargetGoal(Llama* llama)
 }
 bool Llama::LlamaHurtByTargetGoal::canContinueToUse()
 {
-    if (eTYPE_DERIVED_FROM(EntityType::LLAMA, mMob->GetType()))
+    auto* llama = static_cast<Llama*>(mMob);
+    if (llama->mDidSpit)
     {
-        Llama* llama = static_cast<Llama*>(mMob);
-        if (llama->mDidSpit)
-        {
-            llama->setDidSpit(false);
-            return false;
-        }
+        llama->setDidSpit(false);
+        return false;
     }
 
     return TargetGoal::canContinueToUse();

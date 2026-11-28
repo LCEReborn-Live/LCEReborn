@@ -304,6 +304,40 @@ const int BARK_JUNGLE = 315;
 const int BARK_ACACIA = 316;
 const int BARK_DARK_OAK = 317;
 const int BARK_OAK = 318;
+const int SMOKER = 319;
+const int LIT_SMOKER = 320;
+const int BLAST_FURNACE = 321;
+const int LIT_BLAST_FURNACE = 322;
+const int SMOOTH_STONE = 323;
+const int CARTOGRAPHY_TABLE = 324;
+const int GRINDSTONE = 325;
+const int BARREL = 326;
+const int COMPOSTER = 327;
+const int STONECUTTER = 328;
+const int SMITHING_TABLE = 329;
+const int FLETCHING_TABLE = 330;
+const int SWEET_BERRY_BUSH = 331;
+const int UNDYED_SHULKER_BOX = 332;
+const int STRIPPED_WOOD_FIRST = 333;
+const int WOOD_SPECIES_COUNT = 6;
+const int LANTERN = 339;
+const int BAMBOO = 340;
+const int SCAFFOLDING = 341;
+const int STANDING_WOOD_SIGN_FIRST = 342;
+const int WALL_WOOD_SIGN_FIRST = STANDING_WOOD_SIGN_FIRST + WOOD_SPECIES_COUNT - 1;
+const int SMOOTH_SANDSTONE = 352;
+const int SMOOTH_RED_SANDSTONE = 353;
+const int SMOOTH_QUARTZ = 354;
+const int DECOR_STAIRS_FIRST = 355;
+const int DECOR_WALL_FIRST = 369;
+const int DECOR_SLAB_FIRST = 389;
+const int DECOR_DOUBLE_SLAB_FIRST = 391;
+const int CAMPFIRE = 393;
+const int BELL = 394;
+const int LECTERN = 395;
+const int LOOM = 396;
+// Reserve IDs for additional title-update blocks without resizing the registries.
+const int COUNT = 512;
 }
 
 #endif

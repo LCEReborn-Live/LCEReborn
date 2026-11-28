@@ -159,6 +159,8 @@ ItemColors* ItemColors::createDefault(BlockColors* blockColors)
             if (found != EntityIO::sSpawnInfo.end())
             {
                 EntityIO::SpawnableMobInfo* info = found->second;
+                const int rgb = layer == 0 ? info->baseRgb : info->overlayRgb;
+                if (rgb >= 0) return rgb;
                 if (layer == 0)
                 {
                     if (info->colour != 0)

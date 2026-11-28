@@ -6,6 +6,7 @@
 #include "game/minigame/MiniGameDef.hpp"
 #include "game/client/render/Particle.hpp"
 #include "game/client/render/LevelRenderer.hpp"
+#include "game/world/block/SignBlock.hpp"
 #include "game/core/VideoSettings.hpp"
 #include "game/core/EntityType.hpp"
 
@@ -2886,7 +2887,7 @@ void LevelRenderer::renderDestroyAnimation(Tesselator* tesselator, boost::shared
         double dz = progress->getPos().z - camZ;
         Block* block = mLevels[userIndex]->getBlockState(progress->getPos())->getBlock();
         if (block == Blocks::chest || block == Blocks::ender_chest || block == Blocks::trapped_chest
-            || block == Blocks::standing_sign || block == Blocks::skull || block == Blocks::wall_sign)
+            || block == Blocks::skull || dynamic_cast<SignBlock*>(block))
         {
             continue;
         }

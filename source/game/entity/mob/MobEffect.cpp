@@ -1,4 +1,5 @@
 #include "game/entity/mob/MobEffect.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/core/StringIds.hpp"
 #include "game/core/EntityType.hpp"
 
@@ -249,6 +250,12 @@ void MobEffect::staticCtor()
                                            ->setDescriptionId(IDS_EFFECT_SLOWFALLING)
                                            ->setIcon(EMobEffectIcon_SlowFalling)
                                            ->setBeneficial());
+    mobEffectRegistry->registerMapping(++effectCount, ResourceLocation(L"minecraft", L"bad_omen"),
+        (new MobEffect(false, eMinecraftColour_Effect_Weakness))->setDescriptionId(IDS_LCE_BAD_OMEN)
+            ->setIcon(EMobEffectIcon_BadOmen));
+    mobEffectRegistry->registerMapping(++effectCount, ResourceLocation(L"minecraft", L"hero_of_the_village"),
+        (new MobEffect(false, eMinecraftColour_Effect_Luck))->setDescriptionId(IDS_LCE_HERO_OF_THE_VILLAGE)
+            ->setIcon(EMobEffectIcon_HeroOfTheVillage)->setBeneficial());
 }
 
 unsigned int MobEffect::GetEffectCount()

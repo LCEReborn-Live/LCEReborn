@@ -16,7 +16,7 @@ public:
     virtual ~MapExtendingRecipe();
 
     static void StaticCtor();
-    bool isExplorationMap(const boost::shared_ptr<MapItemSavedData>& data);
+    static bool isExplorationMap(const boost::shared_ptr<MapItemSavedData>& data);
     virtual bool matches(boost::shared_ptr<CraftingContainer> craftingContainer, Level* level);
     virtual not_null_ptr<ItemInstance> assemble(boost::shared_ptr<CraftingContainer> craftingContainer);
     virtual Recipe::_eGroupType getGroup();

@@ -124,6 +124,7 @@ public:
     static void EnterDeleteThreadCS();
     static void LeaveDeleteThreadCS();
     void displayItemActivation(not_null_ptr<ItemInstance>, int);
+    void displayIconActivation(const ResourceLocation* icon, int playerIndex);
 
     void setRenderHand(bool);
     bool shouldRenderHand();
@@ -223,7 +224,8 @@ private:
     float mZoomX;
     float mZoomY;
     not_null_ptr<ItemInstance> mItemActivationItems[4];
-    int mItemActivationTicks[4];
+    const ResourceLocation* mItemActivationIcons[4] = {};
+    int mItemActivationTicks[4] = {};
     float mItemActivationOffX[4];
     float mItemActivationOffY[4];
     PostChain* mPostEffect;

@@ -1,5 +1,6 @@
 #include "game/core/FoodRecipies.hpp"
 
+#include "game/core/Bush.hpp"
 #include "game/core/DyeColor.hpp"
 #include "game/item/ItemInstance.hpp"
 #include "game/item/Items.hpp"
@@ -18,16 +19,14 @@ void FoodRecipies::addRecipes(Recipes* recipes)
                                 Blocks::red_mushroom, Items::bowl, L'F');
     recipes->addShapedRecipe(new ItemInstance(Items::cookie, 8), L"sczcig", L"#X#", L'X',
                              new ItemInstance(Items::dye, 1, DyeColor::BROWN->getItemData()), L'#', Items::wheat, L'F');
-    recipes->addShapedRecipe(new ItemInstance(Items::rabbitStew), L"sssczcicictcig", L" R ", L"CPM", L" B ", L'R',
-                             new ItemInstance(Items::cookedRabbit), L'C', Items::carrot, L'P', Items::bakedPotato, L'M',
-                             Blocks::brown_mushroom, L'B', Items::bowl, L'F');
-    recipes->addShapedRecipe(new ItemInstance(Items::rabbitStew), L"sssczcicictcig", L" R ", L"CPD", L" B ", L'R',
-                             new ItemInstance(Items::cookedRabbit), L'C', Items::carrot, L'P', Items::bakedPotato, L'D',
-                             Blocks::red_mushroom, L'B', Items::bowl, L'F');
+    for (Block* mushroom : {Blocks::brown_mushroom, Blocks::red_mushroom})
+        recipes->addShapelessRecipe(new ItemInstance(Items::rabbitStew), L"iiitig", Items::cookedRabbit,
+                                    Items::carrot, Items::bakedPotato, mushroom, Items::bowl, L'F');
     recipes->addShapedRecipe(new ItemInstance(Blocks::melon_block), L"ssscig", L"MMM", L"MMM", L"MMM", L'M',
                              Items::melon, L'F');
-    recipes->addShapedRecipe(new ItemInstance(Items::beetrootSoup), L"ssscicig", L"OOO", L"OOO", L" B ", L'O',
-                             Items::beetroot, L'B', Items::bowl, L'F');
+    recipes->addShapelessRecipe(new ItemInstance(Items::beetrootSoup), L"iiiiiiig",
+                                Items::beetroot, Items::beetroot, Items::beetroot,
+                                Items::beetroot, Items::beetroot, Items::beetroot, Items::bowl, L'F');
     recipes->addShapedRecipe(new ItemInstance(Items::melonSeeds), L"scig", L"M", L'M', Items::melon, L'F');
     recipes->addShapedRecipe(new ItemInstance(Items::pumpkinSeeds, 4), L"sctg", L"M", L'M', Blocks::pumpkin, L'F');
     recipes->addShapelessRecipe(new ItemInstance(Items::pumpkinPie), L"tiig", Blocks::pumpkin, Items::sugar, Items::egg,

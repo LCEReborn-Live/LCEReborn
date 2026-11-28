@@ -10,7 +10,8 @@
 #include "game/world/block/Block.hpp"
 #include "game/world/block/DoorBlock.hpp"
 
-BreakDoorGoal::BreakDoorGoal(Mob* mob) : DoorInteractGoal(mob), mBreakingTime(0), mLastBreakProgress(-1)
+BreakDoorGoal::BreakDoorGoal(Mob* mob, int duration, int minimumDifficulty)
+    : DoorInteractGoal(mob), mBreakingTime(0), mLastBreakProgress(-1), mDuration(duration), mMinimumDifficulty(minimumDifficulty)
 {
 }
 
@@ -41,7 +42,7 @@ void BreakDoorGoal::stop()
 bool BreakDoorGoal::canContinueToUse()
 {
     double distance = mMob->distanceToSqr(mDoorPos);
-    return mBreakingTime <= 240 && !DoorBlock::isOpen(mMob->mLevel, mDoorPos) && distance < 4.0;
+    return mBreakingTime <= mDuration && !DoorBlock::isOpen(mMob->mLevel, mDoorPos) && distance < 4.0;
 }
 
 void BreakDoorGoal::tick()
@@ -52,14 +53,14 @@ void BreakDoorGoal::tick()
         mMob->mLevel->levelEvent(LevelEvent::SOUND_ZOMBIE_WOODEN_DOOR, mDoorPos, 0);
 
     ++mBreakingTime;
-    int progress = (int)(((float)mBreakingTime / 240.0f) * 10.0f);
+    int progress = (int)(((float)mBreakingTime / mDuration) * 10.0f);
     if (progress != mLastBreakProgress)
     {
         mMob->mLevel->destroyBlockProgress(mMob->getId(), mDoorPos, progress);
         mLastBreakProgress = progress;
     }
 
-    if (mBreakingTime == 240 && mMob->mLevel->getDifficulty() == Difficulty::HARD)
+    if (mBreakingTime == mDuration && mMob->mLevel->getDifficulty()->getId() >= mMinimumDifficulty)
     {
         mMob->mLevel->removeBlock(mDoorPos);
         mMob->mLevel->levelEvent(LevelEvent::SOUND_ZOMBIE_DOOR_CRASH, mDoorPos, 0);

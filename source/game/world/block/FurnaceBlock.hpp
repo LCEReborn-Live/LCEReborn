@@ -4,6 +4,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "game/core/InteractionHand.hpp"
+#include "game/item/FurnaceKind.hpp"
 #include "game/world/block/BaseEntityBlock.hpp"
 
 class BlockEntity;
@@ -31,7 +32,7 @@ class FurnaceBlock : public BaseEntityBlock
 public:
     static DirectionProperty* FACING;
 
-    FurnaceBlock(bool lit);
+    FurnaceBlock(bool lit, FurnaceKind kind = FurnaceKind::Furnace);
     virtual boost::shared_ptr<BlockEntity> newBlockEntity(Level* level, int data);
     static void blockStaticCtor();
     virtual Item* getResource(const BlockState* state, Random* random, int lootBonus);
@@ -64,8 +65,10 @@ private:
     static bool sKeepInventory;
 
     bool mLit;
+    FurnaceKind mKind;
     TextureAtlasSprite* mTopIcon;
     TextureAtlasSprite* mFrontIcon;
+    TextureAtlasSprite* mBottomIcon;
 };
 
 #endif

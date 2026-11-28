@@ -40,7 +40,9 @@ enum EEntityEvent
     BURNED = 37,
     SQUID_INK = 38,
     EAT_ITEM_PARTICLES = 39,
-    MINECART_TNT_PRIME = 40
+    MINECART_TNT_PRIME = 40,
+    RAID_HERO_REWARD = 62,
+    RAID_BAD_OMEN = 63
 };
 }
 

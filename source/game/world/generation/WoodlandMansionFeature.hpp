@@ -31,9 +31,6 @@ public:
         virtual bool isValid();
         virtual EStructureStart GetType();
 
-    private:
-        WoodlandMansionFeature* mFeature;
-        bool mValid;
     };
 
     WoodlandMansionFeature(GenericOverworldLevelSource* source);

@@ -5,6 +5,8 @@
 #include "game/item/CraftingContainer.hpp"
 #include "game/item/Item.hpp"
 #include "game/item/ItemInstance.hpp"
+#include "game/item/Items.hpp"
+#include "game/core/DyeColor.hpp"
 
 ShapelessRecipe::ShapelessRecipe(ItemInstance* result, std::vector<ItemInstance*>* ingredients,
                                  Recipe::_eGroupType group)
@@ -67,6 +69,7 @@ bool ShapelessRecipe::matches(boost::shared_ptr<CraftingContainer> craftingConta
                     ItemInstance* ingredient = *it;
                     if (item->getItem() == ingredient->getItem()
                         && (ingredient->getAuxValue() == -1 || item->getAuxValue() == ingredient->getAuxValue()
+                            || (ingredient->getItem() == Items::dye && DyeColor::matchesDyeIngredient(ingredient->getAuxValue(), item->getAuxValue()))
                             || (ingredient->getAuxValue() == 0 && ingredient->isDamageableItem())))
                     {
                         found = true;

@@ -7,6 +7,7 @@
 
 #include "game/client/render/ParticleType.hpp"
 #include "game/core/DyeColor.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/core/IconRegister.hpp"
 #include "game/core/InteractionHand.hpp"
 #include "game/core/Mth.hpp"
@@ -38,11 +39,20 @@ DyeItem::DyeItem() : Item()
 
 int DyeItem::getDescriptionId(not_null_ptr<ItemInstance> itemInstance)
 {
-    return DyeColor::byItemData(itemInstance->getAuxValue())->getName();
+    const int data = itemInstance->getAuxValue();
+    if (data >= DyeColor::BlackDye && data < DyeColor::DyeItemDataCount)
+        return IDS_LCE_DYE_FIRST + data - DyeColor::BlackDye;
+    const int pigmentData = DyeColor::dyeItemData(data);
+    if (pigmentData != data)
+        return IDS_LCE_DYE_SOURCE_FIRST + pigmentData - DyeColor::BlackDye;
+    return DyeColor::byItemData(data)->getName();
 }
 
 int DyeItem::getUseDescriptionId(not_null_ptr<ItemInstance> itemInstance)
 {
+    const int data = itemInstance->getAuxValue();
+    if (data >= DyeColor::BlackDye && data < DyeColor::DyeItemDataCount)
+        return IDS_LCE_DESC_DYE;
     return DyeColor::byItemData(itemInstance->getAuxValue())->getUseName();
 }
 
@@ -88,9 +98,9 @@ InteractionResult::EInteractionResult DyeItem::useOn(boost::shared_ptr<Player> p
         return InteractionResult::eInteractionResult_Fail;
     }
 
-    const DyeColor* color = DyeColor::byItemData(itemInstance->getAuxValue());
+    const int data = itemInstance->getAuxValue();
 
-    if (color == DyeColor::WHITE)
+    if (data == DyeColor::WHITE->getItemData())
     {
         if (growCrop(itemInstance, level, blockPos, simulate))
         {
@@ -102,7 +112,7 @@ InteractionResult::EInteractionResult DyeItem::useOn(boost::shared_ptr<Player> p
             return InteractionResult::eInteractionResult_Success;
         }
     }
-    else if (color == DyeColor::BROWN)
+    else if (data == DyeColor::BROWN->getItemData())
     {
         const BlockState* state = level->getBlockState(blockPos);
         Block* block = state->getBlock();
@@ -188,7 +198,7 @@ bool DyeItem::interactEnemy(not_null_ptr<ItemInstance> itemInstance, boost::shar
 
 TextureAtlasSprite* DyeItem::getIcon(int auxValue)
 {
-    return mIcons[Mth::clamp(auxValue, 0, 15)];
+    return mIcons[Mth::clamp(auxValue, 0, DyeColor::DyeItemDataCount - 1)];
 }
 
 void DyeItem::registerIcons(IconRegister* iconRegister)
@@ -197,4 +207,8 @@ void DyeItem::registerIcons(IconRegister* iconRegister)
     {
         mIcons[i] = iconRegister->registerIcon(getIconName() + L"_" + DyeColor::TEXTURE_NAMES[i]);
     }
+    mIcons[DyeColor::BlackDye] = iconRegister->registerIcon(L"black_dye");
+    mIcons[DyeColor::BrownDye] = iconRegister->registerIcon(L"brown_dye");
+    mIcons[DyeColor::BlueDye] = iconRegister->registerIcon(L"blue_dye");
+    mIcons[DyeColor::WhiteDye] = iconRegister->registerIcon(L"white_dye");
 }

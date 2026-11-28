@@ -228,6 +228,24 @@ StrongholdFeature::StrongholdStart::StrongholdStart() : StructureStart()
 {
 }
 
+void StrongholdFeature::StrongholdStart::load(Level* level, DataInputStream* input)
+{
+    StructureStart::load(level, input);
+    if (mPieces.empty())
+        return;
+    auto* start = dynamic_cast<StrongholdPieces::StartPiece*>(mPieces.front());
+    if (!start)
+        return;
+    for (auto* piece : mPieces)
+    {
+        if (auto* portal = dynamic_cast<StrongholdPieces::PortalRoom*>(piece))
+        {
+            start->mPortalRoom = portal;
+            break;
+        }
+    }
+}
+
 EStructureStart StrongholdFeature::StrongholdStart::GetType()
 {
     return eStructureStart_Stronghold;

@@ -7,6 +7,7 @@
 
 #include "game/util/Random.hpp"
 #include "game/util/ResourceLocation.hpp"
+#include "game/world/block/BlockId.hpp"
 #include "game/world/block/MappedRegistry.hpp"
 
 class Block;
@@ -105,7 +106,7 @@ class DefaultedMappedRegistry<ResourceLocation, Block*> : public MappedRegistry<
 public:
     enum
     {
-        BLOCK_COUNT = 319
+        BLOCK_COUNT = BlockId::COUNT
     };
 
     class iterator

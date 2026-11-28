@@ -1,5 +1,9 @@
 #include "game/item/Recipes.hpp"
+#include "game/item/SignItem.hpp"
+#include "game/world/block/DecorativeStone.hpp"
 
+#include <array>
+#include <algorithm>
 #include <cwchar>
 #include <string>
 #include <utility>
@@ -11,9 +15,13 @@
 #include "game/item/BookCloningRecipe.hpp"
 #include "game/item/FireworksRecipe.hpp"
 #include "game/item/Items.hpp"
+#include "game/item/BannerStencilItem.hpp"
+#include "game/core/BannerPattern.hpp"
+#include "game/world/block/FlowerBlock.hpp"
 #include "game/item/MapCloningRecipe.hpp"
 #include "game/item/RepairItemRecipe.hpp"
 #include "game/world/block/Blocks.hpp"
+#include "game/world/block/BlockId.hpp"
 #include "game/world/block/NewStoneSlabBlock.hpp"
 #include "game/world/block/PlanksBlock.hpp"
 #include "game/world/block/PrismarineBlock.hpp"
@@ -54,6 +62,54 @@ RepairItemRecipe* Recipes::mRepairItemRecipe = NULL;
 BookCloningRecipe* Recipes::mBookCloningRecipe = NULL;
 TippedArrowRecipe* Recipes::mTippedArrowRecipe = NULL;
 ArmorDyeRecipe* Recipes::mArmorDyeRecipe = NULL;
+
+namespace
+{
+const std::array<Block*, 14>& smokerWoods()
+{
+    static const std::array<Block*, 14> woods = {
+        Blocks::log, Blocks::log2,
+        Blocks::stripped_log_oak, Blocks::stripped_log_spruce, Blocks::stripped_log_birch,
+        Blocks::stripped_log_jungle, Blocks::stripped_log_acacia, Blocks::stripped_log_dark_oak,
+        Blocks::bark_oak, Blocks::bark_spruce, Blocks::bark_birch,
+        Blocks::bark_jungle, Blocks::bark_acacia, Blocks::bark_dark_oak,
+    };
+    return woods;
+}
+
+class MixedWoodSmokerRecipe : public ShapedRecipe
+{
+public:
+    MixedWoodSmokerRecipe()
+        : ShapedRecipe(3, 3, new ItemInstance*[9]{
+            nullptr, new ItemInstance(Blocks::log, 1, -1), nullptr,
+            new ItemInstance(Blocks::log, 1, -1), new ItemInstance(Blocks::furnace),
+            new ItemInstance(Blocks::log, 1, -1), nullptr, new ItemInstance(Blocks::log, 1, -1), nullptr,
+        }, new ItemInstance(Blocks::smoker), Recipe::eGroupType_Structures)
+    {
+        // The assisted crafting menu shows recipes with concrete ingredient IDs.
+        mDisplayInSimpleCrafting = false;
+    }
+
+    bool matches(boost::shared_ptr<CraftingContainer> grid, Level*) override
+    {
+        if (grid->getWidth() != 3 || grid->getHeight() != 3
+            || grid->getItem(4)->getItem() != Item::byBlock(Blocks::furnace))
+            return false;
+        for (unsigned int corner : {0U, 2U, 6U, 8U})
+            if (!grid->getItem(corner)->isEmpty())
+                return false;
+        const auto& woods = smokerWoods();
+        for (unsigned int side : {1U, 3U, 5U, 7U})
+        {
+            Block* block = Block::byItem(grid->getItem(side)->getItem());
+            if (std::find(woods.begin(), woods.end(), block) == woods.end())
+                return false;
+        }
+        return true;
+    }
+};
+}
 
 Recipes::Recipes()
 {
@@ -104,7 +160,24 @@ Recipes::Recipes()
                     new ItemInstance(Blocks::stripped_log_acacia, 1), L'S');
     addShapedRecipe(new ItemInstance(Blocks::planks, 4, PlanksBlock::Variant::DARK_OAK->getData()), L"sczg", L"#", L'#',
                     new ItemInstance(Blocks::stripped_log_dark_oak, 1), L'S');
+    Block* const bark[] = {Blocks::bark_oak, Blocks::bark_spruce, Blocks::bark_birch, Blocks::bark_jungle,
+                           Blocks::bark_acacia, Blocks::bark_dark_oak};
+    Block* const strippedLogs[] = {Blocks::stripped_log_oak, Blocks::stripped_log_spruce, Blocks::stripped_log_birch,
+                                   Blocks::stripped_log_jungle, Blocks::stripped_log_acacia, Blocks::stripped_log_dark_oak};
+    for (int variant = 0; variant < BlockId::WOOD_SPECIES_COUNT; ++variant)
+    {
+        auto* strippedWood = Block::byId(BlockId::STRIPPED_WOOD_FIRST + variant);
+        addShapelessRecipe(new ItemInstance(Blocks::planks, 4, variant), L"tg", bark[variant], L'S');
+        addShapelessRecipe(new ItemInstance(Blocks::planks, 4, variant), L"tg", strippedWood, L'S');
+        Block* logs = variant < 4 ? Blocks::log : Blocks::log2;
+        addShapedRecipe(new ItemInstance(bark[variant], 3), L"ssczg", L"LL", L"LL", L'L',
+                        new ItemInstance(logs, 1, variant % 4), L'S');
+        addShapedRecipe(new ItemInstance(strippedWood, 3), L"ssctg", L"LL", L"LL", L'L', strippedLogs[variant], L'S');
+    }
     addShapedRecipe(new ItemInstance(Items::stick, 4), L"ssctg", L"#", L"#", L'#', Blocks::planks, L'S');
+    addShapedRecipe(new ItemInstance(Items::stick), L"sscig", L"B", L"B", L'B', Items::bamboo, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::scaffolding, 6), L"ssscicig", L"BSB", L"B B", L"B B",
+                    L'B', Items::bamboo, L'S', Items::string, L'T');
     mToolRecipies->addRecipes(this);
     mFoodRecipies->addRecipes(this);
     addShapedRecipe(new ItemInstance(Blocks::quartz_block, 1), L"sscig", L"##", L"##", L'#', Items::quartz, L'S');
@@ -136,8 +209,8 @@ Recipes::Recipes()
                     L"###", L"###", L'#', Blocks::cobblestone, L'S');
     addShapedRecipe(new ItemInstance(Blocks::cobblestone_wall, 6, WallBlock::Variant::MOSSY->getData()), L"ssctg",
                     L"###", L"###", L'#', Blocks::mossy_cobblestone, L'S');
-    addShapedRecipe(new ItemInstance(Blocks::nether_brick_fence, 6), L"ssctg", L"###", L"###", L'#',
-                    Blocks::nether_brick, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::nether_brick_fence, 6), L"ssctcig", L"BNB", L"BNB",
+                    L'B', Blocks::nether_brick, L'N', Items::netherbrick, L'S');
     addShapedRecipe(new ItemInstance(Blocks::iron_bars, 16), L"sscig", L"###", L"###", L'#', Items::ironIngot, L'S');
     addShapedRecipe(new ItemInstance(Blocks::fence_gate, 1), L"ssciczg", L"#W#", L"#W#", L'#', Items::stick, L'W',
                     new ItemInstance(Blocks::planks, 1, PlanksBlock::Variant::OAK->getData()), L'S');
@@ -193,8 +266,6 @@ Recipes::Recipes()
                     Blocks::cobblestone, L'S');
     addShapedRecipe(new ItemInstance(Blocks::brick_stairs, 4), L"sssctg", L"#  ", L"## ", L"###", L'#',
                     Blocks::brick_block, L'S');
-    addShapedRecipe(new ItemInstance(Blocks::stone_brick_stairs, 4), L"sssctg", L"#  ", L"## ", L"###", L'#',
-                    Blocks::stonebrick, L'S');
     addShapedRecipe(new ItemInstance(Blocks::nether_brick_stairs, 4), L"sssctg", L"#  ", L"## ", L"###", L'#',
                     Blocks::nether_brick, L'S');
     addShapedRecipe(new ItemInstance(Blocks::sandstone_stairs, 4), L"sssctg", L"#  ", L"## ", L"###", L'#',
@@ -224,12 +295,8 @@ Recipes::Recipes()
                     Blocks::sand, L'T');
     addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::COBBLESTONE->getData()), L"sctg",
                     L"###", L'#', Blocks::cobblestone, L'S');
-    addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::STONE->getData()), L"sctg", L"###",
-                    L'#', Blocks::stone, L'S');
     addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::BRICK->getData()), L"sctg", L"###",
                     L'#', Blocks::brick_block, L'S');
-    addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::SMOOTHBRICK->getData()), L"sctg",
-                    L"###", L'#', Blocks::stonebrick, L'S');
     addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::NETHERBRICK->getData()), L"sctg",
                     L"###", L'#', Blocks::nether_brick, L'S');
     addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::SAND->getData()), L"sctg", L"###",
@@ -434,8 +501,11 @@ Recipes::Recipes()
     addShapedRecipe(new ItemInstance(Blocks::conduit, 1), L"ssscicig", L"###", L"#X#", L"###", L'#', Items::nautilus,
                     L'X', Items::nautilusCore, L'M');
     mOreRecipies->addRecipes(this);
-    addShapedRecipe(new ItemInstance(Items::sign, 3), L"sssctcig", L"###", L"###", L" X ", L'#', Blocks::planks, L'X',
-                    Items::stick, L'D');
+    for (int wood = 0; wood < BlockId::WOOD_SPECIES_COUNT; ++wood)
+    {
+        addShapedRecipe(new ItemInstance(SignItem::byWoodType(wood), 3), L"sssczcig", L"###", L"###", L" X ",
+                        L'#', new ItemInstance(Blocks::planks, 1, wood), L'X', Items::stick, L'D');
+    }
     addShapedRecipe(new ItemInstance(Blocks::piston, 1), L"sssctcicictg", L"TTT", L"#X#", L"#R#", L'#',
                     Blocks::cobblestone, L'X', Items::ironIngot, L'R', Items::redstone, L'T', Blocks::planks, L'M');
     addShapedRecipe(new ItemInstance(Blocks::sticky_piston, 1), L"sscictg", L"S", L"P", L'S', Items::slimeBall, L'P',
@@ -459,7 +529,7 @@ Recipes::Recipes()
     for (int colour = 0; colour < 16; ++colour)
     {
         addShapedRecipe(new ItemInstance(Items::bed, 1, colour), eRecipeCategory_Dyeing, L"ssczczg", L" D", L" G", L'D',
-                        new ItemInstance(Items::dye, 1, 15 - colour), L'G', new ItemInstance(Items::bed, 1, -1), L'0');
+                        new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(15 - colour)), L'G', new ItemInstance(Items::bed, 1, -1), L'0');
     }
     Block* shulkerBoxes[16] = {Blocks::white_shulker_box,      Blocks::orange_shulker_box, Blocks::magenta_shulker_box,
                                Blocks::light_blue_shulker_box, Blocks::yellow_shulker_box, Blocks::lime_shulker_box,
@@ -470,10 +540,96 @@ Recipes::Recipes()
     for (int colour = 0; colour < 16; ++colour)
     {
         addShapedRecipe(new ItemInstance(shulkerBoxes[colour], 1, colour), eRecipeCategory_Dyeing, L"ssczczg", L" D",
-                        L" G", L'D', new ItemInstance(Items::dye, 1, 15 - colour), L'G',
+                        L" G", L'D', new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(15 - colour)), L'G',
                         new ItemInstance(Blocks::purple_shulker_box, 1, -1), L'0');
     }
     mBannerRecipes->addRecipes(this);
+    // Append recipes so existing assisted-crafting recipe indices stay stable.
+    for (Block* wood : smokerWoods())
+    {
+        addShapedRecipe(new ItemInstance(Blocks::smoker), L"sssctctg", L" W ", L"WFW", L" W ",
+                        L'W', wood, L'F', Blocks::furnace, L'S');
+    }
+    mRecipes[eRecipeCategory_Crafting].push_back(new MixedWoodSmokerRecipe());
+    addShapedRecipe(new ItemInstance(Blocks::blast_furnace), L"ssscictctg", L"III", L"IFI", L"SSS",
+                    L'I', Items::ironIngot, L'F', Blocks::furnace, L'S', Blocks::smooth_stone, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::cartography_table), L"ssscictg", L"PP", L"WW", L"WW",
+                    L'P', Items::paper, L'W', Blocks::planks, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::grindstone), L"ssciczctg", L"STS", L"W W",
+                    L'S', Items::stick, L'T', new ItemInstance(Blocks::stone_slab, 1, StoneSlabBlock::Variant::STONE->getData()),
+                    L'W', Blocks::planks, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::barrel), L"sssctctg", L"PSP", L"P P", L"PSP",
+                    L'P', Blocks::planks, L'S', Blocks::wooden_slab, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::stonecutter), L"ssciczg", L" I ", L"SSS", L'I', Items::ironIngot,
+                    L'S', new ItemInstance(Blocks::stone, 1, StoneBlock::Variant::STONE->getData()), L'S');
+    addShapedRecipe(new ItemInstance(Blocks::smithing_table), L"ssscictg", L"II", L"WW", L"WW",
+                    L'I', Items::ironIngot, L'W', Blocks::planks, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::fletching_table), L"ssscictg", L"FF", L"WW", L"WW",
+                    L'F', Items::flint, L'W', Blocks::planks, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::lantern), L"ssscictg", L"NNN", L"NTN", L"NNN",
+                    L'N', Items::ironNugget, L'T', Blocks::torch, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::composter), L"sssctg", L"S S", L"S S", L"SSS",
+                    L'S', Blocks::wooden_slab, L'S');
+
+    for (int material = 0; material < DecorativeStone::MaterialCount; ++material)
+    {
+        const auto& entry = DecorativeStone::materials[material];
+        const auto ingredient = [&] { return new ItemInstance(Block::byId(entry.blockId), 1, entry.data); };
+        if (material < DecorativeStone::StairCount)
+        {
+            auto* stair = Block::byId(BlockId::DECOR_STAIRS_FIRST + material);
+            const int group = material / DecorativeStone::SlabTypesPerBlock;
+            const int variant = material % DecorativeStone::SlabTypesPerBlock;
+            auto* slab = Block::byId(BlockId::DECOR_SLAB_FIRST + group);
+            addShapedRecipe(new ItemInstance(stair, 4), L"sssczg", L"#  ", L"## ", L"###", L'#', ingredient(), L'S');
+            addShapedRecipe(new ItemInstance(slab, 6, variant), L"sczg", L"###", L'#', ingredient(), L'S');
+        }
+        if (entry.wall)
+        {
+            auto* wall = Block::byId(BlockId::DECOR_WALL_FIRST + material);
+            addShapedRecipe(new ItemInstance(wall, 6), L"ssczg", L"###", L"###", L'#', ingredient(), L'S');
+        }
+    }
+    addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::STONE->getData()), L"sctg",
+                    L"###", L'#', Blocks::smooth_stone, L'S');
+
+    addShapedRecipe(new ItemInstance(Blocks::stone_brick_stairs, 4), L"sssctg", L"#  ", L"## ", L"###", L'#',
+                    Blocks::stonebrick, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::stone_slab, 6, StoneSlabBlock::Variant::SMOOTHBRICK->getData()), L"sctg",
+                    L"###", L'#', Blocks::stonebrick, L'S');
+
+    Block* campfireLogs[] = {Blocks::log, Blocks::log2, Blocks::bark_oak, Blocks::bark_spruce, Blocks::bark_birch,
+                             Blocks::bark_jungle, Blocks::bark_acacia, Blocks::bark_dark_oak,
+                             Blocks::stripped_log_oak, Blocks::stripped_log_spruce, Blocks::stripped_log_birch,
+                             Blocks::stripped_log_jungle, Blocks::stripped_log_acacia, Blocks::stripped_log_dark_oak};
+    const auto addCampfireRecipe = [this](Block* logs) {
+        for (int fuel : {0, 1})
+            addShapedRecipe(new ItemInstance(Blocks::campfire), L"sssciczctg", L" S ", L"SCS", L"LLL",
+                            L'S', Items::stick, L'C', new ItemInstance(Items::coal, 1, fuel), L'L', logs, L'S');
+    };
+    for (auto* logs : campfireLogs)
+        addCampfireRecipe(logs);
+    for (int wood = 0; wood < BlockId::WOOD_SPECIES_COUNT; ++wood)
+        addCampfireRecipe(Block::byId(BlockId::STRIPPED_WOOD_FIRST + wood));
+
+    addShapedRecipe(new ItemInstance(Blocks::lectern), L"sssctctg", L"SSS", L" B ", L" S ",
+                    L'S', Blocks::wooden_slab, L'B', Blocks::bookshelf, L'S');
+    addShapedRecipe(new ItemInstance(Blocks::loom), L"sscictg", L"SS", L"PP",
+                    L'S', Items::string, L'P', Blocks::planks, L'S');
+    for (int variant = 0; variant < BannerStencilItem::Count; ++variant)
+    {
+        const auto* ingredient = BannerStencilItem::patternFor(variant)->getPatternItem();
+        addShapelessRecipe(new ItemInstance(Items::bannerStencil, 1, variant), L"izg", Items::paper,
+                           new ItemInstance(ingredient->getItem(), 1, ingredient->getAuxValue()), L'T');
+    }
+    for (int dye = DyeColor::BlackDye; dye < DyeColor::DyeItemDataCount; ++dye)
+        addShapelessRecipe(new ItemInstance(Items::dye, 1, dye), L"zg",
+                           new ItemInstance(Items::dye, 1, DyeColor::colorItemData(dye)), L'D');
+    addShapelessRecipe(new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L"zg",
+                       new ItemInstance(Blocks::red_flower, 1, FlowerBlock::Flower::LILY_OF_THE_VALLEY->getData()), L'D');
+    addShapelessRecipe(new ItemInstance(Items::dye, 1, DyeColor::BlueDye), L"zg",
+                       new ItemInstance(Blocks::red_flower, 1, FlowerBlock::Flower::CORNFLOWER->getData()), L'D');
+
     buildRecipeIngredientsArray();
 }
 

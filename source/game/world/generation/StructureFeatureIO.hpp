@@ -17,7 +17,8 @@ enum EStructureStart
     eStructureStart_WoodlandMansion = 7,
     eStructureStart_BuriedTreasure = 8,
     eStructureStart_Shipwreck = 9,
-    eStructureStart_OceanRuin = 10
+    eStructureStart_OceanRuin = 10,
+    eStructureStart_PillagerOutpost = 11
 };
 
 #include "game/world/generation/StructurePiece.hpp"
@@ -55,7 +56,7 @@ private:
     static boost::unordered_map<unsigned int, std::wstring> startIds;
     static boost::unordered_map<std::wstring, StructurePieceFactory> pieceFactories;
     static boost::unordered_map<unsigned int, std::wstring> pieceIds;
-    static int version;
+    static thread_local int version;
 };
 
 #endif

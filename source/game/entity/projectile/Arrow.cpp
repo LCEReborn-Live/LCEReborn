@@ -21,6 +21,7 @@
 #include "game/item/EnchantmentHelper.hpp"
 #include "game/minigame/MiniGameDef.hpp"
 #include "game/world/Level.hpp"
+#include "game/world/block/Blocks.hpp"
 #include "game/world/generation/Player.hpp"
 
 namespace
@@ -116,6 +117,9 @@ bool Arrow::canHitEntity(const boost::shared_ptr<Entity>& entity)
 bool Arrow::onHit(const HitResult* result)
 {
     const bool hit = AbstractRotatedItemProjectile::onHit(result);
+    if (!mLevel->mIsClientSide && result->mType == HitResult::BLOCK
+        && mLevel->getBlock(result->getBlockPos()) == Blocks::chorus_flower)
+        mLevel->destroyBlock(result->getBlockPos(), true);
     if (result->mEntity == nullptr && canPierceEntities())
     {
         setFlag(PIERCE_MASK, false);

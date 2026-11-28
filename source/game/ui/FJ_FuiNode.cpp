@@ -883,3 +883,9 @@ void FJ_FuiNode::setCallbackScene(UIScene* pScene)
 {
     m_pCallbackScene = pScene;
 }
+void FJ_FuiNode::setColorMultiplier(float red, float green, float blue)
+{
+    m_pRenderNode->m_redMultiply = red;
+    m_pRenderNode->m_greenMultiply = green;
+    m_pRenderNode->m_blueMultiply = blue;
+}

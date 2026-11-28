@@ -21,11 +21,10 @@ REGIONS = [('timeline', 0, 28), ('action', 2, 132), ('shape', 3, 28),
 TYPES = {1: 'shape', 2: 'timeline', 3: 'bitmap', 4: 'reference', 5: 'text'}
 RETAINED_CONTRACTS = {
     'AvatarSelectMenu720.fui': 'PC avatar tabs require TabLeftOff, TabMiddleOff and TabRightOff',
-    'TradingMenu720.fui': 'Current trading code requires RequiredLabel, Request1Label and Request2Label',
-    'TradingMenuSplit720.fui': 'Current trading code requires RequiredLabel, Request1Label and Request2Label',
     'FullscreenProgress720.fui': 'Loading controls still use the original progress and text component hierarchy',
     'FullscreenProgressSplit720.fui': 'Loading controls still use the original progress and text component hierarchy',
 }
+TRADING_SCENES = {'TradingMenu720.fui', 'TradingMenuSplit720.fui'}
 
 
 def cstr(data):
@@ -173,12 +172,67 @@ class Movie:
         return sorted(set(legacy.exports()) - set(existing))
 
 
+def fit_trading_slots(movie):
+    slot_lists = {
+        index for index, reference in enumerate(movie.regions['reference'])
+        if cstr(reference[4:68]) == 'fourj.listClasses.FJ_SlotList'
+    }
+    bar_slot_size = next(int(cstr(action[68:132])) for action in movie.regions['action']
+                         if action[0] == 16 and cstr(action[4:68]) == 'TradingBar')
+    for event in movie.regions['event']:
+        if event[2] != 4 or struct.unpack_from('<H', event, 6)[0] not in slot_lists:
+            continue
+        xx, xy, yx, yy, x, y = struct.unpack_from('<6f', event, 12)
+        # The runtime slot list uses the same guide size at 1080p and 720p.
+        xx, xy, yx, yy = (value * 2 / 3 for value in (xx, xy, yx, yy))
+        name = struct.unpack_from('<h', event, 10)[0]
+        if name >= 0 and cstr(movie.regions['name'][name]) == 'TradingBar':
+            # Center the legacy seven offers in TU80's ten-slot row.
+            xx *= 7 / 10
+            x += bar_slot_size * 1.5
+        struct.pack_into('<6f', event, 12, xx, xy, yx, yy, x, y)
+
+
+def single_shape_dimensions(library, timeline):
+    """Return the bounds of a panel exported as a one-shape timeline."""
+    first, count = struct.unpack_from('<HH', library.regions['timeline'][timeline], 4)
+    start, events = struct.unpack_from('<II', library.regions['frame'][first], 64)
+    event = library.regions['event'][start]
+    if count != 1 or events != 1 or event[2] != 1:
+        raise ValueError('Unexpected shared panel structure')
+    index, = struct.unpack_from('<H', event, 6)
+    left, right, top, bottom = struct.unpack_from('<4f', library.regions['shape'][index], 12)
+    xx, xy, yx, yy = struct.unpack_from('<4f', event, 12)
+    if xy or yx:
+        raise ValueError('Unexpected rotated panel')
+    return (right - left) * xx, (bottom - top) * yy
+
+
+def fit_trading_panels(movie, donor, runtime):
+    donor_exports, runtime_exports = donor.exports(), runtime.exports()
+    panel_names = {'FJ_Panel9Grid', 'FJ_panel9Grid_16', 'FJ_SquareRecessedPanel'}
+    for event in movie.regions['event']:
+        if event[2] != 4:
+            continue
+        reference, = struct.unpack_from('<H', event, 6)
+        name = cstr(movie.regions['reference'][reference][4:68])
+        if name not in panel_names:
+            continue
+        width, height = single_shape_dimensions(donor, donor_exports[name][1])
+        old_width, old_height = single_shape_dimensions(runtime, runtime_exports[name][1])
+        xx, xy, yx, yy = struct.unpack_from('<4f', event, 12)
+        sx, sy = width / old_width, height / old_height
+        struct.pack_into('<4f', event, 12, xx * sx, xy * sx, yx * sy, yy * sy)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline', type=Path, required=True)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--current', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--trading-only', action='store_true',
+                        help='Replace only the two trading scenes in the current archive')
     args = parser.parse_args()
     baseline = read_archive(args.baseline.read_bytes())
     source = read_archive(args.source.read_bytes())
@@ -190,6 +244,8 @@ def main():
             continue
         name = name.decode()
         target = mapped(name)
+        if args.trading_only and target not in TRADING_SCENES:
+            continue
         record = dict(source=name, target=target)
         if target.encode() not in baseline:
             record.update(status='new-unconnected', reason='No existing screen implementation')
@@ -200,6 +256,11 @@ def main():
         else:
             old = Movie(baseline[target.encode()])
             new = Movie(data).normalize()
+            if target in TRADING_SCENES:
+                fit_trading_slots(new)
+                if args.trading_only:
+                    fit_trading_panels(new, Movie(source[b'skinHDGraphicsInGame.fui']).normalize(),
+                                       Movie(current[b'skinGraphicsInGame.fui']))
             if target.startswith('skin'):
                 record['retained_exports'] = new.append_legacy(old)
             payload = new.encode()
@@ -223,6 +284,8 @@ def main():
         if missing:
             result[key] = current[key]
             record.update(status='incompatible-retained', missing_exports=missing)
+    if args.trading_only and {r['target'] for r in report if r['status'] in ('same', 'changed')} != TRADING_SCENES:
+        raise ValueError(f'Both trading scenes must be compatible with the current archive: {report}')
     args.output.mkdir(parents=True, exist_ok=True)
     movie_dir = args.output / 'movies'
     movie_dir.mkdir(exist_ok=True)

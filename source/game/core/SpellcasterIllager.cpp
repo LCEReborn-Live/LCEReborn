@@ -38,13 +38,13 @@ void SpellcasterIllager::defineSynchedData()
 
 void SpellcasterIllager::readAdditionalSaveData(CompoundTag* tag)
 {
-    Mob::readAdditionalSaveData(tag);
+    Raider::readAdditionalSaveData(tag);
     mSpellTicks = tag->getInt(L"SpellTicks");
 }
 
 void SpellcasterIllager::addAdditonalSaveData(CompoundTag* tag)
 {
-    Mob::addAdditonalSaveData(tag);
+    Raider::addAdditonalSaveData(tag);
     tag->putInt(L"SpellTicks", mSpellTicks);
 }
 
@@ -59,6 +59,7 @@ bool SpellcasterIllager::isCastingSpell()
 
 int SpellcasterIllager::getArmPose()
 {
+    if (isCelebrating()) return ILLAGER_ARM_POSE_CELEBRATING;
     return isCastingSpell() ? ILLAGER_ARM_POSE_SPELLCASTING : ILLAGER_ARM_POSE_CROSSED;
 }
 

@@ -1,4 +1,5 @@
 #include "game/core/Witch.hpp"
+#include "game/util/AABB.hpp"
 #include "game/core/Mth.hpp"
 #include "game/entity/mob/EntityEvent.hpp"
 #include "game/core/EntityType.hpp"
@@ -37,9 +38,10 @@
 const EntityDataAccessor<bool>* Witch::DATA_USING_ITEM = NULL;
 static AttributeModifier* SPEED_MODIFIER_DRINKING =
     (new AttributeModifier(eMODIFIER_ID_WitchDrinkingSpeedPenalty, -0.25, 0))->setSerialize(false);
-Witch::Witch(Level* level) : Monster(level)
+Witch::Witch(Level* level) : Raider(level)
 {
     fjDerivedCtorCalls();
+    setCanJoinRaid(false);
     setSize(0.6f, 1.95f);
     mUsingTime = 0;
     mCategories |= EntityCategory::eEntityCategory_Humanoid | EntityCategory::eEntityCategory_Monster;
@@ -67,7 +69,12 @@ void Witch::performRangedAttack(boost::shared_ptr<LivingEntity> target, float di
     double dz = target->mZ + target->mZd - mZ;
     float horizontal = Mth::sqrt(dx * dx + dz * dz);
     Potion* potion = Potions::HARMING;
-    if (horizontal >= 8.0f && !target->hasEffect(MobEffects::MOVEMENT_SLOWDOWN))
+    if (boost::dynamic_pointer_cast<Raider>(target))
+    {
+        potion = target->getHealth() <= 4.0f ? Potions::HEALING : Potions::REGENERATION;
+        setTarget({});
+    }
+    else if (horizontal >= 8.0f && !target->hasEffect(MobEffects::MOVEMENT_SLOWDOWN))
     {
         potion = Potions::SLOWNESS;
     }
@@ -96,15 +103,57 @@ bool Witch::isAggressive()
 void Witch::setAggressive(bool)
 {
 }
+namespace
+{
+class WitchHealRaiderGoal : public Goal
+{
+    Witch& mWitch;
+    boost::weak_ptr<Raider> mTarget;
+public:
+    explicit WitchHealRaiderGoal(Witch& witch) : mWitch(witch) { setRequiredControlFlags(1); }
+    std::wstring getName() override { return L"HealRaidAlly"; }
+    bool canUse() override
+    {
+        if (mWitch.mHealCooldown > 0 || !mWitch.hasActiveRaid() || !mWitch.getRandom()->nextBoolean()) return false;
+        std::vector<boost::shared_ptr<Entity>> entities;
+        mWitch.mLevel->getEntities(mWitch.shared_from_this(), mWitch.getBoundingBox()->grow(16, 4, 16), &entities);
+        double distance = 16 * 16;
+        mTarget.reset();
+        for (auto& entity : entities)
+            if (auto raider = boost::dynamic_pointer_cast<Raider>(entity))
+                if (raider->isAlive() && raider->GetType() != EntityType::WITCH
+                    && mWitch.distanceToSqr(raider) < distance && mWitch.canSee(raider))
+                { distance = mWitch.distanceToSqr(raider); mTarget = raider; }
+        return !mTarget.expired();
+    }
+    void start() override { mWitch.mHealCooldown = 200; mWitch.setTarget(mTarget.lock()); }
+    bool canContinueToUse() override
+    {
+        auto target = mTarget.lock();
+        return target && target->isAlive() && mWitch.getTarget() == target && mWitch.distanceToSqr(target) < 256;
+    }
+    void stop() override { if (mWitch.getTarget() == mTarget.lock()) mWitch.setTarget({}); mTarget.reset(); }
+};
+class WitchPlayerTargetGoal : public NearestAttackableTargetGoal
+{
+    Witch& mWitch;
+public:
+    explicit WitchPlayerTargetGoal(Witch& witch)
+        : NearestAttackableTargetGoal(&witch, typeid(Player), true, false, false), mWitch(witch) {}
+    bool canUse() override { return mWitch.mHealCooldown <= 0 && NearestAttackableTargetGoal::canUse(); }
+};
+}
 void Witch::registerGoals()
 {
+    Raider::registerGoals();
     mGoalSelector.addGoal(1, new FloatGoal(this), true);
     mGoalSelector.addGoal(2, new RangedAttackGoal(this, this, 1.0, 60, 10.0f), true);
     mGoalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this, 1.0), true);
     mGoalSelector.addGoal(3, new LookAtPlayerGoal(this, typeid(Player), 8.0f), true);
     mGoalSelector.addGoal(3, new RandomLookAroundGoal(this), true);
     mTargetSelector.addGoal(1, new HurtByTargetGoal(this, false, arrayWithLength<unsigned long long>()), true);
-    mTargetSelector.addGoal(2, new NearestAttackableTargetGoal(this, typeid(Player), true, false, false), true);
+    mTargetSelector.addGoal(2, new WitchHealRaiderGoal(*this), true);
+    mTargetSelector.addGoal(3, new WitchPlayerTargetGoal(*this), true);
 }
 void Witch::defineSynchedData()
 {
@@ -139,6 +188,7 @@ void Witch::registerAttributes()
 }
 void Witch::aiStep()
 {
+    if (!mLevel->mIsClientSide && mHealCooldown > 0) --mHealCooldown;
     if (!mLevel->mIsClientSide)
     {
         if (isDrinkingPotion())
@@ -211,7 +261,7 @@ void Witch::aiStep()
             mLevel->broadcastEntityEvent(shared_from_this(), EntityEvent::WITCH_HAT_MAGIC, 0);
         }
     }
-    Monster::aiStep();
+    Raider::aiStep();
 }
 
 void Witch::handleEntityEvent(unsigned char event, int data)
@@ -227,7 +277,7 @@ void Witch::handleEntityEvent(unsigned char event, int data)
     }
     else
     {
-        Monster::handleEntityEvent(event, data);
+        Raider::handleEntityEvent(event, data);
     }
 }
 

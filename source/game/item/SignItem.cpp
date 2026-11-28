@@ -6,6 +6,7 @@
 #include "game/core/Mth.hpp"
 #include "game/core/Stats.hpp"
 #include "game/item/ItemInstance.hpp"
+#include "game/item/ItemId.hpp"
 #include "game/world/Level.hpp"
 #include "game/world/block/Block.hpp"
 #include "game/world/block/BlockEntity.hpp"
@@ -22,9 +23,14 @@
 #include "game/world/block/WallSignBlock.hpp"
 #include "game/world/generation/Player.hpp"
 
-SignItem::SignItem()
+SignItem::SignItem(int woodType) : mWoodType(woodType)
 {
     mMaxStackSize = 16;
+}
+
+Item* SignItem::byWoodType(int woodType)
+{
+    return Item::byId(woodType == 0 ? ItemId::SIGN : ItemId::WOOD_SIGN_FIRST + woodType - 1);
 }
 
 InteractionResult::EInteractionResult SignItem::useOn(boost::shared_ptr<Player> player, Level* level,
@@ -51,11 +57,13 @@ InteractionResult::EInteractionResult SignItem::useOn(boost::shared_ptr<Player> 
         return InteractionResult::eInteractionResult_Fail;
     }
 
-    signPos = pos.relative(direction);
+    signPos = replaceable ? pos : pos.relative(direction);
+    const bool standing = direction == Direction::UP;
+    auto* signBlock = SignBlock::byWoodType(mWoodType, standing);
 
     not_null_ptr<ItemInstance> itemInstance = player->getItemInHand(hand);
 
-    if (!player->mayUseItemAt(signPos, direction, itemInstance) || !Blocks::standing_sign->mayPlace(level, signPos))
+    if (!player->mayUseItemAt(signPos, direction, itemInstance) || !signBlock->mayPlace(level, signPos))
     {
         return InteractionResult::eInteractionResult_Fail;
     }
@@ -67,25 +75,19 @@ InteractionResult::EInteractionResult SignItem::useOn(boost::shared_ptr<Player> 
 
     if (!simulate)
     {
-        if (replaceable)
-        {
-            signPos = signPos.below();
-        }
-
-        if (direction == Direction::UP)
+        const auto* signState = signBlock->defaultBlockState();
+        if (standing)
         {
             int rotation = Mth::absFloor((double)((player->mYRot + 180.0f) * 16.0f / 360.0f) + 0.5) & 15;
-            level->setBlock(signPos,
-                            Blocks::standing_sign->defaultBlockState()->setValue(StandingSignBlock::ROTATION, rotation),
-                            Block::UPDATE_ALL | Block::UPDATE_IMMEDIATE, false);
+            signState = signState->setValue(StandingSignBlock::ROTATION, rotation);
         }
         else
         {
-            level->setBlock(signPos, Blocks::wall_sign->defaultBlockState()->setValue(WallSignBlock::FACING, direction),
-                            Block::UPDATE_ALL | Block::UPDATE_IMMEDIATE, false);
+            signState = signState->setValue(WallSignBlock::FACING, direction);
         }
 
-        itemInstance->shrink(1);
+        if (!level->setBlock(signPos, signState, Block::UPDATE_ALL | Block::UPDATE_IMMEDIATE, false))
+            return InteractionResult::eInteractionResult_Fail;
 
         boost::shared_ptr<BlockEntity> blockEntity = level->getBlockEntity(signPos);
 
@@ -97,10 +99,10 @@ InteractionResult::EInteractionResult SignItem::useOn(boost::shared_ptr<Player> 
             }
         }
 
-        Block* signBlock = direction == Direction::UP ? Blocks::standing_sign : Blocks::wall_sign;
+        itemInstance->shrink(1);
 
         player->awardStat(GenericStats::blocksPlaced(signBlock),
-                          GenericStats::param_blocksPlaced(signBlock->getBlockState(itemInstance->getAuxValue()), 1));
+                          GenericStats::param_blocksPlaced(signState, 1));
     }
 
     return InteractionResult::eInteractionResult_Success;

@@ -7,7 +7,7 @@
 
 const EntityDataAccessor<unsigned char>* AbstractIllager::DATA_ILLAGER_FLAGS = NULL;
 
-AbstractIllager::AbstractIllager(Level* level) : Monster(level)
+AbstractIllager::AbstractIllager(Level* level) : Raider(level)
 {
 }
 

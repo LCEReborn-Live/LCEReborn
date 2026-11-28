@@ -102,7 +102,7 @@ boost::shared_ptr<MapItemSavedData> MapItem::getSavedData(not_null_ptr<ItemInsta
 
 void MapItem::update(Level* level, boost::shared_ptr<Entity> entity, boost::shared_ptr<MapItemSavedData> data)
 {
-    if (level->mDimension->getType()->getId() != data->mDimension)
+    if (data->mLocked || level->mDimension->getType()->getId() != data->mDimension)
         return;
     if (!eTYPE_DERIVED_FROM(EntityType::PLAYER, entity->GetType()))
         return;
@@ -427,6 +427,13 @@ void MapItem::inventoryTick(not_null_ptr<ItemInstance> itemInstance, Level* leve
 
     boost::shared_ptr<MapItemSavedData> data = getSavedData(itemInstance, level);
 
+    if (data->mLocked)
+    {
+        if (eTYPE_DERIVED_FROM(EntityType::PLAYER, entity->GetType()))
+            data->tickCarriedBy(boost::static_pointer_cast<Player>(entity), itemInstance);
+        return;
+    }
+
     if (eTYPE_DERIVED_FROM(EntityType::PLAYER, entity->GetType()))
     {
         boost::shared_ptr<Player> player = boost::static_pointer_cast<Player>(entity);
@@ -470,6 +477,8 @@ void MapItem::scaleMap(not_null_ptr<ItemInstance> itemInstance, Level* level, in
 {
     boost::shared_ptr<MapItemSavedData> oldData =
         static_cast<MapItem*>(Items::filledMap)->getSavedData(itemInstance, level);
+    if (oldData && oldData->mLocked)
+        return;
     itemInstance->setAuxValue(level->getFreeAuxValueFor(L"map"));
     boost::shared_ptr<MapItemSavedData> data(new MapItemSavedData(L"map_" + _toString(itemInstance->getAuxValue())));
     if (oldData)
@@ -487,6 +496,8 @@ void MapItem::enableMapTracking(not_null_ptr<ItemInstance> itemInstance, Level* 
 {
     boost::shared_ptr<MapItemSavedData> oldData =
         static_cast<MapItem*>(Items::filledMap)->getSavedData(itemInstance, level);
+    if (oldData && oldData->mLocked)
+        return;
     itemInstance->setAuxValue(level->getFreeAuxValueFor(L"map"));
     boost::shared_ptr<MapItemSavedData> data(new MapItemSavedData(L"map_" + _toString(itemInstance->getAuxValue())));
     if (oldData)
@@ -501,6 +512,29 @@ void MapItem::enableMapTracking(not_null_ptr<ItemInstance> itemInstance, Level* 
     }
 }
 
+void MapItem::lockMap(not_null_ptr<ItemInstance> item, Level* level)
+{
+    auto oldData = getSavedDataIfExists(item->getAuxValue(), level);
+    if (!oldData || oldData->mLocked)
+        return;
+
+    const int id = level->getFreeAuxValueFor(L"map");
+    const std::wstring name = L"map_" + _toString(id);
+    boost::shared_ptr<MapItemSavedData> copy(new MapItemSavedData(name));
+    copy->mXCenter = oldData->mXCenter;
+    copy->mZCenter = oldData->mZCenter;
+    copy->mScale = oldData->mScale;
+    copy->mDimension = oldData->mDimension;
+    copy->mTrackingPosition = oldData->mTrackingPosition;
+    copy->mUnlimitedTracking = oldData->mUnlimitedTracking;
+    std::copy_n(oldData->mColors.data, copy->mColors.length, copy->mColors.data);
+    copy->mLocked = true;
+    copy->setDirty();
+    level->setSavedData(name, copy);
+    item->setAuxValue(id);
+    item->getTag()->putBoolean(L"map_locked", true);
+}
+
 void MapItem::onCraftedBy(not_null_ptr<ItemInstance> itemInstance, Level* level, boost::shared_ptr<Player> player)
 {
     CompoundTag* tag = itemInstance->getTag();
@@ -508,7 +542,13 @@ void MapItem::onCraftedBy(not_null_ptr<ItemInstance> itemInstance, Level* level,
     {
         return;
     }
-    if (tag->contains(L"map_scale_direction", Tag::TAG_ANY_NUMERIC))
+    if (tag->getBoolean(L"map_lock_pending"))
+    {
+        if (!level->mIsClientSide)
+            lockMap(itemInstance, level);
+        tag->remove(L"map_lock_pending");
+    }
+    else if (tag->contains(L"map_scale_direction", Tag::TAG_ANY_NUMERIC))
     {
         scaleMap(itemInstance, level, tag->getInt(L"map_scale_direction"));
         tag->remove(L"map_scale_direction");

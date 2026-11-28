@@ -70,7 +70,7 @@ bool MapExtendingRecipe::matches(boost::shared_ptr<CraftingContainer> craftingCo
         }
     }
 
-    if (map->isEmpty())
+    if (map->isEmpty() || (map->getTag() && map->getTag()->getBoolean(L"map_locked")))
     {
         return false;
     }
@@ -80,7 +80,7 @@ bool MapExtendingRecipe::matches(boost::shared_ptr<CraftingContainer> craftingCo
     {
         return false;
     }
-    if (isExplorationMap(data))
+    if (data->isLocked() || isExplorationMap(data))
     {
         return false;
     }

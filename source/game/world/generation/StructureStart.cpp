@@ -47,7 +47,9 @@ void StructureStart::postProcess(Level* level, Random& random, BoundingBox* box)
         StructurePiece* piece = *it;
         if (piece->getBoundingBox()->intersects(box) && !piece->postProcess(level, random, box))
         {
+            delete piece;
             it = mPieces.erase(it);
+            setDirty();
         }
         else
         {
@@ -63,6 +65,7 @@ void StructureStart::postProcess(Level* level, Random& random, BoundingBox* box)
 
 void StructureStart::calculateBoundingBox()
 {
+    delete mBoundingBox;
     mBoundingBox = BoundingBox::getUnknownBox();
     for (std::vector<StructurePiece*>::iterator it = mPieces.begin(); it != mPieces.end(); ++it)
     {
@@ -74,7 +77,7 @@ arrayWithLength<unsigned char> StructureStart::createTag(int chunkX, int chunkZ)
 {
     ByteArrayOutputStream byteStream;
     DataOutputStream output(&byteStream);
-    output.writeInt(4);
+    output.writeInt(5);
     output.writeUTF(StructureFeatureIO::getEncodeId(this));
     output.writeInt(chunkX);
     output.writeInt(chunkZ);
@@ -102,10 +105,15 @@ void StructureStart::load(Level* level, DataInputStream* input)
     for (int i = 0; i < count; ++i)
     {
         StructurePiece* piece = StructureFeatureIO::loadStaticPiece(input, level);
-        if (piece != NULL)
+        if (!piece)
         {
-            mPieces.push_back(piece);
+            // Legacy records have no per-piece lengths, so an unknown piece cannot be skipped.
+            for (auto* loaded : mPieces)
+                delete loaded;
+            mPieces.clear();
+            return;
         }
+        mPieces.push_back(piece);
     }
     readAdditionalSaveData(input);
 }

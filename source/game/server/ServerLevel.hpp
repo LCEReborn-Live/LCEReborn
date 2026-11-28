@@ -34,6 +34,8 @@ class LevelStorage;
 class MinecraftServer;
 class MobCategory;
 class NaturalMobSpawner;
+class PatrolSpawner;
+class Raids;
 class Player;
 class PlayerChunkMap;
 class PortalForcer;
@@ -90,6 +92,7 @@ public:
     virtual ~ServerLevel();
 
     static void staticCtor();
+    Raids* getRaids() const { return mRaids.get(); }
     static int runUpdate(void* param);
 
     virtual Level* postConstruct();
@@ -214,6 +217,8 @@ private:
     bool allPlayersSleeping;
     PortalForcer* portalForcer;
     NaturalMobSpawner* mobSpawner;
+    boost::shared_ptr<PatrolSpawner> mPatrolSpawner;
+    boost::shared_ptr<Raids> mRaids;
     VillageSiege* villageSiege;
     int emptyTime;
     bool somePlayerSleeping;

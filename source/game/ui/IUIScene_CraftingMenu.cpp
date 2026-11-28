@@ -535,6 +535,7 @@ void IUIScene_CraftingMenu::DisplayCustomRecipeIngredients(int recipe)
                     }
                     else if ((itemId >= ItemId::LEATHER_HELMET && itemId <= ItemId::LEATHER_BOOTS)
                              || (blockId >= BlockId::WHITE_SHULKER_BOX && blockId <= BlockId::BLACK_SHULKER_BOX)
+                             || blockId == BlockId::UNDYED_SHULKER_BOX
                              || itemId == ItemId::LEATHER_HORSE_ARMOR)
                     {
                         useBaseItem = true;
@@ -895,16 +896,20 @@ void IUIScene_CraftingMenu::CheckRecipesAvailable()
             {
                 unsigned int key = ingredients.itemIds[i] | (ingredients.auxValues[i] << 16);
                 CompoundTag* tag = ingredients.itemTags != NULL ? ingredients.itemTags[i] : NULL;
+                const bool pigment = ingredientItem == Items::dye && ingredients.auxValues[i] >= DyeColor::BlackDye
+                    && ingredients.auxValues[i] < DyeColor::DyeItemDataCount;
                 for (std::vector<InventoryItemCount>::iterator count = inventoryCounts.begin();
                      count != inventoryCounts.end(); ++count)
                 {
-                    if (count->first.first != key)
+                    if (count->first.first != key
+                        && !(pigment && (count->first.first & 0xffff) == (key & 0xffff)
+                             && DyeColor::matchesDyeIngredient(ingredients.auxValues[i], count->first.first >> 16)))
                         continue;
                     if (tag == NULL
                         || (count->first.second != NULL && tag->equalsWithException(count->first.second, ignoredTags)))
                     {
-                        have = count->second;
-                        break;
+                        have += count->second;
+                        if (!pigment) break;
                     }
                 }
             }
@@ -2007,13 +2012,15 @@ void IUIScene_CraftingMenu::refreshBaseItemSlots(not_null_ptr<ItemInstance> item
         for (std::vector<const DyeColor*>::iterator color = DyeColor::COLORS.begin(); color != DyeColor::COLORS.end();
              ++color)
         {
-            choice = not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, (*color)->getItemData()));
+            const int dyeData = DyeColor::dyeItemData((*color)->getItemData());
+            choice = not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, dyeData));
             bool owned = false;
             for (unsigned int slot = 0; slot < m_player->mInventory->m_items.size(); ++slot)
             {
                 if (m_player->mInventory->m_items[slot]->getItem() == Items::dye
-                    && m_player->mInventory->m_items[slot]->getAuxValue() == (*color)->getItemData())
+                    && DyeColor::matchesDyeIngredient(dyeData, m_player->mInventory->m_items[slot]->getAuxValue()))
                 {
+                    choice->setAuxValue(m_player->mInventory->m_items[slot]->getAuxValue());
                     owned = true;
                     break;
                 }
@@ -2161,13 +2168,15 @@ void IUIScene_CraftingMenu::refreshBaseItemSlots(not_null_ptr<ItemInstance> item
         for (std::vector<const DyeColor*>::iterator color = DyeColor::COLORS.begin(); color != DyeColor::COLORS.end();
              ++color)
         {
-            dye = not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, (*color)->getItemData()));
+            const int dyeData = DyeColor::dyeItemData((*color)->getItemData());
+            dye = not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, dyeData));
             bool owned = false;
             for (unsigned int slot = 0; slot < m_player->mInventory->m_items.size(); ++slot)
             {
                 if (m_player->mInventory->m_items[slot]->getItem() == Items::dye
-                    && m_player->mInventory->m_items[slot]->getAuxValue() == (*color)->getItemData())
+                    && DyeColor::matchesDyeIngredient(dyeData, m_player->mInventory->m_items[slot]->getAuxValue()))
                 {
+                    dye->setAuxValue(m_player->mInventory->m_items[slot]->getAuxValue());
                     owned = true;
                     break;
                 }

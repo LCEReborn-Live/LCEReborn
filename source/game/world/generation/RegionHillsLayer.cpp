@@ -96,7 +96,7 @@ arrayWithLength<int> RegionHillsLayer::getArea(int x, int z, int width, int heig
                 }
                 else if (centre == Biome::JUNGLE->id)
                 {
-                    hills = Biome::JUNGLE_HILLS->id;
+                    hills = !mutate && nextRandom(9) == 0 ? Biome::eBiomeIDs_BambooJungle : Biome::JUNGLE_HILLS->id;
                 }
                 else if (centre == Biome::eBiomeIDs_Ocean)
                 {

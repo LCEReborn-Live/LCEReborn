@@ -15,11 +15,14 @@ class ResourceLocation;
 class OcelotRenderer : public MobRenderer
 {
 public:
-    OcelotRenderer(EntityRenderDispatcher* dispatcher);
+    OcelotRenderer(EntityRenderDispatcher* dispatcher, bool cat = false);
 
     virtual const ResourceLocation* getTextureLocation(boost::shared_ptr<Entity>& entity);
     virtual void scale(boost::shared_ptr<LivingEntity>& entity, float partialTicks);
     virtual Model* createModel(const ModelDefinition& definition);
+
+private:
+    bool mCat;
 };
 
 #endif

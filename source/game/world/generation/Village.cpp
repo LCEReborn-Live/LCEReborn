@@ -4,13 +4,17 @@
 #include <climits>
 #include <cmath>
 #include <typeinfo>
+#include <limits>
 
 #include "game/core/Mth.hpp"
+#include "game/core/Cat.hpp"
+#include "game/core/GameRules.hpp"
 #include "game/data/CompoundTag.hpp"
 #include "game/data/ListTag.hpp"
 #include "game/entity/mob/Entity.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
 #include "game/util/AABB.hpp"
+#include "game/util/NbtUtils.hpp"
 #include "game/util/Random.hpp"
 #include "game/util/Vec3.hpp"
 #include "game/world/Level.hpp"
@@ -72,8 +76,33 @@ int Village::getDoorCount()
 
 bool Village::isInside(const BlockPos& pos)
 {
-    int radius = mRadius;
-    return (double)mCenter.distSqr(pos) < (double)(radius * radius);
+    const int range = getBoundaryRange();
+    const auto distance = distanceToBoundaryPointsSqr(pos);
+    return usesPointsOfInterest() ? distance <= range * range : distance < range * range;
+}
+
+double Village::distanceToBoundaryPointsSqr(const BlockPos& pos) const
+{
+    if (!usesPointsOfInterest())
+        return mCenter.distSqr(pos);
+    double distance = std::numeric_limits<double>::infinity();
+    for (const auto& bed : mBeds)
+        distance = std::min(distance, bed.distSqr(pos));
+    for (const auto& site : mWorkSites)
+        distance = std::min(distance, site.distSqr(pos));
+    return distance;
+}
+
+int Village::getBoundaryRange() const
+{
+    return usesPointsOfInterest() ? POINT_RANGE : mRadius;
+}
+
+void Village::setPointsOfInterest(std::vector<BlockPos> beds, std::vector<BlockPos> workSites)
+{
+    mBeds = std::move(beds);
+    mWorkSites = std::move(workSites);
+    calcInfo();
 }
 
 bool Village::canSpawnAt(const BlockPos& size, const BlockPos& pos)
@@ -112,7 +141,7 @@ Vec3* Village::findRandomSpawnPos(const BlockPos& pos, int xSize, int ySize, int
     {
         BlockPos candidate = pos.offset(mLevel->mRandom->nextInt(16) - 8, mLevel->mRandom->nextInt(6) - 3,
                                         mLevel->mRandom->nextInt(16) - 8);
-        if (isInside(candidate) && canSpawnAt(size, candidate))
+        if (isInside(candidate) && mLevel->hasChunksAt(candidate, 2, false) && canSpawnAt(size, candidate))
             return Vec3::newPermanent(candidate.x, candidate.y, candidate.z);
     }
     return NULL;
@@ -128,6 +157,29 @@ bool Village::isDoor(const BlockPos& pos)
 
 void Village::calcInfo()
 {
+    if (usesPointsOfInterest())
+    {
+        long long x = 0, y = 0, z = 0;
+        const auto include = [&](const BlockPos& pos) {
+            x += pos.x;
+            y += pos.y;
+            z += pos.z;
+        };
+        for (const auto& bed : mBeds)
+            include(bed);
+        for (const auto& site : mWorkSites)
+            include(site);
+        const auto count = static_cast<long long>(mBeds.size() + mWorkSites.size());
+        mCenter = BlockPos(static_cast<int>(x / count), static_cast<int>(y / count), static_cast<int>(z / count));
+        double furthest = 0;
+        for (const auto& bed : mBeds)
+            furthest = std::max(furthest, mCenter.distSqr(bed));
+        for (const auto& site : mWorkSites)
+            furthest = std::max(furthest, mCenter.distSqr(site));
+        mRadius = POINT_RANGE + static_cast<int>(std::ceil(std::sqrt(furthest)));
+        return;
+    }
+
     int count = (int)mDoors.size();
     if (count == 0)
     {
@@ -193,21 +245,38 @@ void Village::updateAggressors()
 
 void Village::countPopulation()
 {
-    AABB* box = AABB::newTemp(mCenter.x - mRadius, mCenter.y - 4, mCenter.z - mRadius, mCenter.x + mRadius,
-                              mCenter.y + 4, mCenter.z + mRadius);
+    const int height = usesPointsOfInterest() ? mRadius : 4;
+    AABB* box = AABB::newTemp(mCenter.x - mRadius, mCenter.y - height, mCenter.z - mRadius, mCenter.x + mRadius,
+                              mCenter.y + height, mCenter.z + mRadius);
     std::vector<boost::shared_ptr<Entity> >* entities = mLevel->getEntitiesOfClass(typeid(Villager), box);
-    mPopulation = (int)entities->size();
+    mRecentlySlept = 0;
+    for (const auto& entity : *entities)
+    {
+        auto* resident = static_cast<Villager*>(entity.get());
+        if (resident->isAlive() && !resident->isBaby() && isInside(BlockPos(entity)) && resident->sleptRecently())
+            ++mRecentlySlept;
+    }
+    mPopulation = usesPointsOfInterest()
+        ? static_cast<int>(std::count_if(entities->begin(), entities->end(), [&](const auto& entity) {
+            return isInside(BlockPos(entity));
+        }))
+        : static_cast<int>(entities->size());
     delete entities;
-    if (mPopulation == 0)
+    if (mPopulation == 0 && !usesPointsOfInterest())
         mPlayerStandings.clear();
 }
 
 void Village::countGolem()
 {
-    AABB* box = AABB::newTemp(mCenter.x - mRadius, mCenter.y - 4, mCenter.z - mRadius, mCenter.x + mRadius,
-                              mCenter.y + 4, mCenter.z + mRadius);
+    const int height = usesPointsOfInterest() ? mRadius : 4;
+    AABB* box = AABB::newTemp(mCenter.x - mRadius, mCenter.y - height, mCenter.z - mRadius, mCenter.x + mRadius,
+                              mCenter.y + height, mCenter.z + mRadius);
     std::vector<boost::shared_ptr<Entity> >* entities = mLevel->getEntitiesOfClass(typeid(VillagerGolem), box);
-    mGolems = (int)entities->size();
+    mGolems = usesPointsOfInterest()
+        ? static_cast<int>(std::count_if(entities->begin(), entities->end(), [&](const auto& entity) {
+            return isInside(BlockPos(entity));
+        }))
+        : static_cast<int>(entities->size());
     delete entities;
 }
 
@@ -220,9 +289,41 @@ void Village::tick(int tick)
         countPopulation();
     if (tick % 30 == 0)
         countGolem();
-    if (mGolems < mPopulation / 10 && mDoors.size() > 20 && mLevel->mRandom->nextInt(7000) == 0)
+    const bool modern = usesPointsOfInterest();
+    const BlockPos& activity = modern ? mBeds[tick % mBeds.size()] : mCenter;
+    const int catCapacity = getCatCapacity();
+    if (tick % 1200 == 0 && mPopulation > 0 && catCapacity > 0 && mLevel->hasChunksAt(activity, 8, false)
+        && mLevel->getGameRules()->getBoolean(GameRules::RULE_DOMOBSPAWNING))
     {
-        Vec3* pos = findRandomSpawnPos(mCenter, 2, 4, 2);
+        const int height = modern ? mRadius : 8;
+        const AABB* area = AABB::newTemp(mCenter.x - mRadius, mCenter.y - height, mCenter.z - mRadius,
+                                       mCenter.x + mRadius, mCenter.y + height, mCenter.z + mRadius);
+        auto* cats = mLevel->getEntitiesOfClass(typeid(Cat), area);
+        const auto count = modern ? static_cast<size_t>(std::count_if(cats->begin(), cats->end(), [&](const auto& cat) {
+            return isInside(BlockPos(cat));
+        })) : cats->size();
+        const bool underCap = count < static_cast<unsigned int>(catCapacity);
+        delete cats;
+        if (underCap && mLevel->canCreateMore(EntityType::CAT, Level::eSpawnType_Breed))
+        {
+            if (const Vec3* pos = findRandomSpawnPos(activity, 1, 2, 1))
+            {
+                auto cat = boost::shared_ptr<Cat>(new Cat(mLevel));
+                cat->moveTo(pos->x + 0.5, pos->y, pos->z + 0.5, mLevel->mRandom->nextFloat() * 360.0f, 0.0f);
+                const BlockPos spawn(pos->x, pos->y, pos->z);
+                cat->finalizeMobSpawn(mLevel->getCurrentDifficultyAt(spawn), nullptr, L"");
+                mLevel->addEntity(cat);
+                delete pos;
+            }
+        }
+    }
+    const bool tryGolem = modern ? tick % 200 == 0
+        && mLevel->getGameRules()->getBoolean(GameRules::RULE_DOMOBSPAWNING)
+        && qualifiesForGolem() && mLevel->mRandom->nextInt(3) == 0
+        : qualifiesForGolem() && mLevel->mRandom->nextInt(7000) == 0;
+    if (tryGolem)
+    {
+        Vec3* pos = findRandomSpawnPos(activity, 2, 4, 2);
         if (pos != NULL)
         {
             boost::shared_ptr<Entity> golem(new VillagerGolem(mLevel));
@@ -231,6 +332,20 @@ void Village::tick(int tick)
             ++mGolems;
         }
     }
+}
+
+int Village::getCatCapacity() const
+{
+    if (usesPointsOfInterest())
+        return std::min(5, static_cast<int>(mBeds.size() / 4));
+    return mDoors.size() >= 4 ? Mth::clamp(mPopulation / 4, 1, 5) : 0;
+}
+
+bool Village::qualifiesForGolem() const
+{
+    if (usesPointsOfInterest())
+        return mGolems == 0 && mBeds.size() >= 3 && mRecentlySlept >= 3;
+    return mGolems < mPopulation / 10 && mDoors.size() > 20;
 }
 
 const BlockPos* Village::getCenter()
@@ -337,7 +452,7 @@ void Village::addDoorInfo(boost::shared_ptr<DoorInfo> door)
 
 bool Village::canRemove()
 {
-    return mDoors.empty();
+    return !usesPointsOfInterest() && mDoors.empty();
 }
 
 void Village::addAggressor(boost::shared_ptr<LivingEntity> entity)
@@ -427,6 +542,12 @@ void Village::readAdditionalSaveData(CompoundTag* tag)
     mNoBreedTimer = tag->getInt(L"MTick");
     mCenter = BlockPos(tag->getInt(L"CX"), tag->getInt(L"CY"), tag->getInt(L"CZ"));
     mBottom = BlockPos(tag->getInt(L"ACX"), tag->getInt(L"ACY"), tag->getInt(L"ACZ"));
+    if (tag->contains(L"Beds", Tag::TAG_LIST))
+    {
+        auto* beds = tag->getList(L"Beds", Tag::TAG_COMPOUND);
+        for (int i = 0; i < beds->size(); ++i)
+            mBeds.push_back(NbtUtils::readBlockPos(beds->getCompound(i)));
+    }
     ListTag* doors = tag->getList(L"Doors", Tag::TAG_COMPOUND);
     int i;
     for (i = 0; i < doors->size(); ++i)
@@ -474,6 +595,13 @@ void Village::addAdditonalSaveData(CompoundTag* tag)
         doors->add(door);
     }
     tag->put(L"Doors", doors);
+    if (usesPointsOfInterest())
+    {
+        auto* beds = new ListTag();
+        for (const auto& bed : mBeds)
+            beds->add(NbtUtils::writeBlockPos(bed));
+        tag->put(L"Beds", beds);
+    }
     ListTag* players = new ListTag();
     for (boost::unordered_map<std::wstring, int>::iterator player = mPlayerStandings.begin();
          player != mPlayerStandings.end(); ++player)

@@ -28,8 +28,11 @@ void VillagerModel::_init(float scale, float yOffset, int texWidth, int texHeigh
         mArms = new ModelPartSkin(this, L"arms", modelDefinition, NULL, 0.0f, NULL);
         mLeg0 = new ModelPartSkin(this, L"leg0", modelDefinition, NULL, 0.0f, NULL);
         mLeg1 = new ModelPartSkin(this, L"leg1", modelDefinition, NULL, 0.0f, NULL);
-        mNose = new ModelPartSkin(this, L"nose", modelDefinition, NULL, 0.0f, NULL);
-        mHead->addChild(mNose);
+        mNose = new ModelPartSkin(this, L"nose", modelDefinition, mHead, scale, NULL);
+        if (modelDefinition.hasModelPart(L"helmet"))
+            new ModelPartSkin(this, L"helmet", modelDefinition, mHead, scale, NULL);
+        if (modelDefinition.hasModelPart(L"brim"))
+            new ModelPartSkin(this, L"brim", modelDefinition, mHead, scale, NULL);
         compileSkinnedDrawlist();
     }
     else

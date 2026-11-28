@@ -2,10 +2,14 @@
 #include "game/core/StringIds.hpp"
 #include "game/core/EntityType.hpp"
 
+#include <array>
+#include <utility>
+
 #include "game/client/audio/SoundSource.hpp"
 #include "game/client/audio/SoundType.hpp"
 #include "game/core/BannerPattern.hpp"
 #include "game/core/DyeColor.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/core/L10N.hpp"
 #include "game/core/Mth.hpp"
 #include "game/data/CompoundTag.hpp"
@@ -25,6 +29,60 @@
 #include "game/world/block/StandingBannerBlock.hpp"
 #include "game/world/block/WallBannerBlock.hpp"
 #include "game/world/generation/Player.hpp"
+
+namespace
+{
+using BannerLayer = std::pair<const BannerPattern*, const DyeColor*>;
+using BannerLayers = std::array<BannerLayer, 6>;
+
+BannerLayers illagerBannerLayers()
+{
+    // The lower half covers the mouth of the Creeper mask, leaving just two eyes.
+    return {{{BannerPattern::HALF_HORIZONTAL, DyeColor::GRAY},
+             {BannerPattern::RHOMBUS_MIDDLE, DyeColor::WHITE},
+             {BannerPattern::CREEPER, DyeColor::CYAN},
+             {BannerPattern::HALF_HORIZONTAL_MIRROR, DyeColor::SILVER},
+             {BannerPattern::TRIANGLE_BOTTOM, DyeColor::GRAY},
+             {BannerPattern::BORDER, DyeColor::BLACK}}};
+}
+
+BannerLayers oldIllagerBannerLayers()
+{
+    return {{{BannerPattern::HALF_HORIZONTAL_MIRROR, DyeColor::GRAY},
+             {BannerPattern::RHOMBUS_MIDDLE, DyeColor::WHITE},
+             {BannerPattern::STRIPE_MIDDLE, DyeColor::CYAN},
+             {BannerPattern::STRIPE_CENTER, DyeColor::GRAY},
+             {BannerPattern::TRIANGLE_BOTTOM, DyeColor::GRAY},
+             {BannerPattern::BORDER, DyeColor::BLACK}}};
+}
+
+bool hasLayers(ListTag* patterns, const BannerLayers& layers)
+{
+    if (!patterns || patterns->size() != static_cast<int>(layers.size()))
+        return false;
+
+    for (int i = 0; i < patterns->size(); ++i)
+    {
+        const auto& [pattern, color] = layers[i];
+        CompoundTag* layer = patterns->getCompound(i);
+        if (layer->getString(BannerBlockEntity::TAG_PATTERN) != pattern->getHashname()
+            || layer->getInt(BannerBlockEntity::TAG_COLOR) != color->getItemData())
+            return false;
+    }
+    return true;
+}
+
+void addIllagerBannerLayers(ListTag& patterns)
+{
+    for (const auto& [pattern, color] : illagerBannerLayers())
+    {
+        auto* layer = new CompoundTag();
+        layer->putString(BannerBlockEntity::TAG_PATTERN, pattern->getHashname());
+        layer->putInt(BannerBlockEntity::TAG_COLOR, color->getItemData());
+        patterns.add(layer);
+    }
+}
+}
 
 BannerItem::BannerItem() : BlockItem(Blocks::standing_banner)
 {
@@ -116,6 +174,16 @@ InteractionResult::EInteractionResult BannerItem::useOn(boost::shared_ptr<Player
 std::wstring BannerItem::getName(not_null_ptr<ItemInstance> itemInstance)
 {
     const DyeColor* color = getColor(itemInstance);
+    if (color == DyeColor::SILVER)
+    {
+        auto* tag = static_cast<CompoundTag*>(itemInstance->getTagElement(BLOCK_ENTITY_TAG));
+        if (tag && tag->contains(BannerBlockEntity::TAG_PATTERNS, Tag::TAG_LIST))
+        {
+            auto* patterns = tag->getList(BannerBlockEntity::TAG_PATTERNS, Tag::TAG_COMPOUND);
+            if (isIllagerBanner(color, patterns))
+                return L10N::GetString(IDS_LCE_ILLAGER_BANNER);
+        }
+    }
     int nameId = BannerPattern::BASE->getDisplayName(color->getBlockData());
     return L10N::GetString(nameId);
 }
@@ -159,6 +227,32 @@ ItemInstance* BannerItem::makeBanner(const DyeColor* color, ListTag* patterns)
         tag->put(BannerBlockEntity::TAG_PATTERNS, copiedPatterns);
     }
     return item;
+}
+
+not_null_ptr<ItemInstance> BannerItem::makeIllagerBanner()
+{
+    const int base = DyeColor::SILVER->getItemData();
+    auto banner = not_null_ptr<ItemInstance>(new ItemInstance(Items::banner, 1, base));
+    ListTag patterns(Tag::TAG_COMPOUND);
+    addIllagerBannerLayers(patterns);
+    BannerBlockEntity::addTags(banner, base, &patterns);
+    return banner;
+}
+
+ListTag* BannerItem::copyBannerPatterns(const DyeColor* color, ListTag* patterns)
+{
+    if (color != DyeColor::SILVER || !hasLayers(patterns, oldIllagerBannerLayers()))
+        return patterns->copy();
+
+    auto* updated = new ListTag(Tag::TAG_COMPOUND);
+    addIllagerBannerLayers(*updated);
+    return updated;
+}
+
+bool BannerItem::isIllagerBanner(const DyeColor* color, ListTag* patterns)
+{
+    return color == DyeColor::SILVER
+        && (hasLayers(patterns, illagerBannerLayers()) || hasLayers(patterns, oldIllagerBannerLayers()));
 }
 
 int BannerItem::getColor(not_null_ptr<ItemInstance> itemInstance, int layer)

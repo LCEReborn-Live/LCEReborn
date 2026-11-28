@@ -25,6 +25,16 @@
 #include "game/world/Level.hpp"
 #include "game/world/LevelSource.hpp"
 #include "game/world/block/AnvilBlock.hpp"
+#include "game/world/block/BarrelBlock.hpp"
+#include "game/world/block/GrindstoneBlock.hpp"
+#include "game/world/block/ComposterBlock.hpp"
+#include "game/world/block/StonecutterBlock.hpp"
+#include "game/world/block/LanternBlock.hpp"
+#include "game/world/block/BambooBlock.hpp"
+#include "game/world/block/ScaffoldingBlock.hpp"
+#include "game/world/block/CampfireBlock.hpp"
+#include "game/world/block/BellBlock.hpp"
+#include "game/world/block/LecternBlock.hpp"
 #include "game/world/block/BaseRailBlock.hpp"
 #include "game/world/block/BedBlock.hpp"
 #include "game/world/block/CauldronBlockEntity.hpp"
@@ -186,6 +196,15 @@ bool BlockRenderer::canRender(int renderShape)
     case BLOCK_RENDER_WALL:
     case BLOCK_RENDER_BEACON:
     case BLOCK_RENDER_ANVIL:
+    case BLOCK_RENDER_GRINDSTONE:
+    case BLOCK_RENDER_COMPOSTER:
+    case BLOCK_RENDER_STONECUTTER:
+    case BLOCK_RENDER_LANTERN:
+    case BLOCK_RENDER_BAMBOO:
+    case BLOCK_RENDER_SCAFFOLDING:
+    case BLOCK_RENDER_CAMPFIRE:
+    case BLOCK_RENDER_BELL:
+    case BLOCK_RENDER_LECTERN:
     case BLOCK_RENDER_HOPPER:
     case BLOCK_RENDER_QUARTZ:
     case BLOCK_RENDER_SLIME_BLOCK:
@@ -1942,7 +1961,20 @@ bool BlockRenderer::tesselateInWorld(const BlockState* state, const BlockPos& po
         else
         {
             setShape(block->getShape(state, mLevelSource, pos));
+            if (block == Blocks::barrel)
+            {
+                const auto* facing = state->getValue(BarrelBlock::FACING);
+                if (facing->getAxis() == Direction::Axis::X)
+                {
+                    mFaceRotation0 = mFaceRotation1 = 1;
+                    mFaceRotation4 = mFaceRotation5 = 1;
+                }
+                else if (facing->getAxis() == Direction::Axis::Z)
+                    mFaceRotation2 = mFaceRotation3 = 1;
+            }
             rendered = tesselateBlockInWorld(state, pos, faces);
+            if (block == Blocks::barrel)
+                mFaceRotation0 = mFaceRotation1 = mFaceRotation2 = mFaceRotation3 = mFaceRotation4 = mFaceRotation5 = 0;
         }
         break;
     }
@@ -2066,6 +2098,17 @@ bool BlockRenderer::tesselateInWorld(const BlockState* state, const BlockPos& po
         break;
     case BLOCK_RENDER_ANVIL:
         rendered = tesselateAnvilInWorld(state, pos);
+        break;
+    case BLOCK_RENDER_GRINDSTONE:
+    case BLOCK_RENDER_COMPOSTER:
+    case BLOCK_RENDER_STONECUTTER:
+    case BLOCK_RENDER_LANTERN:
+    case BLOCK_RENDER_BAMBOO:
+    case BLOCK_RENDER_SCAFFOLDING:
+    case BLOCK_RENDER_CAMPFIRE:
+    case BLOCK_RENDER_BELL:
+    case BLOCK_RENDER_LECTERN:
+        rendered = tesselateCuboidBlock(state, pos, false);
         break;
     case BLOCK_RENDER_BREWING_STAND:
         rendered = tesselateBrewingStandInWorld(state, pos);
@@ -2508,6 +2551,151 @@ bool BlockRenderer::tesselateBlockInWorld(const BlockState* state, const BlockPo
         return tesselateBlockInWorldWithAmbienceOcclusionTexLighting(state, pos, red, green, blue, faces,
                                                                      mShapeOutside);
     return tesselateBlockInWorld(state, pos, red, green, blue);
+}
+
+bool BlockRenderer::tesselateCuboidBlock(const BlockState* state, const BlockPos& pos, bool inventory)
+{
+    using Point = CuboidBlockModel::Point;
+    using Quad = std::array<Point, 4>;
+    Block* block = state->getBlock();
+    const auto* grindstone = block == Blocks::grindstone ? static_cast<GrindstoneBlock*>(block) : nullptr;
+    const auto* composter = block == Blocks::composter ? static_cast<ComposterBlock*>(block) : nullptr;
+    const auto* stonecutter = block == Blocks::stonecutter ? static_cast<StonecutterBlock*>(block) : nullptr;
+    const auto* lantern = block == Blocks::lantern ? static_cast<LanternBlock*>(block) : nullptr;
+    const auto* bamboo = block == Blocks::bamboo ? static_cast<BambooBlock*>(block) : nullptr;
+    const auto* scaffold = block == Blocks::scaffolding ? static_cast<ScaffoldingBlock*>(block) : nullptr;
+    const auto* campfire = block == Blocks::campfire ? static_cast<CampfireBlock*>(block) : nullptr;
+    const auto* bell = block == Blocks::bell ? static_cast<BellBlock*>(block) : nullptr;
+    const auto* lectern = block == Blocks::lectern ? static_cast<LecternBlock*>(block) : nullptr;
+    if (!grindstone && !composter && !stonecutter && !lantern && !bamboo && !scaffold && !campfire && !bell && !lectern)
+        return false;
+    const auto& parts = lectern ? lectern->getModel() : bell ? bell->getModel(state) : campfire ? campfire->getModel(state)
+                        : scaffold ? scaffold->getModel(state) : bamboo ? bamboo->getModel(state)
+                        : lantern ? lantern->getModel(state) : grindstone ? grindstone->getModel()
+                        : composter ? composter->getModel() : stonecutter->getModel();
+    TextureAtlasSprite* lanternTexture = lantern ? block->getTexture(Direction::UP, state) : nullptr;
+    auto* textures = lectern ? lectern->getModelTextures()
+                    : bell ? bell->getModelTextures() : campfire ? campfire->getModelTextures()
+                    : scaffold ? scaffold->getModelTextures() : bamboo ? bamboo->getModelTextures()
+                    : grindstone ? grindstone->getModelTextures()
+                    : composter ? composter->getModelTextures()
+                    : stonecutter ? stonecutter->getModelTextures() : &lanternTexture;
+    auto* builder = Tesselator::getInstance()->getBuilder();
+    if (inventory)
+        builder->begin();
+    else
+        builder->tex2(hasLightOverride() ? mLightOverride : getLightColor(block, mLevelSource, pos));
+
+    const auto emit = [&](Quad points, const CuboidBlockModel::Face& face, int side)
+    {
+        TextureAtlasSprite* texture = hasFixedTexture() ? mFixedTexture
+                                                       : getTextureOrMissing(textures[face.texture]);
+        if (grindstone)
+            for (auto& point : points)
+                point = GrindstoneBlock::orientPoint(state, point);
+        if (stonecutter)
+            for (auto& point : points)
+                point = StonecutterBlock::orientPoint(state, point);
+        if (campfire)
+            for (auto& point : points)
+                point = CampfireBlock::orientPoint(state, point);
+        if (bell)
+            for (auto& point : points)
+                point = BellBlock::orientPoint(state, point);
+        if (lectern)
+            for (auto& point : points)
+                point = LecternBlock::orientPoint(state, point);
+        const Point a{points[1][0] - points[0][0], points[1][1] - points[0][1], points[1][2] - points[0][2]};
+        const Point b{points[2][0] - points[0][0], points[2][1] - points[0][1], points[2][2] - points[0][2]};
+        const Point normal{a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
+        const float length = std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+        const float ax = std::abs(normal[0]), ay = std::abs(normal[1]), az = std::abs(normal[2]);
+        const Direction* direction = ay > 0 ? (normal[1] > 0 ? Direction::UP : Direction::DOWN)
+                                   : ax > 0 ? (normal[0] > 0 ? Direction::EAST : Direction::WEST)
+                                            : (normal[2] > 0 ? Direction::SOUTH : Direction::NORTH);
+        if (!inventory && !mRenderAllFaces && face.cullSide >= 0)
+        {
+            const auto* cullSide = face.cullSide == side ? direction : Direction::from3DDataValue(face.cullSide);
+            if (!block->shouldRenderFace(state, mLevelSource, pos, cullSide))
+                return;
+        }
+        static constexpr int buckets[] = {6, 1, 2, 4, 5, 3};
+        builder->bucket(buckets[direction->get3DDataValue()]);
+        if (inventory)
+            builder->normal(normal[0] / length, normal[1] / length, normal[2] / length);
+        else
+        {
+            const float verticalShade = normal[1] >= 0 ? 1.0f : shadeDown;
+            const float shade = (ax * shadeWestEast + ay * verticalShade + az * shadeNorthSouth) / (ax + ay + az);
+            builder->color(shade, shade, shade);
+        }
+        const float originX = inventory ? -0.5f : float(pos.x);
+        const float originY = inventory ? -0.5f : float(pos.y);
+        const float originZ = inventory ? -0.5f : float(pos.z);
+        float u0 = texture->getU(face.uv[0]), v0 = texture->getV(face.uv[1]);
+        float u1 = texture->getU(face.uv[2]), v1 = texture->getV(face.uv[3]);
+        texture->adjustUVs(u0, u1, v0, v1);
+        const float u[] = {u0, u0, u1, u1};
+        const float v[] = {v0, v1, v1, v0};
+        for (size_t i = 0; i < points.size(); ++i)
+        {
+            const auto uv = (i + face.uvRotation) % points.size();
+            builder->vertexUV(originX + points[i][0] / 16, originY + points[i][1] / 16, originZ + points[i][2] / 16,
+                              u[uv], v[uv]);
+        }
+    };
+
+    static constexpr int boxFaces[][4] = {
+        {4, 0, 1, 5}, {2, 6, 7, 3}, {3, 1, 0, 2}, {6, 4, 5, 7}, {2, 0, 4, 6}, {7, 5, 1, 3},
+    };
+    const auto renderPart = [&](const CuboidBlockModel::Part& part)
+    {
+        const auto& bounds = part.bounds;
+        const float angle = part.yRotation * 0.01745329252f;
+        const float sine = std::sin(angle);
+        const float cosine = std::cos(angle);
+        const float pitch = part.xRotation * 0.01745329252f;
+        const float pitchSine = std::sin(pitch);
+        const float pitchCosine = std::cos(pitch);
+        for (size_t i = 0; i < part.faces.size(); ++i)
+        {
+            const auto& face = part.faces[i];
+            if (face.texture < 0)
+                continue;
+            Quad quad;
+            for (size_t j = 0; j < quad.size(); ++j)
+            {
+                const int corner = boxFaces[i][j];
+                quad[j] = {bounds[corner & 1][0], bounds[(corner >> 1) & 1][1], bounds[corner >> 2][2]};
+                if (part.xRotation != 0)
+                {
+                    const float y = quad[j][1] - 8;
+                    const float z = quad[j][2] - 8;
+                    quad[j][1] = 8 + y * pitchCosine - z * pitchSine;
+                    quad[j][2] = 8 + z * pitchCosine + y * pitchSine;
+                }
+                if (part.yRotation != 0)
+                {
+                    const float x = quad[j][0] - 8;
+                    const float z = quad[j][2] - 8;
+                    quad[j][0] = 8 + x * cosine + z * sine;
+                    quad[j][2] = 8 + z * cosine - x * sine;
+                }
+            }
+            emit(quad, face, static_cast<int>(i));
+        }
+    };
+    for (const auto& part : parts)
+        renderPart(part);
+    if (composter && !inventory)
+    {
+        if (const auto* contents = composter->getContents(state))
+            renderPart(*contents);
+    }
+
+    if (inventory)
+        builder->end();
+    return true;
 }
 
 float BlockRenderer::tesselateAnvilPiece(const BlockState* state, const BlockPos& pos, int part, float bottom,
@@ -3092,6 +3280,10 @@ void BlockRenderer::renderBlock(const BlockState* state, float brightness, float
     {
         state = block->getBlockState(Direction::NORTH->get3DDataValue());
     }
+    else if (block == Blocks::barrel)
+    {
+        state = block->defaultBlockState();
+    }
 
     if (mUseColor)
     {
@@ -3384,6 +3576,12 @@ void BlockRenderer::renderBlock(const BlockState* state, float brightness, float
         GlStateManager::translatef(-0.5f, -0.5f, -0.5f);
         tesselateAnvilInWorld(state, BlockPos(0, 0, 0), true);
         GlStateManager::translatef(0.5f, 0.5f, 0.5f);
+    }
+    else if (shape == BLOCK_RENDER_GRINDSTONE || shape == BLOCK_RENDER_COMPOSTER || shape == BLOCK_RENDER_STONECUTTER
+             || shape == BLOCK_RENDER_LANTERN || shape == BLOCK_RENDER_BAMBOO || shape == BLOCK_RENDER_SCAFFOLDING
+             || shape == BLOCK_RENDER_CAMPFIRE || shape == BLOCK_RENDER_BELL || shape == BLOCK_RENDER_LECTERN)
+    {
+        tesselateCuboidBlock(state, BlockPos(), true);
     }
     else if (shape == BLOCK_RENDER_AIR_PORTAL_FRAME)
     {
@@ -7387,11 +7585,11 @@ bool BlockRenderer::tesselateFenceGateInWorld(const BlockState* state, const Blo
     float postTop;
     float middleTop;
     if (((facing == Direction::NORTH || facing == Direction::SOUTH)
-         && mLevelSource->getBlockState(pos.offset(-1, 0, 0))->getBlock() == Blocks::cobblestone_wall
-         && mLevelSource->getBlockState(pos.offset(1, 0, 0))->getBlock() == Blocks::cobblestone_wall)
+         && mLevelSource->getBlockState(pos.offset(-1, 0, 0))->getBlock()->mIsWall
+         && mLevelSource->getBlockState(pos.offset(1, 0, 0))->getBlock()->mIsWall)
         || ((facing == Direction::EAST || facing == Direction::WEST)
-            && mLevelSource->getBlockState(pos.offset(0, 0, -1))->getBlock() == Blocks::cobblestone_wall
-            && mLevelSource->getBlockState(pos.offset(0, 0, 1))->getBlock() == Blocks::cobblestone_wall))
+            && mLevelSource->getBlockState(pos.offset(0, 0, -1))->getBlock()->mIsWall
+            && mLevelSource->getBlockState(pos.offset(0, 0, 1))->getBlock()->mIsWall))
     {
         postTop = 0.8125f;
         gateTop = 0.75f;
@@ -7554,6 +7752,14 @@ bool BlockRenderer::tesselateCauldronInWorld(const BlockState* state, const Bloc
     renderFaceDown(state, (double)pos.x, (double)((float)pos.y + 0.25f), (double)pos.z, inner);
 
     int level = state->getValue(CauldronBlock::LEVEL);
+    if (level == CauldronBlock::LavaLevel)
+    {
+        auto* lava = Blocks::lava->getTexture(Direction::UP, Blocks::lava->defaultBlockState());
+        builder->tex2(state->getLightColor(mLevelSource, pos));
+        builder->color(1.0f, 1.0f, 1.0f);
+        renderFaceUp(state, pos.x, pos.y - 1.0 / 16.0, pos.z, lava);
+        return true;
+    }
     if (level > 0)
     {
         TextureAtlasSprite* water = CauldronBlock::getTexture(CauldronBlock::TEXTURE_WATER);

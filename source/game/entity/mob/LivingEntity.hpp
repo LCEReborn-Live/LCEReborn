@@ -138,6 +138,7 @@ public:
     virtual void setHealth(float health);
     virtual const DamageSource* getLastDamageSource();
     virtual void blockUsingShield(const boost::shared_ptr<LivingEntity>& attacker);
+    virtual void blockedByShield(const boost::shared_ptr<LivingEntity>& defender);
     virtual void playHurtSound(const DamageSource* source);
     virtual bool checkTotemDeathProtection(const DamageSource* source);
     virtual bool isDamageSourceBlocked(const DamageSource* source);

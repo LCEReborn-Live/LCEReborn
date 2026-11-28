@@ -26,6 +26,7 @@ class OceanMonumentFeature;
 class OceanRuinFeature;
 class PerlinNoise;
 class PerlinSimplexNoise;
+class PillagerOutpostFeature;
 class RandomScatteredLargeFeature;
 class ShipwreckFeature;
 class StrongholdFeature;
@@ -90,6 +91,7 @@ private:
     BuriedTreasureFeature* mBuriedTreasure;
     ShipwreckFeature* mShipwreck;
     OceanRuinFeature* mOceanRuin;
+    PillagerOutpostFeature* mOutpost;
 };
 
 #endif

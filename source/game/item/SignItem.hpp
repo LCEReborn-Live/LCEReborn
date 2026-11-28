@@ -15,12 +15,15 @@ class Player;
 class SignItem : public Item
 {
 public:
-    SignItem();
+    explicit SignItem(int woodType = 0);
+    static Item* byWoodType(int woodType);
 
     virtual InteractionResult::EInteractionResult useOn(boost::shared_ptr<Player> player, Level* level,
                                                         const BlockPos& pos, InteractionHand::EInteractionHand hand,
                                                         const Direction* direction, float hitX, float hitY, float hitZ,
                                                         bool simulate);
+private:
+    const int mWoodType;
 };
 
 #endif

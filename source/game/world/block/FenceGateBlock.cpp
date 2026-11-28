@@ -64,11 +64,11 @@ const BlockState* FenceGateBlock::fillVirtualBlockStateProperties(const BlockSta
 {
     const Direction::Axis* axis = state->getValue(HorizontalDirectionalBlock::FACING_PROPERTY)->getAxis();
     const bool inWall = (axis == Direction::Axis::Z
-                         && (levelSource->getBlockState(pos.west())->getBlock() == Blocks::cobblestone_wall
-                             || levelSource->getBlockState(pos.east())->getBlock() == Blocks::cobblestone_wall))
+                         && (levelSource->getBlockState(pos.west())->getBlock()->mIsWall
+                             || levelSource->getBlockState(pos.east())->getBlock()->mIsWall))
                         || (axis == Direction::Axis::X
-                            && (levelSource->getBlockState(pos.north())->getBlock() == Blocks::cobblestone_wall
-                                || levelSource->getBlockState(pos.south())->getBlock() == Blocks::cobblestone_wall));
+                            && (levelSource->getBlockState(pos.north())->getBlock()->mIsWall
+                                || levelSource->getBlockState(pos.south())->getBlock()->mIsWall));
     if (inWall)
         state = state->setValue(IN_WALL, true);
     return state;

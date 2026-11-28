@@ -111,6 +111,9 @@ ShipwreckPiece::ShipwreckPiece(Level* level, GenericOverworldLevelSource* levelS
     const int& lowAB = std::min(heightA, heightB);
     const int& lowCD = std::min(heightC, heightD);
     mHeight = lowAB < lowCD ? lowAB : lowCD;
+    // Both beached and submerged variants fit inside the saved placement bounds.
+    mBoundingBox->y0 = mHeight - 3;
+    mBoundingBox->y1 = mHeight - 1 + sizeY - 1;
 }
 
 bool ShipwreckPiece::IsUpsideDownShipwreckType(int type)
@@ -162,22 +165,12 @@ bool ShipwreckPiece::postProcess(Level* level, Random& random, BoundingBox* box)
     settings.setMirror(Mirror::NONE);
     settings.placeWaterBelowSeaLevel(true);
 
-    int yOffset = upsideDown || beached ? -4 : -2;
-    int xOffset = 0;
-    int zOffset = 0;
-    switch (mRotation->getType())
-    {
-    case Rotation::eTYPE_Clockwise90:
-        xOffset = getBoundingBox()->getXSpan();
-        break;
-    case Rotation::eTYPE_Clockwise180:
-        xOffset = getBoundingBox()->getXSpan();
-        zOffset = getBoundingBox()->getZSpan();
-        break;
-    }
-    BlockPos place = origin.offset(xOffset, mHeight + yOffset, zOffset);
-
     const StructureTemplate* structure = structureManager->getOrCreate(SHIPWRECK_TYPES[templateType]);
+    const auto size = structure->getSize();
+    const auto last = StructureTemplate::transform(BlockPos(size.x - 1, 0, size.z - 1), Mirror::NONE, mRotation);
+    const int yOffset = upsideDown || beached ? -4 : -2;
+    const BlockPos place(mBoundingBox->x0 - std::min(0, last.x), mHeight + 1 + yOffset,
+                         mBoundingBox->z0 - std::min(0, last.z));
     structure->placeInWorldChunk(level, place, &settings);
     StructureTemplate::MarkerMap markers = structure->getMarkers(place, &settings);
     StructureTemplate::MarkerMap::const_iterator it;
@@ -222,6 +215,7 @@ void ShipwreckPiece::addAdditionalSaveData(DataOutputStream* output)
     output->writeInt(mNonUpsideDownType);
     output->writeInt(mWoodType);
     output->writeInt(mHeight);
+    output->writeByte(mRotation->getType());
 }
 
 void ShipwreckPiece::readAdditionalSaveData(DataInputStream* input, StructureManager*)
@@ -230,6 +224,12 @@ void ShipwreckPiece::readAdditionalSaveData(DataInputStream* input, StructureMan
     mNonUpsideDownType = input->readInt();
     mWoodType = input->readInt();
     mHeight = input->readInt();
+    mRotation = Rotation::byType(static_cast<Rotation::eTYPE>(input->readByte()));
+}
+
+StructurePiece* ShipwreckPiece::Create()
+{
+    return new ShipwreckPiece();
 }
 
 EStructurePiece ShipwreckPiece::GetType()

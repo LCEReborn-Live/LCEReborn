@@ -1,4 +1,5 @@
 #include "game/ui/UIScene_WritableBookMenu.hpp"
+#include <algorithm>
 #include "game/core/StringIds.hpp"
 
 #include <cstring>
@@ -24,6 +25,7 @@
 #include "game/ui/fuiFile.hpp"
 #include "game/ui/fuiRenderNode.hpp"
 #include "game/world/generation/MultiplayerLocalPlayer.hpp"
+#include "game/world/block/LecternBlock.hpp"
 #include "platform/CInput.hpp"
 #include "platform/CProfile.hpp"
 #include "game/core/GameSettings.hpp"
@@ -41,20 +43,15 @@ template <typename T> std::wstring _toString(T value);
 extern ConsoleUIController gConsoleUIController;
 extern C_4JProfile* gProfile;
 
-struct UIScene_WritableBookMenuData
-{
-    not_null_ptr<ItemInstance> item;
-    int player;
-    bool canEdit;
-};
-
 UIScene_WritableBookMenu::UIScene_WritableBookMenu(int type, void* data, UILayer* layer) : UIScene(type, layer)
 {
-    UIScene_WritableBookMenuData* sceneData = static_cast<UIScene_WritableBookMenuData*>(data);
+    const auto* sceneData = static_cast<WritingBookMenuInitData*>(data);
     initialiseMovie();
     m_playerId = sceneData->player;
     m_book = sceneData->item;
     m_canEdit = sceneData->canEdit;
+    mFromLectern = sceneData->fromLectern;
+    mLecternPos = sceneData->position;
     m_textChanged = false;
     m_titleText = L"";
     m_currentPage = 0;
@@ -86,6 +83,8 @@ UIScene_WritableBookMenu::UIScene_WritableBookMenu(int type, void* data, UILayer
 
     doHorizontalResizeCheck();
     Init();
+    m_currentPage = std::max(0, std::min(sceneData->page, m_pageCount - 1));
+    UpdatePageNumber();
     RetrieveBookText();
     SetCaretPosition(m_caretPosition);
     FormatAndDisplayText(EFormatTextType_Display);
@@ -248,7 +247,7 @@ void UIScene_WritableBookMenu::Init()
         }
     }
 
-    if (m_pages == 0 && m_canEdit)
+    if (m_pages == 0 && (m_canEdit || mFromLectern))
     {
         m_pages = new ListTag();
         m_pages->add(new StringTag(L""));
@@ -571,6 +570,7 @@ void UIScene_WritableBookMenu::ScrollPageLeft()
         if (m_textChanged)
             StoreBookText();
         --m_currentPage;
+        reportLecternPage();
         RetrieveBookText();
         UpdatePageNumber();
         updateTooltips();
@@ -602,11 +602,29 @@ void UIScene_WritableBookMenu::ScrollPageRight()
         appendPageToBook();
     }
     ++m_currentPage;
+    reportLecternPage();
     RetrieveBookText();
     FormatAndDisplayText(EFormatTextType_Display);
     SetCaretPosition(m_caretPosition);
     UpdatePageNumber();
     updateTooltips();
+}
+
+void UIScene_WritableBookMenu::reportLecternPage()
+{
+    if (!mFromLectern)
+        return;
+    auto* connection = Minecraft::GetInstance()->getConnection(m_playerId);
+    if (!connection)
+        return;
+    ByteArrayOutputStream bytes;
+    DataOutputStream output(&bytes);
+    output.writeInt(mLecternPos.x);
+    output.writeInt(mLecternPos.y);
+    output.writeInt(mLecternPos.z);
+    output.writeInt(m_currentPage);
+    connection->send(boost::shared_ptr<Packet>(
+        new ServerboundCustomPayloadPacket(LecternBlock::PageMessage, bytes.toByteArray())));
 }
 
 void UIScene_WritableBookMenu::handleInput(int player, int action, bool repeat, bool pressed, bool released,

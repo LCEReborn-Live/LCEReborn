@@ -27,6 +27,8 @@ public:
 
     static int getChargeDuration(not_null_ptr<ItemInstance> item);
     static bool isCharged(not_null_ptr<ItemInstance> item);
+    static void loadProjectile(not_null_ptr<ItemInstance> crossbow, not_null_ptr<ItemInstance> ammo, int count);
+    static void clearProjectiles(not_null_ptr<ItemInstance> crossbow);
     static void playLoadingSound(Level* level, const boost::shared_ptr<LivingEntity>& entity,
                                  not_null_ptr<ItemInstance> item, int ticks);
 

@@ -6,6 +6,8 @@
 #include "game/item/CraftingContainer.hpp"
 #include "game/item/Item.hpp"
 #include "game/item/ItemInstance.hpp"
+#include "game/item/Items.hpp"
+#include "game/core/DyeColor.hpp"
 
 ShapedRecipe::ShapedRecipe(int width, int height, ItemInstance** ingredients, ItemInstance* result, int group)
     : mWidth(width),
@@ -92,6 +94,7 @@ bool ShapedRecipe::matches(boost::shared_ptr<CraftingContainer> craftingContaine
                 return false;
             }
             if (ingredient->getAuxValue() != -1 && ingredient->getAuxValue() != item->getAuxValue()
+                && !(ingredient->getItem() == Items::dye && DyeColor::matchesDyeIngredient(ingredient->getAuxValue(), item->getAuxValue()))
                 && (ingredient->getAuxValue() != 0 || !item->isDamageableItem()))
             {
                 return false;

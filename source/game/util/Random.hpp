@@ -8,6 +8,8 @@ public:
     Random(long long seed);
 
     void setSeed(long long seed);
+    // Checkpoint for uniform draws. Restoring with setSeed clears the Gaussian cache.
+    long long getUniformSeed() const { return seed ^ 0x5DEECE66DLL; }
 
     int nextInt();
     int nextInt(int bound);

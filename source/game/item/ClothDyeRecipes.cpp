@@ -16,22 +16,29 @@ void ClothDyeRecipes::addRecipes(Recipes* recipes)
         if (color != DyeColor::WHITE->getBlockData())
         {
             recipes->addShapelessRecipe(new ItemInstance(Blocks::wool, 1, color), L"zzg",
-                                        new ItemInstance(Items::dye, 1, 15 - color),
+                                        new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(15 - color)),
                                         new ItemInstance(Item::byBlock(Blocks::wool)), L'D');
         }
         recipes->addShapedRecipe(new ItemInstance(Blocks::stained_hardened_clay, 8, 15 - color), L"sssczczg", L"###",
                                  L"#X#", L"###", L'#', new ItemInstance(Blocks::hardened_clay), L'X',
-                                 new ItemInstance(Items::dye, 1, color), L'D');
+                                 new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(color)), L'D');
         recipes->addShapelessRecipe(
             new ItemInstance(Blocks::concrete_powder, 8, 15 - color), L"zzzzzzzzzg",
-            new ItemInstance(Items::dye, 1, color), new ItemInstance(Blocks::gravel), new ItemInstance(Blocks::gravel),
+            new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(color)), new ItemInstance(Blocks::gravel), new ItemInstance(Blocks::gravel),
             new ItemInstance(Blocks::gravel), new ItemInstance(Blocks::gravel), new ItemInstance(Blocks::sand),
             new ItemInstance(Blocks::sand), new ItemInstance(Blocks::sand), new ItemInstance(Blocks::sand), L'D');
         recipes->addShapedRecipe(new ItemInstance(Blocks::stained_glass, 8, 15 - color), L"sssczczg", L"###", L"#X#",
                                  L"###", L'#', new ItemInstance(Blocks::glass), L'X',
-                                 new ItemInstance(Items::dye, 1, color), L'D');
+                                 new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(color)), L'D');
         recipes->addShapedRecipe(new ItemInstance(Blocks::stained_glass_pane, 16, 15 - color), L"ssczg", L"###", L"###",
                                  L'#', new ItemInstance(Blocks::stained_glass, 1, 15 - color), L'D');
+        recipes->addShapelessRecipe(new ItemInstance(Blocks::stained_glass_pane, 1, 15 - color), L"zzg",
+                                    new ItemInstance(Blocks::glass_pane), new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(color)),
+                                    L'D');
+        if (color != DyeColor::WHITE->getItemData())
+            recipes->addShapelessRecipe(new ItemInstance(Blocks::carpet, 1, 15 - color), L"zzg",
+                                        new ItemInstance(Blocks::carpet, 1, DyeColor::WHITE->getBlockData()),
+                                        new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(color)), L'D');
     }
 
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 1, DyeColor::YELLOW->getItemData()), L"zg",
@@ -46,44 +53,44 @@ void ClothDyeRecipes::addRecipes(Recipes* recipes)
 
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::PINK->getItemData()), L"zzg",
                                 new ItemInstance(Items::dye, 1, DyeColor::RED->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()), L'D');
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::ORANGE->getItemData()), L"zzg",
                                 new ItemInstance(Items::dye, 1, DyeColor::RED->getItemData()),
                                 new ItemInstance(Items::dye, 1, DyeColor::YELLOW->getItemData()), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::LIME->getItemData()), L"zzg",
                                 new ItemInstance(Items::dye, 1, DyeColor::GREEN->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()), L'D');
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::GRAY->getItemData()), L"zzg",
-                                new ItemInstance(Items::dye, 1, DyeColor::BLACK->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()), L'D');
+                                new ItemInstance(Items::dye, 1, DyeColor::BlackDye),
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::SILVER->getItemData()), L"zzg",
                                 new ItemInstance(Items::dye, 1, DyeColor::GRAY->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()), L'D');
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 3, DyeColor::SILVER->getItemData()), L"zzzg",
-                                new ItemInstance(Items::dye, 1, DyeColor::BLACK->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()), L'D');
+                                new ItemInstance(Items::dye, 1, DyeColor::BlackDye),
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye),
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::LIGHT_BLUE->getItemData()), L"zzg",
-                                new ItemInstance(Items::dye, 1, DyeColor::BLUE->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()), L'D');
+                                new ItemInstance(Items::dye, 1, DyeColor::BlueDye),
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::CYAN->getItemData()), L"zzg",
-                                new ItemInstance(Items::dye, 1, DyeColor::BLUE->getItemData()),
+                                new ItemInstance(Items::dye, 1, DyeColor::BlueDye),
                                 new ItemInstance(Items::dye, 1, DyeColor::GREEN->getItemData()), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::PURPLE->getItemData()), L"zzg",
-                                new ItemInstance(Items::dye, 1, DyeColor::BLUE->getItemData()),
+                                new ItemInstance(Items::dye, 1, DyeColor::BlueDye),
                                 new ItemInstance(Items::dye, 1, DyeColor::RED->getItemData()), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 2, DyeColor::MAGENTA->getItemData()), L"zzg",
                                 new ItemInstance(Items::dye, 1, DyeColor::PURPLE->getItemData()),
                                 new ItemInstance(Items::dye, 1, DyeColor::PINK->getItemData()), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 3, DyeColor::MAGENTA->getItemData()), L"zzzg",
-                                new ItemInstance(Items::dye, 1, DyeColor::BLUE->getItemData()),
+                                new ItemInstance(Items::dye, 1, DyeColor::BlueDye),
                                 new ItemInstance(Items::dye, 1, DyeColor::RED->getItemData()),
                                 new ItemInstance(Items::dye, 1, DyeColor::PINK->getItemData()), L'D');
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 4, DyeColor::MAGENTA->getItemData()), L"zzzzg",
-                                new ItemInstance(Items::dye, 1, DyeColor::BLUE->getItemData()),
+                                new ItemInstance(Items::dye, 1, DyeColor::BlueDye),
                                 new ItemInstance(Items::dye, 1, DyeColor::RED->getItemData()),
                                 new ItemInstance(Items::dye, 1, DyeColor::RED->getItemData()),
-                                new ItemInstance(Items::dye, 1, DyeColor::WHITE->getItemData()), L"D");
+                                new ItemInstance(Items::dye, 1, DyeColor::WhiteDye), L"D");
 
     recipes->addShapelessRecipe(new ItemInstance(Items::dye, 1, DyeColor::LIGHT_BLUE->getItemData()), L"zg",
                                 new ItemInstance(Blocks::red_flower, 1, FlowerBlock::Flower::BLUE_ORCHID->getData()),
@@ -130,7 +137,7 @@ void ClothDyeRecipes::addRecipes(Recipes* recipes)
     for (int color = 0; color < 16; ++color)
     {
         recipes->addShapelessRecipe(new ItemInstance(Items::bed, 1, color), L"zzgv",
-                                    new ItemInstance(Items::dye, 1, 15 - color), new ItemInstance(Items::bed, 1, -1),
+                                    new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(15 - color)), new ItemInstance(Items::bed, 1, -1),
                                     L'X', eAward_ChangeOfSheets);
     }
 }

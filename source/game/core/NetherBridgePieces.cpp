@@ -56,7 +56,8 @@ void NetherBridgePieces::loadStatic()
     StructureFeatureIO::setPieceId(eStructurePiece_MonsterThrone, &MonsterThrone::Create, L"NeMT");
     StructureFeatureIO::setPieceId(eStructurePiece_RoomCrossing, &RoomCrossing::Create, L"NeRC");
     StructureFeatureIO::setPieceId(eStructurePiece_StairsRoom, &StairsRoom::Create, L"NeSR");
-    StructureFeatureIO::setPieceId(eStructurePiece_NetherBridgeStartPiece, &BridgeCrossing::Create, L"NeStart");
+    StructureFeatureIO::setPieceId(eStructurePiece_NetherBridgeStartPiece,
+                                   []() -> StructurePiece* { return new StartPiece(); }, L"NeStart");
 }
 
 StructurePiece* NetherBridgePieces::findAndCreateBridgePieceFactory(PieceWeight* weight,

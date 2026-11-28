@@ -154,6 +154,11 @@ void ServerBossEvent::setVisible(bool visible)
     }
 }
 
+bool ServerBossEvent::isVisible()
+{
+    return visible;
+}
+
 std::vector<boost::shared_ptr<ServerPlayer> >* ServerBossEvent::getPlayers()
 {
     std::vector<boost::shared_ptr<ServerPlayer> >* result = new std::vector<boost::shared_ptr<ServerPlayer> >();

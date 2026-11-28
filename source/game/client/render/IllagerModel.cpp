@@ -10,6 +10,8 @@
 #include "game/core/AbstractIllager.hpp"
 #include "game/core/Mth.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
+#include "game/item/CrossbowItem.hpp"
+#include "game/item/ItemInstance.hpp"
 
 IllagerModel::IllagerModel(float scale, float yOffset, int texWidth, int texHeight,
                            const ModelDefinition& modelDefinition)
@@ -18,9 +20,12 @@ IllagerModel::IllagerModel(float scale, float yOffset, int texWidth, int texHeig
     {
         mHead = new ModelPartSkin(this, L"head", modelDefinition, NULL, 0.0f, NULL);
         mBody = new ModelPartSkin(this, L"body", modelDefinition, NULL, 0.0f, NULL);
-        mArms = new ModelPartSkin(this, L"arms", modelDefinition, NULL, 0.0f, NULL);
-        mLeg0 = new ModelPartSkin(this, L"leg0", modelDefinition, NULL, 0.0f, NULL);
-        mLeg1 = new ModelPartSkin(this, L"leg1", modelDefinition, NULL, 0.0f, NULL);
+        mArms = modelDefinition.hasModelPart(L"arms")
+            ? new ModelPartSkin(this, L"arms", modelDefinition, NULL, 0.0f, NULL) : new ModelPartSkin(this);
+        mLeg0 = new ModelPartSkin(this, modelDefinition.hasModelPart(L"rightLeg") ? L"rightLeg" : L"leg0",
+                                  modelDefinition, NULL, 0.0f, NULL);
+        mLeg1 = new ModelPartSkin(this, modelDefinition.hasModelPart(L"leftLeg") ? L"leftLeg" : L"leg1",
+                                  modelDefinition, NULL, 0.0f, NULL);
         mNose = new ModelPartSkin(this, L"nose", modelDefinition, NULL, 0.0f, NULL);
         mRightArm = new ModelPartSkin(this, L"rightarm", modelDefinition, NULL, 0.0f, NULL);
         mLeftArm = new ModelPartSkin(this, L"leftarm", modelDefinition, NULL, 0.0f, NULL);
@@ -149,7 +154,15 @@ void IllagerModel::setupAnim(float limbSwing, float limbSwingAmount, float ageIn
 
     int armPose = boost::static_pointer_cast<AbstractIllager>(entity)->getArmPose();
 
-    if (armPose == ILLAGER_ARM_POSE_ATTACKING)
+    if (armPose == ILLAGER_ARM_POSE_CELEBRATING)
+    {
+        mRightArm->mZ = mLeftArm->mZ = 0;
+        mRightArm->mX = -5; mLeftArm->mX = 5;
+        mRightArm->mXRot = mLeftArm->mXRot = Mth::cos(ageInTicks * .6662f) * .05f;
+        mRightArm->mYRot = mLeftArm->mYRot = 0;
+        mRightArm->mZRot = 2.670354f; mLeftArm->mZRot = -2.3561945f;
+    }
+    else if (armPose == ILLAGER_ARM_POSE_ATTACKING)
     {
         float swing = Mth::sin(mAttackTime * 3.1415927f);
         float recover = Mth::sin((1.0f - (1.0f - mAttackTime) * (1.0f - mAttackTime)) * 3.1415927f);
@@ -200,6 +213,38 @@ void IllagerModel::setupAnim(float limbSwing, float limbSwingAmount, float ageIn
         mLeftArm->mXRot = -0.9424779f + mHead->mXRot;
         mLeftArm->mZRot = 1.5707964f;
         mLeftArm->mYRot = mHead->mYRot - 0.4f;
+    }
+    else if (armPose == ILLAGER_ARM_POSE_CROSSBOW_HOLD || armPose == ILLAGER_ARM_POSE_CROSSBOW_CHARGE)
+    {
+        auto living = boost::static_pointer_cast<LivingEntity>(entity);
+        const bool right = living->getMainArm() == HumanoidArm::RIGHT;
+        auto* holding = right ? mRightArm : mLeftArm;
+        auto* support = right ? mLeftArm : mRightArm;
+        const float side = right ? 1.0f : -1.0f;
+        holding->mZRot = support->mZRot = 0.0f;
+        if (armPose == ILLAGER_ARM_POSE_CROSSBOW_CHARGE)
+        {
+            const float progress = Mth::clamp(static_cast<float>(living->getTicksUsingItem())
+                / CrossbowItem::getChargeDuration(living->getMainHandItem()), 0.0f, 1.0f);
+            holding->mYRot = -0.8f * side;
+            holding->mXRot = -0.97f;
+            support->mYRot = (0.4f + 0.45f * progress) * side;
+            support->mXRot = -0.97f - 0.6f * progress;
+        }
+        else
+        {
+            holding->mYRot = -0.3f * side + mHead->mYRot;
+            support->mYRot = 0.6f * side + mHead->mYRot;
+            holding->mXRot = -1.47f + mHead->mXRot;
+            support->mXRot = -1.5f + mHead->mXRot;
+        }
+    }
+    else if (armPose == ILLAGER_ARM_POSE_NEUTRAL)
+    {
+        mRightArm->mYRot = mLeftArm->mYRot = 0.0f;
+        mRightArm->mZRot = mLeftArm->mZRot = 0.0f;
+        mRightArm->mXRot = mLeg1->mXRot;
+        mLeftArm->mXRot = mLeg0->mXRot;
     }
 }
 

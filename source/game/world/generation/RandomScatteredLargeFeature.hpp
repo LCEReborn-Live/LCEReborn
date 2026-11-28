@@ -10,6 +10,7 @@
 
 class BlockPos;
 class Level;
+class GenericOverworldLevelSource;
 class Random;
 class SuperflatConfig;
 
@@ -19,7 +20,8 @@ public:
     class ScatteredFeatureStart : public StructureStart
     {
     public:
-        ScatteredFeatureStart(Level* level, Random& random, int chunkX, int chunkZ);
+        ScatteredFeatureStart(Level* level, Random& random, int chunkX, int chunkZ,
+                              GenericOverworldLevelSource* terrain = nullptr);
         ScatteredFeatureStart();
         virtual EStructureStart GetType();
         static StructureStart* Create();
@@ -35,6 +37,7 @@ public:
     virtual BlockPos* getNearestGeneratedFeature(Level* level, const BlockPos& pos, bool skipExistingChunks);
     virtual bool isFeatureChunk(int chunkX, int chunkZ, bool flatWorld);
     virtual StructureStart* createStructureStart(int chunkX, int chunkZ);
+    void setTerrainSource(GenericOverworldLevelSource* terrain) { mTerrain = terrain; }
     bool isSwamphut(const BlockPos& pos);
     std::vector<Biome::MobSpawnerData*>* getSwamphutEnemies();
 
@@ -42,6 +45,7 @@ private:
     std::vector<Biome::MobSpawnerData*> mSwamphutEnemies;
     int mSpacing;
     int mSeparation;
+    GenericOverworldLevelSource* mTerrain = nullptr;
 };
 
 #endif

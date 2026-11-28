@@ -9,6 +9,7 @@
 class BlockPos;
 class Level;
 class Random;
+class Rotation;
 class TheEndLevelSource;
 
 class EndCityFeature : public StructureFeature
@@ -18,18 +19,18 @@ public:
     {
     public:
         EndCityStart(Level* level, TheEndLevelSource* source, Random& random, int chunkX, int chunkZ);
+        EndCityStart() = default;
+        static StructureStart* Create();
         void create(Level* level, TheEndLevelSource* source, Random& random, int chunkX, int chunkZ);
         virtual bool isValid();
         virtual EStructureStart GetType();
 
-    private:
-        bool mValid;
     };
 
     EndCityFeature(TheEndLevelSource* source);
     virtual std::wstring getFeatureName();
     virtual bool isFeatureChunk(int chunkX, int chunkZ, bool flatWorld);
-    static int getYPositionForFeature(int chunkX, int chunkZ, TheEndLevelSource* source);
+    static int getYPositionForFeature(int chunkX, int chunkZ, TheEndLevelSource* source, Rotation* rotation);
     virtual StructureStart* createStructureStart(int chunkX, int chunkZ);
     virtual BlockPos* getNearestGeneratedFeature(Level* level, const BlockPos& pos, bool skipExistingChunks);
 

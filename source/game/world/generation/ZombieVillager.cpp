@@ -64,8 +64,8 @@ void ZombieVillager::defineSynchedData()
 
 int ZombieVillager::getProfession()
 {
-    int profession = mEntityData->get(DATA_PROFESSION_ID) % 6;
-    return profession < 0 ? 0 : profession;
+    const int profession = mEntityData->get(DATA_PROFESSION_ID);
+    return profession >= 0 && profession <= Villager::MASON ? profession : Villager::UNEMPLOYED;
 }
 
 void ZombieVillager::addDataWalkers(DataFixerUpper* fixer)

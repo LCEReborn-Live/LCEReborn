@@ -34,8 +34,11 @@
 #include "game/world/Dimension.hpp"
 #include "game/world/LevelSource.hpp"
 #include "game/world/generation/Player.hpp"
+#include "game/world/generation/Villager.hpp"
+#include "game/world/generation/Villages.hpp"
 
 #include <typeinfo>
+#include <memory>
 
 BedBlock::Part& gBedHead = *new BedBlock::Part(0, L"head");
 BedBlock::Part& gBedFoot = *new BedBlock::Part(1, L"foot");
@@ -139,7 +142,7 @@ boost::shared_ptr<Player> BedBlock::getSleepingPlayerAt(Level* level, const Bloc
         if (player->isSleeping() && player->mBedPosition->equals(pos))
             return player;
     }
-    return player;
+    return {};
 }
 
 bool BedBlock::use(Level* level, const BlockPos& pos, const BlockState* state, boost::shared_ptr<Player> player,
@@ -188,6 +191,16 @@ bool BedBlock::use(Level* level, const BlockPos& pos, const BlockState* state, b
             uint32_t result = player->startSleepInBed(bedPos, false);
             if (result == Player::BED_SLEEPING_OK)
             {
+                const auto* area = AABB::newTemp(bedPos.x, bedPos.y, bedPos.z,
+                                                bedPos.x + 1, bedPos.y + 1, bedPos.z + 1);
+                std::unique_ptr<std::vector<boost::shared_ptr<Entity>>> sleepers(
+                    level->getEntitiesOfClass(typeid(Villager), area));
+                for (const auto& entity : *sleepers)
+                {
+                    auto villager = boost::static_pointer_cast<Villager>(entity);
+                    if (villager->isSleepingAt(bedPos))
+                        villager->wakeUp();
+                }
                 state = state->setValue<bool>(OCCUPIED, true);
                 level->setBlock(bedPos, state, Block::UPDATE_INVISIBLE, false);
                 if (!level->AllPlayersAreSleeping())
@@ -419,6 +432,11 @@ void BedBlock::playerDestroy(Level* level, boost::shared_ptr<Player> player, con
 
 void BedBlock::onRemove(Level* level, const BlockPos& pos, const BlockState* state)
 {
+    if (const auto villages = level->getVillages())
+    {
+        const BlockPos head = state->getValue(PART) == &gBedHead ? pos : pos.relative(state->getValue(FACING));
+        villages->removeHomeAt(head);
+    }
     Block::onRemove(level, pos, state);
     level->removeBlockEntity(pos);
 }

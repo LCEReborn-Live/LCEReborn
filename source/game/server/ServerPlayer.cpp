@@ -1526,18 +1526,27 @@ int ServerPlayer::openTrading(boost::shared_ptr<Merchant> merchant, const std::w
         new ClientboundContainerOpenPacket(mContainerCounter, ClientboundContainerOpenPacket::TRADER_NPC, nameData,
                                            tradeContainer->getContainerSize(), entityId)));
 
-    MerchantRecipeList* offers = merchant->getOffers(boost::dynamic_pointer_cast<Player>(shared_from_this()));
+    sendTradeOffers();
+    return 1;
+}
+
+void ServerPlayer::sendTradeOffers()
+{
+    auto* menu = dynamic_cast<MerchantMenu*>(mContainerMenu);
+    if (!menu)
+        return;
+
+    MerchantRecipeList* offers = menu->getMerchant()->getOffers(boost::dynamic_pointer_cast<Player>(shared_from_this()));
     if (offers != NULL)
     {
         ByteArrayOutputStream bytes;
         DataOutputStream output(&bytes);
-        output.writeInt(mContainerCounter);
+        output.writeInt(menu->m_containerId);
         offers->writeToStream(&output);
         mConnection->send(boost::shared_ptr<Packet>(
             new ClientboundCustomPayloadPacket(std::wstring(L"MC|TrList"), bytes.toByteArray())));
     }
 
-    return 1;
 }
 
 int ServerPlayer::openHorseInventory(boost::shared_ptr<AbstractHorse> horse, boost::shared_ptr<Container> container)

@@ -62,19 +62,19 @@ public:
     class EmeraldForItems : public ItemListing
     {
     public:
-        EmeraldForItems(Item* item, PriceRange price);
+        EmeraldForItems(Item* item, PriceRange price, int data);
         virtual void addMerchantRecipe(boost::shared_ptr<Merchant> merchant, MerchantRecipeList* recipes,
                                        Random* random);
 
     private:
         Item* mItem;
         PriceRange mPrice;
+        int mData;
     };
 
     class ItemForEmeralds : public ItemListing
     {
     public:
-        ItemForEmeralds(Item* item, const PriceRange& price);
         ItemForEmeralds(const ItemInstance& item, const PriceRange& price);
         virtual void addMerchantRecipe(boost::shared_ptr<Merchant> merchant, MerchantRecipeList* recipes,
                                        Random* random);
@@ -143,6 +143,7 @@ public:
     void _init(int profession);
 
     int getProfession();
+    enum { NITWIT = 5, UNEMPLOYED = 6, MASON = 7 };
     void setProfession(int profession);
     unsigned int getCareer();
     void setCareer(int career);
@@ -150,11 +151,14 @@ public:
     void setTrading(int trading);
     bool isTrading();
     void increaseMerchantCareer();
+    void prepareTradeOffers(int throughLevel);
     void setRewardPlayersInVillage();
     bool countFood(int multiplier);
     bool hasExcessFood();
     bool wantsMoreFood();
     bool hasEnoughFoodToBreed();
+    bool hasBreedingFood();
+    void consumeBreedingFood();
     bool isWillingToBreed(bool consumeFood);
     void setWillingToBreed(bool willing);
     bool isInLove();
@@ -184,9 +188,24 @@ public:
     virtual void registerAttributes();
     virtual void setLastHurtByMob(boost::shared_ptr<LivingEntity> attacker);
     virtual void die(const DamageSource* source);
+    boost::shared_ptr<Entity> changeDimension(int dimension) override;
     virtual const SoundEvent* getHurtSound(const DamageSource* source);
     virtual const SoundEvent* getDeathSound();
     virtual void registerGoals();
+    void hearBell();
+    bool isTakingShelter() const;
+    const BlockPos* getHomeForShelter();
+    const BlockPos* getWorkDestination();
+    const BlockPos* getMeetingDestination();
+    bool isSleeping() override;
+    bool isSleepingAt(const BlockPos& pos);
+    float getSleepRotation();
+    bool sleptRecently() const;
+    void wakeUp();
+    void travel(float strafe, float vertical, float forward) override;
+    void onSyncedDataUpdated(const EntityDataAccessor_Base* accessor) override;
+    int getTradeLevel() const;
+    not_null_ptr<ItemInstance> getTradePreview() const;
     virtual const SoundEvent* getAmbientSound();
     virtual ResourceLocation* getDefaultLootTable();
     virtual void pickUpItem(boost::shared_ptr<ItemEntity> itemEntity);
@@ -210,25 +229,41 @@ public:
     virtual bool isAvailableToTrade();
 
 private:
+    void updateJobSite();
+    void updateSchedule();
+    void updateTrades();
+    void updateTradePreview();
+    void tendFarm();
+    bool isFarmer();
     static const EntityDataAccessor<int>* DATA_PROFESSION;
     static const EntityDataAccessor<int>* DATA_CAREER;
     static const EntityDataAccessor<int>* DATA_TRADING;
+    static const EntityDataAccessor<int>* DATA_SLEEP_DIRECTION;
+    static const EntityDataAccessor<int>* DATA_TRADE_LEVEL;
+    static const EntityDataAccessor<not_null_ptr<ItemInstance>>* DATA_TRADE_PREVIEW;
     static std::vector<std::vector<std::vector<arrayWithLength<ItemListing*> > > > sTrades;
 
     int mRandomTickDivider;
+    long long mShelterUntil = 0;
     bool mInLove;
     bool mChasing;
     boost::weak_ptr<Village> mVillage;
     boost::weak_ptr<Player> mTradingPlayer;
     MerchantRecipeList* mOffers;
-    int mTimeUntilReset;
-    bool mNeedsInitialization;
     bool mWillingToBreed;
     int mRiches;
-    std::wstring mLastTradedPlayerName;
     int mCareerLevel;
     bool mRewardPlayersInVillage;
-    bool mAdditionalTasksSet;
+    Goal* mHarvestGoal = nullptr;
+    bool mTradeLocked = false;
+    bool mProfessionFromJobSite = false;
+    BlockPos mSleepingBed;
+    long long mLastSlept = -1;
+    long long mLastRestock = -1;
+    long long mRestockDay = -1;
+    int mRestocksToday = 0;
+    int mTradeExperience = 0;
+    int mGeneratedTradeLevel = 0;
     SimpleContainer* mInventory;
 };
 

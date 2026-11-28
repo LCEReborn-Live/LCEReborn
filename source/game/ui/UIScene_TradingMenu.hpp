@@ -15,6 +15,7 @@
 class Merchant;
 class MerchantMenu;
 class MerchantRecipe;
+class MerchantRecipeList;
 class UILayer;
 struct fuiRect;
 class ItemInstance;
@@ -52,6 +53,7 @@ public:
     void handleInventoryUpdated(void* data);
     virtual void HandleMessage(EUIMessage message, void* data);
     boost::shared_ptr<Merchant> getMerchant();
+    void setOffers(MerchantRecipeList* offers);
     virtual int getSceneType();
 
 private:
@@ -60,7 +62,7 @@ private:
     MerchantMenu* m_merchantMenu;
     boost::shared_ptr<Merchant> m_merchant;
     std::vector<std::pair<MerchantRecipe*, int> > m_trades;
-    int m_tradeCount;
+    int m_tradeLevel = 0;
     int m_tradeRow;
     int m_tradeOffset;
     bool m_tradeFocusSet;
@@ -69,6 +71,7 @@ private:
     UIControl_SlotList m_tradingBar;
     UIControl_SlotList m_request1;
     UIControl_SlotList m_request2;
+    UIControl_SlotList m_result;
     UIControl_SlotList m_hotBar;
     UIControl_SlotList m_inventory;
     UIControl_Label m_inventoryLabel;

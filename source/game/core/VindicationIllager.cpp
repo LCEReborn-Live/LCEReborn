@@ -17,6 +17,25 @@
 
 static const std::wstring JOHNNY_KEY(L"Johnny");
 
+namespace
+{
+class VindicatorMeleeGoal : public MeleeAttackGoal
+{
+public:
+    explicit VindicatorMeleeGoal(VindicationIllager* mob) : MeleeAttackGoal(mob, 1, false) {}
+    double getAttackReachSqr(boost::shared_ptr<LivingEntity> target) override
+    {
+        auto vehicle = mMob->getVehicle();
+        if (vehicle && vehicle->GetType() == EntityType::RAVAGER)
+        {
+            const double width = vehicle->mBbWidth - .1f;
+            return width * 2 * width * 2 + target->mBbWidth;
+        }
+        return MeleeAttackGoal::getAttackReachSqr(target);
+    }
+};
+}
+
 VindicationIllager::VindicationIllager(Level* level) : AbstractIllager(level)
 {
     fjDerivedCtorCalls();
@@ -34,9 +53,9 @@ void VindicationIllager::addDataWalkers(DataFixerUpper* fixer)
 }
 void VindicationIllager::registerGoals()
 {
-    Mob::registerGoals();
+    Raider::registerGoals();
     mGoalSelector.addGoal(0, new FloatGoal(this), true);
-    mGoalSelector.addGoal(4, new MeleeAttackGoal(this, 1.0, false), true);
+    mGoalSelector.addGoal(4, new VindicatorMeleeGoal(this), true);
     mGoalSelector.addGoal(8, new RandomStrollGoal(this, 0.6), true);
     mGoalSelector.addGoal(9, new LookAtPlayerGoal(this, typeid(Player), 3.0f, 1.0f), true);
     mGoalSelector.addGoal(10, new LookAtPlayerGoal(this, typeid(Mob), 8.0f), true);
@@ -84,17 +103,18 @@ void VindicationIllager::setAggressive(bool value)
 }
 void VindicationIllager::addAdditonalSaveData(CompoundTag* tag)
 {
-    Mob::addAdditonalSaveData(tag);
+    Raider::addAdditonalSaveData(tag);
     if (mJohnny)
         tag->putBoolean(JOHNNY_KEY, true);
 }
 int VindicationIllager::getArmPose()
 {
+    if (isCelebrating()) return ILLAGER_ARM_POSE_CELEBRATING;
     return isAgressive();
 }
 void VindicationIllager::readAdditionalSaveData(CompoundTag* tag)
 {
-    Mob::readAdditionalSaveData(tag);
+    Raider::readAdditionalSaveData(tag);
     if (tag->contains(JOHNNY_KEY, Tag::TAG_ANY_NUMERIC))
         mJohnny = tag->getBoolean(JOHNNY_KEY);
 }

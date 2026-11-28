@@ -10,6 +10,7 @@
 
 class BlockPos;
 class Direction;
+class GenericOverworldLevelSource;
 class Level;
 class Random;
 class StructurePiece;
@@ -37,9 +38,10 @@ public:
     class OceanRuinStart : public StructureStart
     {
     public:
-        OceanRuinStart();
+        OceanRuinStart() = default;
+        static StructureStart* Create();
         OceanRuinStart(Level* level, Random& random, int chunkX, int chunkZ,
-                       const OceanRuinConfiguration& configuration);
+                       const OceanRuinConfiguration& configuration, GenericOverworldLevelSource* terrain = nullptr);
 
         std::vector<BlockPos>* allPositions(Random& random, int x, int z);
         void addClusterRuins(Random& random, const Direction* direction, int x, int z, bool warm,
@@ -48,7 +50,7 @@ public:
         virtual EStructureStart GetType();
 
     private:
-        Level* mLevel;
+        Level* mLevel = nullptr;
     };
 
     OceanRuinFeature();
@@ -60,10 +62,12 @@ public:
     virtual BlockPos* getNearestGeneratedFeature(Level* level, const BlockPos& pos, bool skipExistingChunks);
     virtual bool isFeatureChunk(int chunkX, int chunkZ, bool flatWorld);
     virtual StructureStart* createStructureStart(int chunkX, int chunkZ);
+    void setTerrainSource(GenericOverworldLevelSource* source) { mTerrain = source; }
 
 private:
     int mSpacing;
     int mSeparation;
+    GenericOverworldLevelSource* mTerrain = nullptr;
 };
 
 #endif

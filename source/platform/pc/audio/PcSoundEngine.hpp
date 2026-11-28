@@ -81,6 +81,8 @@ private:
 
     PcMixer m_mixer;
     PcSoundBank m_bank;
+    PcSoundBank m_tu80Bank;
+    bool m_tu80BankLoaded = false;
     bool m_ready;
     Listener m_listener;
 

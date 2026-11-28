@@ -12,6 +12,7 @@ class DataOutputStream;
 class Level;
 class Random;
 class StructureManager;
+class StructureTerrain;
 
 class ScatteredFeaturePieces
 {
@@ -27,8 +28,10 @@ public:
         virtual void addAdditionalSaveData(DataOutputStream* output);
         virtual void readAdditionalSaveData(DataInputStream* input, StructureManager* structureManager);
         bool updateAverageGroundHeight(Level* level, BoundingBox* box, int offset, bool useSpawnHeight);
+        void alignToTerrain(StructureTerrain& terrain, int offset, int minimumHeight);
 
     protected:
+        virtual int terrainBaseY() const;
         StructurePlaceSettings mPlaceSettings;
         int mWidth;
         int mHeight;
@@ -65,8 +68,11 @@ public:
         virtual void readAdditionalSaveData(DataInputStream* input, StructureManager* structureManager);
         static StructurePiece* Create();
         virtual EStructurePiece GetType();
+        void move(int x, int y, int z) override;
 
     private:
+        int terrainBaseY() const override;
+        BlockPos mOrigin;
         bool mHasBasement;
         int mBasementDepth;
     };
@@ -111,6 +117,7 @@ public:
 
     private:
         bool mHasWitch;
+        bool mHasCat = false;
     };
 };
 

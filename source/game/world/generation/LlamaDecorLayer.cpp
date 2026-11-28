@@ -7,10 +7,12 @@
 #include "game/client/render/ModelDefinition.hpp"
 #include "game/client/render/TexturePack.hpp"
 #include "game/core/DyeColor.hpp"
+#include "game/core/EntityType.hpp"
 #include "game/core/Llama.hpp"
 #include "game/entity/mob/Entity.hpp"
 #include "game/util/ResourceLocation.hpp"
 
+static const ResourceLocation TRADER_LLAMA_DECOR(L"mob/llama/decor/trader_llama_decor");
 static ResourceLocation LLAMA_DECOR_TEXTURES[16] = {
     ResourceLocation(TN_MOB_LLAMA_DECOR_DECOR_WHITE),   ResourceLocation(TN_MOB_LLAMA_DECOR_DECOR_ORANGE),
     ResourceLocation(TN_MOB_LLAMA_DECOR_DECOR_MAGENTA), ResourceLocation(TN_MOB_LLAMA_DECOR_DECOR_LIGHT_BLUE),
@@ -35,12 +37,14 @@ void LlamaDecorLayer::render(boost::shared_ptr<LivingEntity>& entity, float limb
                              bool bUseDisplayList)
 {
     boost::shared_ptr<Llama> llama = boost::static_pointer_cast<Llama>(entity);
-    if (!llama->hasSwag())
+    const bool traderLlama = llama->GetType() == EntityType::TRADER_LLAMA;
+    if (!llama->hasSwag() && !traderLlama)
     {
         return;
     }
 
-    mRenderer->bindTexture(&LLAMA_DECOR_TEXTURES[llama->getSwag()->getBlockData()]);
+    mRenderer->bindTexture(llama->hasSwag() ? &LLAMA_DECOR_TEXTURES[llama->getSwag()->getBlockData()]
+                                          : &TRADER_LLAMA_DECOR);
     mModel->copyPropertiesFrom(mRenderer->getModel());
     boost::shared_ptr<Entity> renderEntity(llama);
     mModel->render(renderEntity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, scale, bUseDisplayList);

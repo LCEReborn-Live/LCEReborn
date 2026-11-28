@@ -2,6 +2,7 @@
 #define GAME_UI_UISCENE_FURNACEMENU_HPP
 
 #include <string>
+#include <array>
 #include <boost/shared_ptr.hpp>
 
 #include "game/ui/UIScene_AbstractContainerMenu.hpp"
@@ -27,6 +28,8 @@ public:
     virtual void GetItemScreenData(IUIScene_AbstractContainerMenu::ESceneSection section, int slot, _UIVec2D* position,
                                    _UIVec2D* size);
     virtual void handleSectionClick(IUIScene_AbstractContainerMenu::ESceneSection section);
+    void handleSlotListClicked(IUIScene_AbstractContainerMenu::ESceneSection section, int buttonNum,
+                               int quickKeyHeld) override;
     virtual void setSectionSelectedSlot(IUIScene_AbstractContainerMenu::ESceneSection section, int slot, int direction,
                                         bool wrap);
     virtual unsigned int GetSectionAndSlotInDirection(IUIScene_AbstractContainerMenu::ESceneSection section,
@@ -36,10 +39,19 @@ public:
     virtual std::wstring getMoviePath();
     virtual void handleReload();
     virtual void tick();
+    void customDraw(const char* name, fuiRect* rect) override;
     virtual UIControl* getSection(IUIScene_AbstractContainerMenu::ESceneSection section);
     virtual int getSceneType();
 
 private:
+    void updateMapPreview();
+    void updateWorkstationMovie();
+    bool mCartography = false;
+    bool mGrindstone = false;
+    bool mStonecutter = false;
+    bool mLoom = false;
+    bool m_useStonecutterMovie = false;
+    bool m_useWorkstationMovie = false;
     boost::shared_ptr<Container> m_container;
     UIControl_SlotList m_fuelSlot;
     UIControl_SlotList m_ingredientSlot;
@@ -49,6 +61,10 @@ private:
     UIControl_Label m_fuelLabel;
     UIControl_Progress m_furnaceFire;
     UIControl_Progress m_furnaceArrow;
+    UIControl_Label m_mapName;
+    UIControl_Label m_mapStatus;
+    std::array<UIControl, 5> m_mapPreviews;
+    UIControl m_grindstoneCross;
 };
 
 #endif

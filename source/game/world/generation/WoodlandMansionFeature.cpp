@@ -133,11 +133,10 @@ StructureStart* WoodlandMansionFeature::createStructureStart(int chunkX, int chu
     return new WoodlandMansionStart(this, level, mSource, random, chunkX, chunkZ);
 }
 
-WoodlandMansionFeature::WoodlandMansionStart::WoodlandMansionStart(WoodlandMansionFeature* feature, Level* levelIn,
+WoodlandMansionFeature::WoodlandMansionStart::WoodlandMansionStart(WoodlandMansionFeature*, Level* levelIn,
                                                                    GenericOverworldLevelSource* source,
                                                                    Random& randomIn, int chunkX, int chunkZ)
-    : StructureStart(chunkX, chunkZ),
-      mFeature(feature)
+    : StructureStart(chunkX, chunkZ)
 {
     create(levelIn, source, randomIn, chunkX, chunkZ);
 }
@@ -173,14 +172,13 @@ void WoodlandMansionFeature::WoodlandMansionStart::create(Level* levelIn, Generi
     {
         offsetZ = -5;
     }
-    int height00 = primer.getHighestNonAirPos(7, 7);
-    int height01 = primer.getHighestNonAirPos(7, 7 + offsetZ);
-    int height10 = primer.getHighestNonAirPos(7 + offsetX, 7);
-    int height11 = primer.getHighestNonAirPos(7 + offsetX, 7 + offsetZ);
+    int height00 = primer.getHighestSolidPos(7, 7);
+    int height01 = primer.getHighestSolidPos(7, 7 + offsetZ);
+    int height10 = primer.getHighestSolidPos(7 + offsetX, 7);
+    int height11 = primer.getHighestSolidPos(7 + offsetX, 7 + offsetZ);
     int minHeight = std::min(std::min(height00, height01), std::min(height10, height11));
     if (minHeight < 60 && !source->isFlat())
     {
-        mValid = false;
         return;
     }
     BlockPos origin(chunkX * 16 + 8, minHeight + 1, chunkZ * 16 + 8);
@@ -189,7 +187,6 @@ void WoodlandMansionFeature::WoodlandMansionStart::create(Level* levelIn, Generi
                                            randomIn);
     mPieces.insert(mPieces.empty() ? mPieces.begin() : mPieces.end() - 1, pieces.begin(), pieces.end());
     calculateBoundingBox();
-    mValid = true;
 }
 
 void WoodlandMansionFeature::WoodlandMansionStart::postProcess(Level* levelIn, Random& randomIn, BoundingBox* box)
@@ -232,7 +229,7 @@ void WoodlandMansionFeature::WoodlandMansionStart::postProcess(Level* levelIn, R
 
 bool WoodlandMansionFeature::WoodlandMansionStart::isValid()
 {
-    return mValid;
+    return !mPieces.empty();
 }
 
 EStructureStart WoodlandMansionFeature::WoodlandMansionStart::GetType()

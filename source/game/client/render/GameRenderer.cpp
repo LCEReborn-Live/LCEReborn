@@ -769,7 +769,10 @@ void GameRenderer::tick(bool tickWorld)
     {
         --mItemActivationTicks[playerIndex];
         if (mItemActivationTicks[playerIndex] == 0)
+        {
             mItemActivationItems[playerIndex] = ItemInstance::EMPTY;
+            mItemActivationIcons[playerIndex] = nullptr;
+        }
     }
 
 
@@ -3312,7 +3315,8 @@ void GameRenderer::renderItemActivationAnimation(int width, int height, float pa
     static const float kPi = 3.1415927f;
 
     const int playerIndex = mMinecraft->mPlayer->mUserIndex;
-    if (mItemActivationItems[playerIndex]->isEmpty() || mItemActivationTicks[playerIndex] <= 0)
+    const auto* icon = mItemActivationIcons[playerIndex];
+    if (mItemActivationTicks[playerIndex] <= 0 || (!icon && mItemActivationItems[playerIndex]->isEmpty()))
         return;
 
     const float progress = (static_cast<float>(40 - mItemActivationTicks[playerIndex]) + partialTick) / 40.0f;
@@ -3341,9 +3345,28 @@ void GameRenderer::renderItemActivationAnimation(int width, int height, float pa
     GlStateManager::rotatef(6.0f * cosf(progress * 8.0f), 1.0f, 0.0f, 0.0f);
     GlStateManager::rotatef(6.0f * cosf(progress * 8.0f), 0.0f, 0.0f, 1.0f);
 
-    TextureAtlasSprite* sprite = NULL;
-    mMinecraft->getItemRenderer()->renderStatic(mItemActivationItems[playerIndex], boost::shared_ptr<LivingEntity>(),
-                                                ItemTransforms::FIXED, 1.0f, false, sprite);
+    if (icon)
+    {
+        Lighting::turnOff();
+        GlStateManager::disableDepthTest();
+        GlStateManager::enableTexture();
+        GlStateManager::alphaFunc(4, 0.01f);
+        GlStateManager::enableBlend();
+        GlStateManager::blendFunc(4, 5);
+        GlStateManager::color4f(1, 1, 1, 1);
+        mMinecraft->mTextures->bindTexture(icon);
+        GlStateManager::enableRescaleNormal();
+        GlStateManager::translatef(-0.5f, -0.5f, 0);
+        mItemInHandRenderer->renderItem3D(Tesselator::getInstance(), 0, 0, 1, 1, 18, 18, 0.0625f,
+                                           ItemInHandRenderer::ITEM_RENDER_MODE_EXTRUDED);
+        GlStateManager::disableRescaleNormal();
+        GlStateManager::disableBlend();
+    }
+    else
+    {
+        mMinecraft->getItemRenderer()->renderStatic(mItemActivationItems[playerIndex], {}, ItemTransforms::FIXED,
+                                                    1.0f, false, nullptr);
+    }
 
     GlStateManager::popMatrix();
     Lighting::turnOff();
@@ -3484,10 +3507,12 @@ int GameRenderer::shouldRenderBlockOutline()
 
 void GameRenderer::resetData()
 {
-    mItemActivationItems[0] = ItemInstance::EMPTY;
-    mItemActivationItems[1] = ItemInstance::EMPTY;
-    mItemActivationItems[2] = ItemInstance::EMPTY;
-    mItemActivationItems[3] = ItemInstance::EMPTY;
+    for (int i = 0; i < 4; ++i)
+    {
+        mItemActivationItems[i] = ItemInstance::EMPTY;
+        mItemActivationIcons[i] = nullptr;
+        mItemActivationTicks[i] = 0;
+    }
     mMapRenderer->resetData();
 }
 
@@ -3567,7 +3592,14 @@ void GameRenderer::LeaveDeleteThreadCS()
 void GameRenderer::displayItemActivation(not_null_ptr<ItemInstance> item, int playerIndex)
 {
     mItemActivationItems[playerIndex] = item;
+    mItemActivationIcons[playerIndex] = nullptr;
     mItemActivationTicks[playerIndex] = 40;
     mItemActivationOffX[playerIndex] = mRandom.nextFloat() * 2.0f - 1.0f;
     mItemActivationOffY[playerIndex] = mRandom.nextFloat() * 2.0f - 1.0f;
+}
+
+void GameRenderer::displayIconActivation(const ResourceLocation* icon, int playerIndex)
+{
+    displayItemActivation(ItemInstance::EMPTY, playerIndex);
+    mItemActivationIcons[playerIndex] = icon;
 }

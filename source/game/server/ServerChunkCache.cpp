@@ -66,17 +66,18 @@ ServerChunkCache::ServerChunkCache(ServerLevel* level, ChunkStorage* storage, Ch
 
 ServerChunkCache::~ServerChunkCache()
 {
-    m_storage->WaitForAll();
+    if (m_storage)
+        m_storage->WaitForAll();
     delete m_storage;
     delete m_emptyChunk;
-    delete m_cache;
+    delete[] m_cache;
     delete m_source;
 
     for (int i = 0; i < m_xzSize * m_xzSize; ++i)
     {
         delete m_unloadedCache[i];
     }
-    delete m_unloadedCache;
+    delete[] m_unloadedCache;
 
     for (std::vector<LevelChunk*>::iterator it = m_loadedChunkList.begin(), end = m_loadedChunkList.end(); it != end;
          ++it)

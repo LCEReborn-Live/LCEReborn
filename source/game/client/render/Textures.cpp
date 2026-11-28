@@ -45,6 +45,13 @@ Textures::Textures(TexturePackRepository* texturePackRepository, Options* option
 
 bool Textures::IsTUImage(_TEXTURE_NAME textureName, const std::wstring& name)
 {
+    if (name == L"misc/village_hero_effect" || name == L"misc/bad_omen_effect")
+        return true;
+    if (textureName == TN_UNINDEXED && name.compare(0, 8, L"mob/cat/") == 0)
+        return true;
+    if (name.compare(0, 18, L"mob/villager/tu80/") == 0)
+        return true;
+
     static _TEXTURE_NAME textureIds[] = {
         TN_ARMOR_POWER,
         TN_MOB_ENDERMAN_EYES,
@@ -237,7 +244,20 @@ bool Textures::IsTUImage(_TEXTURE_NAME textureName, const std::wstring& name)
     static const wchar_t* textureNames[] = {
         L"font/Default",    L"font/Mojangles_7", L"font/Mojangles_11",
         L"armor/cloth_1",   L"armor/cloth_1_b",  L"armor/cloth_2",
-        L"armor/cloth_2_b", L"armor/turtle_1",   NULL,
+        L"armor/cloth_2_b", L"armor/turtle_1",
+        L"item/sign_spruce", L"item/sign_birch", L"item/sign_jungle", L"item/sign_acacia", L"item/sign_darkoak",
+        L"item/bell",
+        L"item/banner/banner_pattern_illager",
+        L"mob/panda/panda", L"mob/panda/panda_lazy", L"mob/panda/panda_worried",
+        L"mob/panda/panda_playful", L"mob/panda/panda_brown", L"mob/panda/panda_sneezy",
+        L"mob/panda/panda_aggressive",
+        L"mob/wandering_trader", L"mob/llama/decor/trader_llama_decor",
+        L"mob/villager/levels/level_iron", L"mob/villager/levels/level_gold",
+        L"mob/villager/levels/level_diamond",
+        L"mob/pillager",
+        L"mob/illager/ravager",
+        L"textures/blocks/campfire_smoke",
+        NULL,
     };
     if (textureName < TN_UNINDEXED)
     {
@@ -457,7 +477,9 @@ int Textures::loadTexture(_TEXTURE_NAME textureName, const std::wstring& name)
     std::wstring workingName = name;
     if (name == L"environment/clouds" || name == L"%clamp%misc/shadow" || name == L"%blur%misc/pumpkinblur"
         || name == L"%clamp%misc/shadow" || name == L"gui/icons" || name == L"gui/gui" || name == L"misc/footprint"
-        || name == L"mob/shulker/endergolem" || name == L"item/bed" || name == L"font/Default")
+        || name == L"mob/shulker/endergolem" || name == L"item/bed" || name == L"font/Default"
+        || name == L"textures/blocks/campfire_smoke" || name == L"item/bell"
+        || name == L"misc/village_hero_effect" || name == L"misc/bad_omen_effect")
     {
         sTextureMipmap = false;
     }

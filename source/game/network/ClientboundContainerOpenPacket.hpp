@@ -63,6 +63,13 @@ public:
     static const int REPAIR_TABLE = 19;
     static const int TRAP = 20;
     static const int SHULKER_BOX = 21;
+    static const int SMOKER = 22;
+    static const int BLAST_FURNACE = 23;
+    static const int CARTOGRAPHY = 24;
+    static const int GRINDSTONE = 25;
+    static const int BARREL = 26;
+    static const int STONECUTTER = 27;
+    static const int LOOM = 28;
 
 private:
     int mContainerId;

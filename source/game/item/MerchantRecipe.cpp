@@ -1,4 +1,7 @@
 #include "game/item/MerchantRecipe.hpp"
+#include "game/core/Mth.hpp"
+#include <algorithm>
+#include <cmath>
 
 #include "game/data/CompoundTag.hpp"
 #include "game/item/Item.hpp"
@@ -50,6 +53,8 @@ void MerchantRecipe::_init(not_null_ptr<ItemInstance> buyA, not_null_ptr<ItemIns
 
 void MerchantRecipe::load(CompoundTag* tag)
 {
+    mTradeLevel = Mth::clamp(tag->getInt(L"TradeLevel"), 0, 5);
+    mTradeExperience = Mth::clamp(tag->getInt(L"TradeXP"), 0, 250);
     CompoundTag* buyTag = tag->getCompound(L"buy");
     mBuyA = not_null_ptr<ItemInstance>(new ItemInstance(buyTag));
     CompoundTag* sellTag = tag->getCompound(L"sell");
@@ -82,7 +87,24 @@ void MerchantRecipe::load(CompoundTag* tag)
 
 not_null_ptr<ItemInstance> MerchantRecipe::getBuyAItem()
 {
+    const int discount = mHeroDiscount + mReputationDiscount;
+    if (discount != 0)
+    {
+        auto price = mBuyA->copy();
+        price->setCount(Mth::clamp(price->getCount() - discount, 1, price->getMaxStackSize()));
+        return price;
+    }
     return mBuyA;
+}
+void MerchantRecipe::setHeroDiscount(int amplifier)
+{
+    mHeroDiscount = amplifier < 0 ? 0 : std::max(1,
+        static_cast<int>(std::floor(mBuyA->getCount() * (.3 + .0625 * amplifier))));
+}
+
+void MerchantRecipe::setVillageReputation(int standing)
+{
+    mReputationDiscount = mBuyA->getCount() * standing / 100;
 }
 not_null_ptr<ItemInstance> MerchantRecipe::getBuyBItem()
 {
@@ -114,6 +136,11 @@ bool MerchantRecipe::isSameSameButBetter(MerchantRecipe* other)
 int MerchantRecipe::getUses()
 {
     return mUses;
+}
+
+void MerchantRecipe::restock()
+{
+    mUses = 0;
 }
 int MerchantRecipe::getMaxUses()
 {
@@ -153,5 +180,7 @@ CompoundTag* MerchantRecipe::createTag()
     tag->putInt(L"uses", mUses);
     tag->putInt(L"maxUses", mMaxUses);
     tag->putBoolean(L"rewardExp", mRewardExp);
+    tag->putInt(L"TradeLevel", mTradeLevel);
+    tag->putInt(L"TradeXP", mTradeExperience);
     return tag;
 }

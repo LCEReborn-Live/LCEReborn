@@ -37,60 +37,8 @@ TemplateStructurePiece::~TemplateStructurePiece()
 
 void TemplateStructurePiece::setBoundingBoxFromTemplate()
 {
-    Rotation* rotation = mPlaceSettings->getRotation();
-    BlockPos size = mTemplate->getSize(rotation);
-    Mirror* mirror = mPlaceSettings->getMirror();
-    delete mBoundingBox;
-    mBoundingBox = new BoundingBox(0, 0, 0, size.x, size.y - 1, size.z);
-
-    switch (rotation->getType())
-    {
-    case Rotation::eTYPE_Clockwise90:
-        mBoundingBox->move(-size.x, 0, 0);
-        break;
-    case Rotation::eTYPE_Clockwise180:
-        mBoundingBox->move(-size.x, 0, -size.z);
-        break;
-    case Rotation::eTYPE_CounterClockwise90:
-        mBoundingBox->move(0, 0, -size.z);
-        break;
-    default:
-        break;
-    }
-
-    Mirror::eTYPE mirrorType = mirror->getType();
-    if (mirrorType == Mirror::eTYPE_LeftRight)
-    {
-        BlockPos offset = BlockPos::ZERO;
-        if (rotation == Rotation::CLOCKWISE_90 || rotation == Rotation::COUNTERCLOCKWISE_90)
-            offset = offset.relative(rotation->rotate(Direction::NORTH), size.x);
-        else if (rotation == Rotation::CLOCKWISE_180)
-            offset = offset.relative(Direction::SOUTH, size.z);
-        else
-            offset = offset.relative(Direction::NORTH, size.z);
-        mBoundingBox->move(offset.x, 0, offset.z);
-    }
-    else if (mirrorType == Mirror::eTYPE_FrontBack)
-    {
-        BlockPos offset = BlockPos::ZERO;
-        if (rotation == Rotation::CLOCKWISE_90 || rotation == Rotation::COUNTERCLOCKWISE_90)
-        {
-            offset = offset.relative(rotation->rotate(Direction::WEST), size.z);
-            mBoundingBox->move(offset.x, 0, offset.z);
-        }
-        else if (rotation == Rotation::CLOCKWISE_180)
-        {
-            offset = offset.relative(Direction::EAST, size.x);
-            mBoundingBox->move(offset.x, 0, offset.z);
-        }
-        else
-        {
-            offset = offset.relative(Direction::WEST, size.x);
-            mBoundingBox->move(offset.x, 0, offset.z);
-        }
-    }
-
-    mBoundingBox->move(mTemplatePosition.x, mTemplatePosition.y, mTemplatePosition.z);
+    setBoundingBox(mTemplate->getTransformedBounds(mTemplatePosition, mPlaceSettings->getMirror(),
+                                                   mPlaceSettings->getRotation()));
 }
 
 void TemplateStructurePiece::setup(const StructureTemplate* templateObject, const BlockPos& templatePosition,

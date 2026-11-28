@@ -549,7 +549,7 @@ void ItemRenderer::renderStatic(const not_null_ptr<ItemInstance>& item, boost::s
         }
     }
     else if (item->getItem() != Items::skull && item->getItem() != Items::banner && blockId != BlockId::CONDUIT
-             && !(blockId >= BlockId::WHITE_SHULKER_BOX && blockId <= BlockId::BLACK_SHULKER_BOX))
+             && !Item::IsShulkerBox(item->getItem()))
     {
         if (item->getItem()->getIconType() == 0 && block != NULL
             && BlockRenderer::canRender(block->defaultBlockState()->getRenderShape()))

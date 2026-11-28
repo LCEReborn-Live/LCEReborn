@@ -130,6 +130,8 @@ bool ItemEntity::merge(boost::shared_ptr<ItemEntity> entity)
         return false;
     if (!entity->isAlive() || !isAlive())
         return false;
+    if (mCatGiftRecipient != entity->mCatGiftRecipient)
+        return false;
 
     not_null_ptr<ItemInstance> thisItem = getItem();
     not_null_ptr<ItemInstance> otherItem = entity->getItem();
@@ -318,6 +320,8 @@ void ItemEntity::addAdditonalSaveData(CompoundTag* tag)
         tag->putString(L"Thrower", mThrower);
     if (!getOwner().empty())
         tag->putString(L"Owner", mOwner);
+    if (!mCatGiftRecipient.empty())
+        tag->putString(L"CatGiftRecipient", mCatGiftRecipient);
     if (!getItem()->isEmpty())
         tag->put(L"Item", getItem()->save(new CompoundTag()));
 }
@@ -332,6 +336,7 @@ void ItemEntity::readAdditionalSaveData(CompoundTag* tag)
         mOwner = tag->getString(L"Owner");
     if (tag->contains(L"Thrower"))
         mThrower = tag->getString(L"Thrower");
+    mCatGiftRecipient = tag->getString(L"CatGiftRecipient");
     setItem(not_null_ptr<ItemInstance>(new ItemInstance(tag->getCompound(L"Item"))));
     if (getItem()->isEmpty())
         remove();
@@ -367,6 +372,11 @@ void ItemEntity::playerTouch(boost::shared_ptr<Player> player)
         }
         if (itemType == Items::blazeRod)
             player->awardStat(GenericStats::blazeRod(), GenericStats::param_blazeRod());
+        if (!mCatGiftRecipient.empty() && mCatGiftRecipient == player->getUUID())
+        {
+            player->awardStat(GenericStats::achievement(eAward_WhereHaveYouBeen), GenericStats::param_noArgs());
+            mCatGiftRecipient.clear();
+        }
 
         player->take(shared_from_this(), count);
         if (item->isEmpty())
@@ -405,6 +415,11 @@ void ItemEntity::setOwner(const std::wstring& owner)
 void ItemEntity::setThrower(const std::wstring& thrower)
 {
     mThrower = thrower;
+}
+
+void ItemEntity::setCatGiftRecipient(const std::wstring& uuid)
+{
+    mCatGiftRecipient = uuid;
 }
 
 void ItemEntity::setNoPickUpDelay()

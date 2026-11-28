@@ -41,8 +41,8 @@ static const int s_poisonedHealthFrames[6] = {1, 8, 7, 2, 10, 9};
 static const int s_witheredHealthFrames[6] = {1, 12, 11, 2, 14, 13};
 static const int s_foodFrames[6] = {1, 1, 3, 5, 2, 4};
 static const int s_armourFrames[3] = {1, 2, 3};
-static const int s_effectSlots[28] = {-1, 12, 9,  2,  14, 11, 5,  3,  6,  13, 16, 7,  8,  1,
-                                      0,  4,  10, 15, 17, 18, 19, 20, 21, 22, 23, -1, 25, 24};
+static const int s_effectSlots[30] = {-1, 12, 9,  2,  14, 11, 5,  3,  6,  13, 16, 7,  8,  1,
+                                      0,  4,  10, 15, 17, 18, 19, 20, 21, 22, 23, -1, 25, 24, 26, 27};
 
 void FJ_Hud::SetPlayerLevel(int level)
 {
@@ -708,7 +708,7 @@ void FJ_Hud::InitHud(FJ_Event* event)
             m_bossBars[i] = NULL;
         m_expBarProgress = 0.0f;
         m_horseJumpBarProgress = 0.0f;
-        for (int i = 0; i < 27; ++i)
+        for (int i = 0; i < 28; ++i)
             m_statusEffectTiles[i] = NULL;
     }
 
@@ -1402,7 +1402,7 @@ void FJ_Hud::HideSelectedLabel()
 
 void FJ_Hud::UpdateStatusEffectTile(int count, int index, int effect, bool ambient, float alpha)
 {
-    for (int i = count; i < 27; ++i)
+    for (int i = count; i < 28; ++i)
     {
         if (m_statusEffectTiles[i] != NULL)
         {
@@ -1513,7 +1513,7 @@ void FJ_Hud::SetNumBossBars(int count)
     }
 }
 
-void FJ_Hud::SetBossBar(int index, float progress, const std::wstring& name)
+void FJ_Hud::SetBossBar(int index, float progress, const std::wstring& name, int color, int overlay)
 {
     if (m_bossBars[index] == NULL)
     {
@@ -1541,6 +1541,7 @@ void FJ_Hud::SetBossBar(int index, float progress, const std::wstring& name)
     }
     m_bossBars[index]->setProgress(progress);
     m_bossBars[index]->SetLabel(name);
+    m_bossBars[index]->SetStyle(color, overlay);
     UpdateBossBarPositions();
 }
 

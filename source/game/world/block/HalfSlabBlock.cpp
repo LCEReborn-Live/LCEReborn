@@ -1,5 +1,7 @@
 #include "game/world/block/Predicates.hpp"
 #include "game/world/block/HalfSlabBlock.hpp"
+#include "game/world/block/BlockId.hpp"
+#include "game/world/block/DecorativeStone.hpp"
 #include "game/util/AABB.hpp"
 
 #include <typeinfo>
@@ -161,8 +163,8 @@ bool HalfSlabBlock::isCubeShaped(const BlockState* state)
 
 bool HalfSlabBlock::isHalfSlab(Block* block)
 {
-    return block == Blocks::stone_slab || block == Blocks::wooden_slab || block == Blocks::stone_slab2
-           || block == Blocks::purpur_slab || block == Blocks::prismarine_slab;
+    const auto* slab = dynamic_cast<HalfSlabBlock*>(block);
+    return slab && !slab->isFullSize();
 }
 
 bool HalfSlabBlock::isHalfSlab(const BlockState* state)
@@ -231,13 +233,15 @@ bool HalfSlabBlock::isSlabBlock()
 
 bool HalfSlabBlock::isFullSlab(Block* block)
 {
-    return block == Blocks::purpur_double_slab || block == Blocks::double_wooden_slab
-           || block == Blocks::double_stone_slab2 || block == Blocks::double_stone_slab
-           || block == Blocks::prismarine_double_slab;
+    const auto* slab = dynamic_cast<HalfSlabBlock*>(block);
+    return slab && slab->isFullSize();
 }
 
 Block* HalfSlabBlock::GetDoubleSlabBlockFromSlab(Block* block)
 {
+    const int group = Block::getId(block) - BlockId::DECOR_SLAB_FIRST;
+    if (group >= 0 && group < DecorativeStone::StairCount / DecorativeStone::SlabTypesPerBlock)
+        return Block::byId(BlockId::DECOR_DOUBLE_SLAB_FIRST + group);
     if (block == Blocks::stone_slab)
     {
         return Blocks::double_stone_slab;

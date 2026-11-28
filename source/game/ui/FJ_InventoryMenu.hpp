@@ -26,9 +26,9 @@ public:
 private:
     FJ_FuiNode* m_armorSlots[4];
     fuiRenderNode* m_offhandSlotIcon;
-    FJ_FuiNode* m_effectNodes[27];
-    unsigned char m_effectActive[27];
-    unsigned char m_effectRefreshed[27];
+    FJ_FuiNode* m_effectNodes[28];
+    unsigned char m_effectActive[28];
+    unsigned char m_effectRefreshed[28];
     int m_effectTopY;
     int m_effectNextY;
     int m_effectBottomY;

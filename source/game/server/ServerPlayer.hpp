@@ -163,6 +163,7 @@ public:
     virtual int startBlockInteraction(InteractionObject& interaction);
     virtual int openContainer(boost::shared_ptr<Container> container);
     virtual int openTrading(boost::shared_ptr<Merchant> merchant, const std::wstring& name, int entityId);
+    void sendTradeOffers();
     virtual int openHorseInventory(boost::shared_ptr<AbstractHorse> horse, boost::shared_ptr<Container> container);
     virtual void openItemInstanceGui(not_null_ptr<ItemInstance> item, InteractionHand::EInteractionHand hand);
     void doCloseContainer();

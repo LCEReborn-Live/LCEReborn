@@ -83,6 +83,7 @@ public:
     float getHeight();
 
     void setScaleX(float fScaleX);
+    void setColorMultiplier(float red, float green, float blue);
     void setScaleY(float fScaleY);
     float getScaleX();
     float getScaleY();

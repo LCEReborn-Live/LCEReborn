@@ -95,7 +95,8 @@ public:
         eBiomeIDs_SavannaPlateauMutated = 164,
         eBiomeIDs_MesaBryce = 165,
         eBiomeIDs_MesaRockMutated = 166,
-        eBiomeIDs_MesaClearRockMutated = 167
+        eBiomeIDs_MesaClearRockMutated = 167,
+        eBiomeIDs_BambooJungle = 168
     };
 
     enum BiomeType

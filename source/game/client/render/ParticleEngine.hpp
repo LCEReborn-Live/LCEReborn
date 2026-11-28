@@ -64,9 +64,12 @@ public:
     void setLevel(Level* level);
     std::wstring countParticles();
 
+    static constexpr int CampfireSmokeTexture = 5;
+
 private:
+    static constexpr int TextureTypeCount = CampfireSmokeTexture + 1;
     Level* level;
-    ParticleList particles[3][5][2];
+    ParticleList particles[3][TextureTypeCount][2];
     std::vector<TrackingEmitter*> trackingEmitters;
     Textures* textures;
     Random random;

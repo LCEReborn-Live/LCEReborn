@@ -30,6 +30,7 @@
 #include "game/item/ArmorStandItem.hpp"
 #include "game/item/AxeItem.hpp"
 #include "game/item/BannerItem.hpp"
+#include "game/item/BannerStencilItem.hpp"
 #include "game/item/BedItem.hpp"
 #include "game/item/BoatItem.hpp"
 #include "game/item/BookItem.hpp"
@@ -78,11 +79,13 @@
 #include "game/item/RecordItem.hpp"
 #include "game/item/SaddleItem.hpp"
 #include "game/item/SeedFoodItem.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/item/SeedItem.hpp"
 #include "game/item/ShearsItem.hpp"
 #include "game/item/ShieldItem.hpp"
 #include "game/item/ShovelItem.hpp"
 #include "game/item/SignItem.hpp"
+#include "game/world/block/DecorativeStone.hpp"
 #include "game/item/SimpleFoiledItem.hpp"
 #include "game/item/SkullItem.hpp"
 #include "game/item/SnowItem.hpp"
@@ -97,8 +100,10 @@
 #include "game/world/biome/arrayWithLength.hpp"
 #include "game/world/block/AnvilBlockItem.hpp"
 #include "game/world/block/Block.hpp"
+#include "game/world/block/BlockId.hpp"
 #include "game/world/block/BlockItem.hpp"
 #include "game/world/block/BlockPlanterItem.hpp"
+#include "game/world/block/ScaffoldingBlock.hpp"
 #include "game/world/block/BlockState.hpp"
 #include "game/world/block/Blocks.hpp"
 #include "game/world/block/CoralFanBlockItem.hpp"
@@ -298,7 +303,8 @@ Material* Item::getMaterial()
 
 bool Item::IsShulkerBox(int id)
 {
-    return id >= 219 && id <= 234;
+    return (id >= BlockId::WHITE_SHULKER_BOX && id <= BlockId::BLACK_SHULKER_BOX)
+        || id == BlockId::UNDYED_SHULKER_BOX + 768;
 }
 
 bool Item::IsShulkerBox(Item* item)
@@ -1429,6 +1435,7 @@ void Item::staticCtor()
 
     registerBlock(Blocks::observer);
     registerBlock(Blocks::white_shulker_box, new ShulkerBoxBlockItem(Blocks::white_shulker_box));
+    registerBlock(Blocks::undyed_shulker_box, new ShulkerBoxBlockItem(Blocks::undyed_shulker_box));
 
     registerBlock(Blocks::orange_shulker_box, new ShulkerBoxBlockItem(Blocks::orange_shulker_box));
 
@@ -1538,6 +1545,39 @@ void Item::staticCtor()
     registerBlock(Blocks::bark_jungle);
     registerBlock(Blocks::bark_dark_oak);
     registerBlock(Blocks::bark_oak);
+    for (int species = 0; species < BlockId::WOOD_SPECIES_COUNT; ++species)
+        registerBlock(Block::byId(BlockId::STRIPPED_WOOD_FIRST + species));
+    registerBlock(Blocks::smoker);
+    registerBlock(Blocks::blast_furnace);
+    registerBlock(Blocks::smooth_stone);
+    registerBlock(Blocks::cartography_table);
+    registerBlock(Blocks::grindstone);
+    registerBlock(Blocks::barrel);
+    registerBlock(Blocks::composter);
+    registerBlock(Blocks::stonecutter);
+    registerBlock(Blocks::smithing_table);
+    registerBlock(Blocks::fletching_table);
+    registerBlock(Blocks::lantern);
+    registerBlock(Blocks::scaffolding, new ScaffoldingItem(Blocks::scaffolding));
+    registerBlock(Blocks::campfire);
+    registerBlock(Blocks::bell);
+    registerBlock(Blocks::lectern);
+    registerBlock(Blocks::loom);
+    for (int id = BlockId::SMOOTH_SANDSTONE; id <= BlockId::SMOOTH_QUARTZ; ++id)
+        registerBlock(Block::byId(id));
+    for (int material = 0; material < DecorativeStone::MaterialCount; ++material)
+    {
+        if (material < DecorativeStone::StairCount)
+            registerBlock(Block::byId(BlockId::DECOR_STAIRS_FIRST + material));
+        if (DecorativeStone::materials[material].wall)
+            registerBlock(Block::byId(BlockId::DECOR_WALL_FIRST + material));
+    }
+    for (int group = 0; group < DecorativeStone::StairCount / DecorativeStone::SlabTypesPerBlock; ++group)
+    {
+        auto* slab = static_cast<HalfSlabBlock*>(Block::byId(BlockId::DECOR_SLAB_FIRST + group));
+        auto* doubleSlab = static_cast<HalfSlabBlock*>(Block::byId(BlockId::DECOR_DOUBLE_SLAB_FIRST + group));
+        registerBlock(slab, new SlabBlockItem(slab, slab, doubleSlab));
+    }
     registerItem(256, L"iron_shovel",
                  (new ShovelItem(Tier::IRON))
                      ->setIconName(L"shovelIron")
@@ -1934,6 +1974,14 @@ void Item::staticCtor()
                      ->setIconName(L"sign")
                      ->setBaseItemTypeAndMaterial(34, 1)
                      ->setDescriptionId(IDS_ITEM_SIGN, IDS_DESC_SIGN));
+
+    for (int wood = 1; wood < BlockId::WOOD_SPECIES_COUNT; ++wood)
+    {
+        const auto name = PlanksBlock::Variant::byData(wood)->getSerializedName() + L"_sign";
+        registerItem(ItemId::WOOD_SIGN_FIRST + wood - 1, name,
+                     (new SignItem(wood))->setIconName(name)
+                         ->setDescriptionId(IDS_LCE_WOOD_SIGN_FIRST + wood - 1, IDS_DESC_SIGN));
+    }
 
     registerItem(324, L"wooden_door",
                  (new DoorItem(Blocks::wooden_door))
@@ -2695,6 +2743,15 @@ void Item::staticCtor()
                      ->setDescriptionId(IDS_ITEM_PHANTOM_MEMBRANE, IDS_DESC_PHANTOM_MEMBRANE));
 
     registerItem(ItemId::CROSSBOW, L"crossbow", new CrossbowItem());
+    registerItem(ItemId::SWEET_BERRIES, L"sweet_berries",
+                 (new SeedFoodItem(2, FoodConstants::FOOD_SATURATION_LOW, Blocks::sweet_berry_bush, nullptr))
+                     ->setIconName(L"sweet_berries")
+                     ->setDescriptionId(IDS_LCE_ITEM_SWEET_BERRIES, IDS_LCE_DESC_SWEET_BERRIES));
+    registerItem(ItemId::BANNER_STENCIL, L"banner_stencil", new BannerStencilItem());
+    registerItem(ItemId::BAMBOO, L"bamboo",
+                 (new BlockPlanterItem(Blocks::bamboo))
+                     ->setIconName(L"bamboo")
+                     ->setDescriptionId(IDS_LCE_BAMBOO, IDS_LCE_DESC_BAMBOO));
 
     registerItem(2255, L"debug_fourj_item", (new DebugFourjItem())->setIconName(L"barrier"));
 

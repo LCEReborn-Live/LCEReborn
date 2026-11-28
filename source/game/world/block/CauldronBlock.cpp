@@ -14,6 +14,8 @@
 #include "game/server/ServerPlayer.hpp"
 #include "game/world/block/BannerBlockEntity.hpp"
 #include "game/client/render/ParticleType.hpp"
+#include "game/client/audio/SoundEvents.hpp"
+#include "game/client/audio/SoundSource.hpp"
 #include "game/core/Direction.hpp"
 #include "game/core/IconRegister.hpp"
 #include "game/core/Mth.hpp"
@@ -50,7 +52,7 @@ static const AABB* AABB_WALL_SOUTH = AABB::newPermanent(0.0, 0.0, 0.875, 1.0, 1.
 static const AABB* AABB_WALL_EAST = AABB::newPermanent(0.875, 0.0, 0.0, 1.0, 1.0, 1.0);
 static const AABB* AABB_WALL_WEST = AABB::newPermanent(0.0, 0.0, 0.0, 0.125, 1.0, 1.0);
 AbstractProperty<int>* CauldronBlock::LEVEL = static_cast<AbstractProperty<int>*>(
-    IntegerProperty::create(L"level", 0, 6));
+    IntegerProperty::create(L"level", 0, LavaLevel));
 
 CauldronBlock::CauldronBlock() : BaseEntityBlock(Material::METAL, MaterialColor::STONE)
 {
@@ -89,10 +91,21 @@ bool CauldronBlock::isCubeShaped(const BlockState*)
     return false;
 }
 
+int CauldronBlock::getLightEmission(const BlockState* state)
+{
+    return state->getValue(LEVEL) == LavaLevel ? 15 : 0;
+}
+
 void CauldronBlock::entityInside(Level* level, const BlockPos& pos, const BlockState* state,
                                  const boost::shared_ptr<Entity>& entity)
 {
     int waterLevel = state->getValue(LEVEL);
+    if (waterLevel == LavaLevel)
+    {
+        if (!level->mIsClientSide && entity->mBoundingBox->mMinY < pos.y + 15.0 / 16.0)
+            entity->lavaHurt();
+        return;
+    }
     float waterTop = ((float)(waterLevel * 2) + 5.0f) * 0.0625f + (float)pos.y;
     if (!level->mIsClientSide && entity->isOnFire() && 0 < waterLevel)
     {
@@ -153,6 +166,36 @@ bool CauldronBlock::use(Level* level, const BlockPos& pos, const BlockState* sta
     if (!isCauldron)
         return false;
     boost::shared_ptr<CauldronBlockEntity> cauldron = boost::static_pointer_cast<CauldronBlockEntity>(blockEntity);
+
+    auto held = player->getItemInHand(hand);
+    const bool lava = state->getValue(LEVEL) == LavaLevel;
+    const bool fillLava = state->getValue(LEVEL) == 0 && held->getItem() == Items::lavaBucket;
+    const bool takeLava = lava && held->getItem() == Items::bucket;
+    if (fillLava || takeLava)
+    {
+        if (!clientSide && !level->mIsClientSide
+            && level->setBlock(pos, state->setValue(LEVEL, fillLava ? LavaLevel : 0), Block::UPDATE_CLIENTS, false))
+        {
+            cauldron->setPotionId(L"");
+            cauldron->setCustomColor(0);
+            if (!player->mAbilities.mInstabuild)
+            {
+                auto result = not_null_ptr<ItemInstance>(new ItemInstance(fillLava ? Items::bucket : Items::lavaBucket));
+                held->shrink(1);
+                if (held->isEmpty())
+                    player->setItemInHand(hand, result);
+                else if (!player->addItem(result))
+                    player->drop(result, false);
+            }
+            level->updateNeighbourForOutputSignal(pos, this);
+            level->playSound({}, pos, fillLava ? SoundEvents::BUCKET_EMPTY_LAVA : SoundEvents::BUCKET_FILL_LAVA,
+                             SoundSource::eSoundSource_Blocks, 1.0f, 1.0f, 16.0f);
+        }
+        return true;
+    }
+    if (lava || held->getItem() == Items::lavaBucket)
+        return true;
+
     if (clientSide)
         return false;
 
@@ -445,12 +488,12 @@ bool CauldronBlock::hasAnalogOutputSignal(const BlockState*)
 
 int CauldronBlock::getAnalogOutputSignal(const BlockState* state, Level*, const BlockPos&)
 {
-    return (state->getValue(LEVEL) + 1) / 2;
+    return std::min(3, (state->getValue(LEVEL) + 1) / 2);
 }
 
 const BlockState* CauldronBlock::getBlockState(int data)
 {
-    return defaultBlockState()->setValue(LEVEL, data);
+    return defaultBlockState()->setValue(LEVEL, data == LavaLevel ? LavaLevel : Mth::clamp(data, 0, 6));
 }
 
 int CauldronBlock::convertBlockStateToLegacyData(const BlockState* state)
@@ -469,6 +512,18 @@ unsigned int CauldronBlock::GetInteractTooltip(const BlockTooltipDataHolder& dat
 
     boost::shared_ptr<CauldronBlockEntity> cauldron = boost::static_pointer_cast<CauldronBlockEntity>(blockEntity);
     int waterLevel = data.m_pBlockState->getValue(LEVEL);
+    const auto heldId = Item::getId(data.m_pItemInstance->getItem());
+    if (waterLevel == LavaLevel || heldId == ItemId::LAVA_BUCKET)
+    {
+        if (data.m_bCanPlace && data.m_bUseBlock)
+        {
+            if (waterLevel == LavaLevel && heldId == ItemId::BUCKET)
+                return IDS_TOOLTIPS_COLLECT;
+            if (waterLevel == 0 && heldId == ItemId::LAVA_BUCKET)
+                return IDS_TOOLTIPS_FILL;
+        }
+        return IDS_NONE;
+    }
     bool full = waterLevel >= 6;
     bool empty = waterLevel == 0;
     bool hasPotion = !empty && cauldron->getPotionId().compare(L"") != 0;
@@ -476,7 +531,7 @@ unsigned int CauldronBlock::GetInteractTooltip(const BlockTooltipDataHolder& dat
     bool hasClearWater = hasWater && !cauldron->mHasCustomColor;
     int defaultTooltip = Block::GetInteractTooltip(data);
 
-    switch (Item::getId(data.m_pItemInstance->getItem()))
+    switch (heldId)
     {
     case ItemId::WATER_BUCKET:
         if (!data.m_bUseBlock || !data.m_bCanPlace

@@ -385,6 +385,11 @@ void TextureAtlas::loadUVs()
         addIcon(false, 16, 4, L"crossbow_pulling_2");
         addIcon(false, 16, 5, L"crossbow_arrow");
         addIcon(false, 16, 6, L"crossbow_rocket");
+        addIcon(false, 17, 0, L"acacia_sign");
+        addIcon(false, 17, 1, L"birch_sign");
+        addIcon(false, 17, 2, L"dark_oak_sign");
+        addIcon(false, 17, 3, L"jungle_sign");
+        addIcon(false, 17, 4, L"spruce_sign");
         addIcon(false, 16, 7, L"kelp");
         addIcon(false, 16, 8, L"dried_kelp");
         addIcon(false, 16, 9, L"sea_pickle");
@@ -394,6 +399,15 @@ void TextureAtlas::loadUVs()
         addIcon(false, 16, 13, L"turtle_shell_piece");
         addIcon(false, 16, 14, L"trident");
         addIcon(false, 16, 15, L"phantom_membrane");
+        addIcon(false, 17, 11, L"sweet_berries");
+        addIcon(false, 17, 13, L"bell");
+        addIcon(false, 17, 12, L"banner_stencil");
+        addIcon(false, 16, 1, L"black_dye");
+        addIcon(false, 16, 2, L"blue_dye");
+        addIcon(false, 16, 3, L"brown_dye");
+        addIcon(false, 16, 4, L"white_dye");
+        addIcon(false, 17, 14, L"campfire");
+        addIcon(false, 16, 5, L"bamboo");
         ClockAtlasSprite* clock = new ClockAtlasSprite();
         TextureAtlasSprite* previousClock = mSprites[L"clock"];
         clock->initUVs(previousClock->getU0(false), previousClock->getV0(false), previousClock->getU1(false),
@@ -995,6 +1009,72 @@ void TextureAtlas::loadUVs()
         addIcon(true, 33, 13, L"birch_trapdoor");
         addIcon(true, 33, 14, L"dark_oak_trapdoor");
         addIcon(true, 33, 15, L"jungle_trapdoor");
+        addIcon(true, 31, 14, L"bamboo_stalk");
+        addIcon(true, 31, 15, L"bamboo_large_leaves");
+        addIcon(true, 34, 0, L"bamboo_shoot");
+        addIcon(true, 34, 1, L"bamboo_leaf");
+        addIcon(true, 34, 2, L"flower_lily_of_the_valley");
+        addIcon(true, 34, 3, L"flower_cornflower");
+        addIcon(true, 34, 5, L"sweet_berry_bush_stage0");
+        addIcon(true, 34, 6, L"sweet_berry_bush_stage1");
+        addIcon(true, 34, 7, L"sweet_berry_bush_stage2");
+        addIcon(true, 34, 8, L"sweet_berry_bush_stage3");
+        addIcon(true, 34, 9, L"campfire_log");
+        addIcon(true, 34, 10, L"campfire_log_lit");
+        addIcon(true, 34, 12, L"campfire");
+        addIcon(true, 34, 13, L"scaffolding_side");
+        addIcon(true, 34, 14, L"scaffolding_bottom");
+        addIcon(true, 34, 15, L"scaffolding_top");
+        addIcon(true, 35, 0, L"barrel_side");
+        addIcon(true, 35, 1, L"barrel_top");
+        addIcon(true, 35, 2, L"barrel_bottom");
+        addIcon(true, 35, 6, L"lantern");
+        addIcon(true, 35, 9, L"blast_furnace_front");
+        addIcon(true, 35, 10, L"blast_furnace_front_on");
+        addIcon(true, 35, 11, L"blast_furnace_side");
+        addIcon(true, 35, 12, L"blast_furnace_top");
+        addIcon(true, 36, 0, L"cartography_table_side1");
+        addIcon(true, 36, 1, L"cartography_table_side2");
+        addIcon(true, 36, 2, L"cartography_table_side3");
+        addIcon(true, 36, 3, L"cartography_table_top");
+        addIcon(true, 36, 4, L"lectern_sides");
+        addIcon(true, 36, 5, L"lectern_front");
+        addIcon(true, 36, 6, L"lectern_base");
+        addIcon(true, 36, 7, L"lectern_top");
+        addIcon(true, 36, 8, L"loom_side");
+        addIcon(true, 36, 9, L"loom_front");
+        addIcon(true, 36, 10, L"loom_top");
+        addIcon(true, 36, 11, L"loom_bottom");
+        addIcon(true, 36, 12, L"smithing_table_side");
+        addIcon(true, 36, 13, L"smithing_table_front");
+        addIcon(true, 36, 14, L"smithing_table_top");
+        addIcon(true, 36, 15, L"composter_top");
+        addIcon(true, 37, 0, L"fletching_table_front");
+        addIcon(true, 37, 1, L"fletching_table_side");
+        addIcon(true, 37, 2, L"fletching_table_top");
+        addIcon(true, 37, 6, L"smooth_stone");
+        addIcon(true, 37, 4, L"grindstone_axle");
+        addIcon(true, 37, 5, L"grindstone_wheel");
+        addIcon(true, 37, 6, L"grindstone_rim");
+        addIcon(true, 37, 7, L"smoker_side");
+        addIcon(true, 37, 8, L"smoker_front");
+        addIcon(true, 37, 9, L"smoker_front_on");
+        addIcon(true, 37, 10, L"smoker_top");
+        addIcon(true, 37, 11, L"smoker_bottom");
+        addIcon(true, 37, 12, L"composter_compost");
+        addIcon(true, 37, 13, L"composter_ready");
+        addIcon(true, 37, 14, L"composter_bottom");
+        addIcon(true, 37, 15, L"composter_side");
+        addIcon(true, 38, 0, L"barrel_top_open");
+        addIcon(true, 38, 1, L"smithing_table_bottom");
+        addIcon(true, 38, 12, L"grindstone_java_pivot");
+        addIcon(true, 38, 13, L"grindstone_java_side");
+        addIcon(true, 38, 14, L"grindstone_java_round");
+        addIcon(true, 38, 15, L"grindstone_java_leg");
+        addIcon(true, 39, 0, L"stonecutter_bottom");
+        addIcon(true, 39, 1, L"stonecutter_top");
+        addIcon(true, 39, 2, L"stonecutter_side");
+        addIconWithName(true, 39, 3, L"stonecutter_saw", L"stonecutter2_saw");
     }
 }
 
@@ -1007,18 +1087,40 @@ void TextureAtlas::makeTextureAnimated(TexturePack* pack, TextureAtlasSprite* sp
     }
     std::wstring parent = sprite->mParent;
     std::wstring animation = pack->getAnimationString(parent, sprite->getName(), mPath, true);
-    if (!animation.empty())
+    int defaultFrameTime = 0;
+    if (mIconType == 0 && animation.empty())
+    {
+        if (parent == L"campfire" || parent == L"stonecutter2_saw")
+            defaultFrameTime = 2;
+        else if (parent == L"campfire_log_lit")
+            defaultFrameTime = 4;
+    }
+    if (!animation.empty() || defaultFrameTime != 0)
     {
         std::wstring textureName = mPath + parent + mSpritePrefix;
         std::vector<Texture*>* textures = TextureManager::getInstance()->createTextures(textureName, mSingleImage);
-        if (textures == 0 || textures->empty())
+        if (textures == 0)
             return;
+        if (textures->empty())
+        {
+            delete textures;
+            return;
+        }
 
         Texture* texture = textures->at(0);
         sprite->init(mStitchedTexture, textures, sprite->getX(), sprite->getY(), static_cast<int>(texture->getWidth()),
                      static_cast<int>(texture->getHeight()), false);
         if (textures->size() > 1)
         {
+            if (defaultFrameTime != 0)
+            {
+                for (size_t frame = 0; frame < textures->size(); ++frame)
+                {
+                    if (frame)
+                        animation += L",";
+                    animation += std::to_wstring(frame) + L"*" + std::to_wstring(defaultFrameTime);
+                }
+            }
             mAnimatedSprites.push_back(sprite);
             sprite->loadAnimationFrames(animation);
         }
@@ -1125,6 +1227,67 @@ void TextureAtlas::stitch()
     {
         TextureAtlasSprite* sprite = it->second;
         SpriteCell cell = mSpriteCells[it->first];
+        if (mIconType == 0 && cell.row == 34 && height < 35 * cellSize)
+            cell = mSpriteCells.at(cell.column >= 13 ? L"ladder" : cell.column == 12 ? L"fire_0"
+                                : cell.column >= 9 ? L"planks_oak" : cell.column < 2 ? L"reeds"
+                                : cell.column == 2 ? L"flower_oxeye_daisy"
+                                : cell.column == 3 ? L"flower_blue_orchid" : L"flower_rose");
+        if (mIconType == 0 && cell.row == 31 && height < 32 * cellSize
+            && (it->first == L"bamboo_stalk" || it->first == L"bamboo_large_leaves"))
+            cell = mSpriteCells.at(L"reeds");
+        if (mIconType == 1 && cell.row == 16 && height < 17 * cellSize && it->first == L"bamboo")
+            cell = mSpriteCells.at(L"reeds");
+        if (mIconType == 1 && cell.row == 17 && cell.column <= 4 && height < 18 * cellSize)
+            cell = mSpriteCells.at(L"sign");
+        if (mIconType == 1 && cell.row == 17 && height >= 17 * cellSize && height < 18 * cellSize
+            && it->first.compare(0, 8, L"crossbow") == 0)
+            cell = SpriteCell(16, cell.column == 5 ? 2 : cell.column - 4);
+        if (mIconType == 1 && cell.row == 17 && height < 18 * cellSize && it->first == L"sweet_berries")
+            cell = mSpriteCells.at(L"apple");
+        if (mIconType == 1 && cell.row == 17 && height < 18 * cellSize && it->first == L"campfire")
+            cell = mSpriteCells.at(L"fireball");
+        if (mIconType == 1 && cell.row == 17 && height < 18 * cellSize && it->first == L"bell")
+            cell = mSpriteCells.at(L"ingotGold");
+        if (mIconType == 0 && cell.row == 39 && height < 40 * cellSize)
+        {
+            const wchar_t* fallback[] = {L"stonebrick", L"stoneslab_top", L"stonebrick", L"iron_block"};
+            cell = mSpriteCells.at(fallback[cell.column]);
+        }
+        if (mIconType == 0 && cell.row == 38 && height < 39 * cellSize)
+        {
+            const wchar_t* fallback[] = {L"workbench_side", L"stoneslab_side", L"stoneslab_top", L"log_big_oak"};
+            if (cell.column < 2)
+                cell = mSpriteCells.at(cell.column == 0 ? L"noteblock" : L"planks_big_oak");
+            else
+                cell = mSpriteCells.at(fallback[cell.column - 12]);
+        }
+        if (mIconType == 0 && cell.row == 37 && height < 38 * cellSize)
+        {
+            const wchar_t* fallback[] = {L"workbench_front", L"planks_birch", L"workbench_top", L"planks_birch",
+                                         L"workbench_side", L"stoneslab_side", L"stoneslab_top", L"furnace_side",
+                                         L"furnace_front", L"furnace_front_lit", L"furnace_top", L"furnace_top",
+                                         L"dirt", L"dirt_podzol_top", L"planks_oak", L"workbench_side"};
+            cell = mSpriteCells.at(fallback[cell.column]);
+        }
+        if (mIconType == 0 && cell.row == 35 && height < 36 * cellSize)
+        {
+            const wchar_t* fallback[] = {L"furnace_front", L"furnace_front_lit", L"furnace_side", L"furnace_top"};
+            cell = mSpriteCells.at(cell.column <= 2 ? L"noteblock"
+                                 : cell.column == 6 ? L"iron_block" : fallback[cell.column - 9]);
+        }
+        if (mIconType == 0 && cell.row == 36 && height < 37 * cellSize)
+        {
+            const wchar_t* fallback[] = {L"workbench_front", L"workbench_side", L"workbench_side", L"workbench_top"};
+            const wchar_t* smithing[] = {L"planks_big_oak", L"workbench_front", L"iron_block"};
+            if (cell.column == 15)
+                cell = mSpriteCells.at(L"planks_oak");
+            else if (cell.column >= 12)
+                cell = mSpriteCells.at(smithing[cell.column - 12]);
+            else if (cell.column >= 4)
+                cell = mSpriteCells.at(L"planks_oak");
+            else
+                cell = mSpriteCells.at(fallback[cell.column]);
+        }
         // Keep grid coordinates independent of UVs so switching between atlas
         // heights cannot accumulate offsets. TU80 includes native crossbows.
         if (extendedItems && cell.row == 16 && cell.column >= 2 && cell.column <= 6

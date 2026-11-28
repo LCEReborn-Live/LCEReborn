@@ -219,6 +219,30 @@ const DyeColor* Sheep::getColor()
     return DyeColor::byBlockData(mEntityData->get(gSheepSheared) & 0x0f);
 }
 
+bool Sheep::shear()
+{
+    if (!isAlive() || isSheared() || isBaby())
+        return false;
+    if (!mLevel->mIsClientSide)
+    {
+        setSheared(true);
+        int count = mRandom->nextInt(3) + 1;
+        for (int i = 0; i < count; ++i)
+        {
+            auto wool = spawnAtLocation(
+                not_null_ptr<ItemInstance>(new ItemInstance(Blocks::wool, 1, getColor()->getBlockData())), 1.0f);
+            if (wool)
+            {
+                wool->mYd += mRandom->nextFloat() * 0.05f;
+                wool->mXd += (mRandom->nextFloat() - mRandom->nextFloat()) * 0.1f;
+                wool->mZd += (mRandom->nextFloat() - mRandom->nextFloat()) * 0.1f;
+            }
+        }
+    }
+    playSound(SoundEvents::SHEEP_SHEAR, 1.0f, 1.0f);
+    return true;
+}
+
 bool Sheep::mobInteract(const boost::shared_ptr<Player>& player, InteractionHand::EInteractionHand hand)
 {
     not_null_ptr<ItemInstance> itemInstance = player->getItemInHand(hand);
@@ -228,28 +252,15 @@ bool Sheep::mobInteract(const boost::shared_ptr<Player>& player, InteractionHand
         return false;
     }
 
-    if (itemInstance->getItem() == Items::shears && !isSheared() && !isBaby())
+    if (itemInstance->getItem() == Items::shears && shear())
     {
         if (!mLevel->mIsClientSide)
         {
-            setSheared(true);
-
-            int count = mRandom->nextInt(3) + 1;
-            for (int i = 0; i < count; ++i)
-            {
-                boost::shared_ptr<ItemEntity> wool = spawnAtLocation(
-                    not_null_ptr<ItemInstance>(new ItemInstance(Blocks::wool, 1, getColor()->getBlockData())), 1.0f);
-                wool->mYd += mRandom->nextFloat() * 0.05f;
-                wool->mXd += (mRandom->nextFloat() - mRandom->nextFloat()) * 0.1f;
-                wool->mZd += (mRandom->nextFloat() - mRandom->nextFloat()) * 0.1f;
-            }
-
             player->awardStat(GenericStats::shearedEntity(EntityType::SHEEP),
                               GenericStats::param_shearedEntity(EntityType::SHEEP));
         }
 
         itemInstance->hurtAndBreak(1, player);
-        playSound(SoundEvents::SHEEP_SHEAR, 1.0f, 1.0f);
         return true;
     }
 

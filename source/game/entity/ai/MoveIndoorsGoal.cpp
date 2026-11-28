@@ -14,6 +14,7 @@
 #include "game/world/biome/Biome.hpp"
 #include "game/world/generation/Village.hpp"
 #include "game/world/generation/Villages.hpp"
+#include "game/world/generation/Villager.hpp"
 
 MoveIndoorsGoal::MoveIndoorsGoal(PathfinderMob* mob) : Goal(), mDoorInfo()
 {
@@ -26,7 +27,9 @@ bool MoveIndoorsGoal::canUse()
 {
     BlockPos pos(mMob->shared_from_this());
 
-    if (mMob->mLevel->isDay())
+    const auto* villager = dynamic_cast<Villager*>(mMob);
+    const bool alarm = villager && villager->isTakingShelter();
+    if (!alarm && mMob->mLevel->isDay())
     {
         if (!mMob->mLevel->isRaining())
             return false;
@@ -35,7 +38,7 @@ bool MoveIndoorsGoal::canUse()
             return false;
     }
 
-    if (mMob->mLevel->mDimension->isHasSkyLight() && mMob->getRandom()->nextInt(50) == 0)
+    if (mMob->mLevel->mDimension->isHasSkyLight() && (alarm || mMob->getRandom()->nextInt(50) == 0))
     {
         if (mDoorX != -1 && mMob->distanceToSqr((double)mDoorX, mMob->mY, (double)mDoorZ) < 4.0)
             return false;
@@ -72,6 +75,8 @@ void MoveIndoorsGoal::start()
     int x = pos.getX();
     int y = pos.getY();
     int z = pos.getZ();
+    const auto* villager = dynamic_cast<Villager*>(mMob);
+    const double speed = villager && villager->isTakingShelter() ? 1.45 : 1.0;
     if (mMob->distanceToSqr(pos) > 256.0)
     {
         Vec3* destination = RandomPos::getPosTowards(
@@ -79,12 +84,12 @@ void MoveIndoorsGoal::start()
             Vec3::newTemp((double)x + 0.5, (double)y, (double)z + 0.5));
         if (destination != NULL)
         {
-            mMob->getNavigation()->moveTo(destination->x, destination->y, destination->z, 1.0);
+            mMob->getNavigation()->moveTo(destination->x, destination->y, destination->z, speed);
         }
     }
     else
     {
-        mMob->getNavigation()->moveTo((double)x + 0.5, (double)y, (double)z + 0.5, 1.0);
+        mMob->getNavigation()->moveTo((double)x + 0.5, (double)y, (double)z + 0.5, speed);
     }
 }
 

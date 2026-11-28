@@ -68,6 +68,7 @@
 #include "game/core/Parrot.hpp"
 #include "game/core/Pig.hpp"
 #include "game/core/PolarBear.hpp"
+#include "game/core/Panda.hpp"
 #include "game/core/PrimedTnt.hpp"
 #include "game/core/Salmon.hpp"
 #include "game/core/SharedConstants.hpp"
@@ -505,6 +506,8 @@ void Minecraft::setScreen(Screen* screen)
         {
             if (mTicks == 0)
                 mPlayer->respawn();
+            else if (gApp.GetGameHostOption(eGameHostOption_ImmediateRespawn))
+                gApp.SetAction(mPlayer->mUserIndex, eXuiAction_Respawn, NULL);
             else
                 gConsoleUIController.NavigateToScene(mPlayer->mUserIndex, EUIScene_DeathMenu, NULL, EUILayer_Scene,
                                                      EUIGroup_PlayerDefault);
@@ -3027,6 +3030,7 @@ void MinecraftWorld_RunStaticCtors()
     Chicken::staticCtor();
     Rabbit::staticCtor();
     PolarBear::staticCtor();
+    Panda::staticCtor();
     Turtle::staticCtor();
 
     SynchedEntityData::defineId<int>(EntityType::GOLEM, EntityType::PATHFINDER_MOB, NULL);

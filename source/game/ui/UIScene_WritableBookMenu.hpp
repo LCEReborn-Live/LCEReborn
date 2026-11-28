@@ -9,10 +9,21 @@
 #include "game/ui/UIControl_Touch.hpp"
 #include "game/item/not_null_ptr.hpp"
 #include "game/core/CMinecraftApp.hpp"
+#include "game/world/block/BlockPos.hpp"
 
 class ItemInstance;
 class ListTag;
 class UILayer;
+
+struct WritingBookMenuInitData
+{
+    not_null_ptr<ItemInstance> item;
+    int player;
+    bool canEdit;
+    BlockPos position;
+    bool fromLectern;
+    int page;
+};
 
 class UIScene_WritableBookMenu : public UIScene
 {
@@ -70,6 +81,9 @@ public:
     void RetrieveTitleText();
 
 private:
+    void reportLecternPage();
+    BlockPos mLecternPos;
+    bool mFromLectern = false;
     static const int MAX_PAGES = 50;
     static const int MAX_PAGE_LENGTH = 256;
     static const int MAX_TITLE_LENGTH = 16;

@@ -1,5 +1,6 @@
 #include "game/world/block/FlowerBlock.hpp"
 #include "game/core/StringIds.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/world/block/Blocks.hpp"
 #include "game/world/block/BlockId.hpp"
 
@@ -68,11 +69,18 @@ FlowerBlock::Flower* FlowerBlock::Flower::OXEYE_DAISY = new FlowerBlock::Flower(
     FlowerBlock::FlowerCategory::RED, 8, L"oxeye_daisy", IDS_TILE_OXEYE_DAISY, IDS_DESC_DAISY, L"flower_oxeye_daisy",
     FlowerBlock::Flower::FLOWER_OXEYE_DAISY);
 
+FlowerBlock::Flower* FlowerBlock::Flower::LILY_OF_THE_VALLEY =
+    new FlowerBlock::Flower(FlowerBlock::FlowerCategory::RED, 9, L"lily_of_the_valley", IDS_LCE_TILE_LILY_OF_THE_VALLEY,
+                            IDS_DESC_FLOWER, L"flower_lily_of_the_valley", FlowerBlock::Flower::FLOWER_LILY_OF_THE_VALLEY);
+FlowerBlock::Flower* FlowerBlock::Flower::CORNFLOWER =
+    new FlowerBlock::Flower(FlowerBlock::FlowerCategory::RED, 10, L"cornflower", IDS_LCE_TILE_CORNFLOWER,
+                            IDS_DESC_FLOWER, L"flower_cornflower", FlowerBlock::Flower::FLOWER_CORNFLOWER);
+
 FlowerBlock::Flower* FlowerBlock::Flower::FLOWERS[FlowerBlock::Flower::FLOWER_COUNT] = {
     FlowerBlock::Flower::DANDELION,    FlowerBlock::Flower::POPPY,       FlowerBlock::Flower::BLUE_ORCHID,
     FlowerBlock::Flower::ALLIUM,       FlowerBlock::Flower::HOUSTONIA,   FlowerBlock::Flower::RED_TULIP,
     FlowerBlock::Flower::ORANGE_TULIP, FlowerBlock::Flower::WHITE_TULIP, FlowerBlock::Flower::PINK_TULIP,
-    FlowerBlock::Flower::OXEYE_DAISY};
+    FlowerBlock::Flower::OXEYE_DAISY, FlowerBlock::Flower::LILY_OF_THE_VALLEY, FlowerBlock::Flower::CORNFLOWER};
 
 FlowerBlock::Flower* FlowerBlock::Flower::YELLOW_FLOWERS[FlowerBlock::Flower::YELLOW_FLOWER_COUNT] = {
     FlowerBlock::Flower::DANDELION};
@@ -80,7 +88,8 @@ FlowerBlock::Flower* FlowerBlock::Flower::YELLOW_FLOWERS[FlowerBlock::Flower::YE
 FlowerBlock::Flower* FlowerBlock::Flower::RED_FLOWERS[FlowerBlock::Flower::RED_FLOWER_COUNT] = {
     FlowerBlock::Flower::POPPY,       FlowerBlock::Flower::BLUE_ORCHID, FlowerBlock::Flower::ALLIUM,
     FlowerBlock::Flower::HOUSTONIA,   FlowerBlock::Flower::RED_TULIP,   FlowerBlock::Flower::ORANGE_TULIP,
-    FlowerBlock::Flower::WHITE_TULIP, FlowerBlock::Flower::PINK_TULIP,  FlowerBlock::Flower::OXEYE_DAISY};
+    FlowerBlock::Flower::WHITE_TULIP, FlowerBlock::Flower::PINK_TULIP,  FlowerBlock::Flower::OXEYE_DAISY,
+    FlowerBlock::Flower::LILY_OF_THE_VALLEY, FlowerBlock::Flower::CORNFLOWER};
 
 FlowerBlock::Flower::Flower(FlowerCategory* category, int data, const std::wstring& name, int nameId, int descriptionId,
                             const std::wstring& iconName, EFlower id)

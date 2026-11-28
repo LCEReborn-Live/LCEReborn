@@ -40,6 +40,7 @@ ClientboundSoundPacket::ClientboundSoundPacket(const SoundEvent* sound, SoundSou
 }
 
 ClientboundSoundPacket::ClientboundSoundPacket(const SoundEvent* sound, float volume, float pitch)
+    : ClientboundSoundPacket()
 {
     playUI = true;
     looping = false;

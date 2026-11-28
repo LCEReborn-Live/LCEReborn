@@ -24,6 +24,7 @@ public:
     virtual std::wstring getName() { return L"HarvestFarmBlock"; }
 
 private:
+    bool plantCrop(Level* level, const BlockPos& pos);
     Villager* mVillager;
     bool mHasFarmSeeds;
     bool mWantsMoreFood;

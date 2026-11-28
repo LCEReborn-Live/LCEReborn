@@ -1,7 +1,7 @@
 #ifndef GAME_CORE_ABSTRACTILLAGER_HPP
 #define GAME_CORE_ABSTRACTILLAGER_HPP
 
-#include "game/entity/mob/Monster.hpp"
+#include "game/entity/mob/Raider.hpp"
 
 class Level;
 
@@ -10,10 +10,14 @@ enum EIllagerArmPose
     ILLAGER_ARM_POSE_CROSSED = 0,
     ILLAGER_ARM_POSE_ATTACKING = 1,
     ILLAGER_ARM_POSE_SPELLCASTING = 2,
-    ILLAGER_ARM_POSE_BOW_AND_ARROW = 3
+    ILLAGER_ARM_POSE_BOW_AND_ARROW = 3,
+    ILLAGER_ARM_POSE_CROSSBOW_HOLD,
+    ILLAGER_ARM_POSE_CROSSBOW_CHARGE,
+    ILLAGER_ARM_POSE_NEUTRAL,
+    ILLAGER_ARM_POSE_CELEBRATING
 };
 
-class AbstractIllager : public Monster
+class AbstractIllager : public Raider
 {
 public:
     AbstractIllager(Level* level);

@@ -1,47 +1,53 @@
 #include "game/client/render/OcelotRenderer.hpp"
 
+#include <array>
+
 #include "game/client/render/ModelDefinition.hpp"
 #include "game/client/render/OcelotModel.hpp"
 #include "game/core/GlStateManager.hpp"
+#include "game/core/Cat.hpp"
+#include "game/core/Mth.hpp"
 #include "game/core/Ocelot.hpp"
 #include "game/entity/mob/LivingEntity.hpp"
 #include "game/util/ResourceLocation.hpp"
 
-static ResourceLocation sBlackOcelotTexture(TN_MOB_CAT_BLACK);
 static ResourceLocation sOcelotTexture(TN_MOB_OZELOT);
-static ResourceLocation sRedOcelotTexture(TN_MOB_CAT_RED);
-static ResourceLocation sSiameseOcelotTexture(TN_MOB_CAT_SIAMESE);
 
-OcelotRenderer::OcelotRenderer(EntityRenderDispatcher* dispatcher) : MobRenderer(dispatcher, new OcelotModel(), 0.4F)
+OcelotRenderer::OcelotRenderer(EntityRenderDispatcher* dispatcher, bool cat)
+    : MobRenderer(dispatcher, new OcelotModel(cat ? L"cat" : L"ocelot"), 0.4F), mCat(cat)
 {
 }
 
 const ResourceLocation* OcelotRenderer::getTextureLocation(boost::shared_ptr<Entity>& entity)
 {
-    boost::shared_ptr<Ocelot> ocelot = boost::static_pointer_cast<Ocelot>(entity);
-    switch (ocelot->getCatType())
-    {
-    case 0:
-    default:
+    if (entity->GetType() != EntityType::CAT)
         return &sOcelotTexture;
-    case 1:
-        return &sBlackOcelotTexture;
-    case 2:
-        return &sRedOcelotTexture;
-    case 3:
-        return &sSiameseOcelotTexture;
-    }
+
+    static const auto textures = [] {
+        const wchar_t* names[] = {L"tuxedo", L"redtabby", L"siamesecat", L"tabby", L"white", L"ragdoll",
+                                  L"persian", L"britishshorthair", L"calico", L"jellie", L"allblackcat"};
+        std::array<std::array<ResourceLocation, 2>, Cat::AllBlack> result;
+        for (int variant = 0; variant < Cat::AllBlack; ++variant)
+        {
+            const std::wstring path = std::wstring(L"mob/cat/") + names[variant];
+            result[variant][0] = ResourceLocation(path);
+            result[variant][1] = ResourceLocation(path + L"_tame");
+        }
+        return result;
+    }();
+    const auto cat = boost::static_pointer_cast<Cat>(entity);
+    const int variant = Mth::clamp(cat->getCatType(), static_cast<int>(Cat::Tuxedo), static_cast<int>(Cat::AllBlack));
+    return &textures[variant - Cat::Tuxedo][cat->isTame() ? 1 : 0];
 }
 
 void OcelotRenderer::scale(boost::shared_ptr<LivingEntity>& entity, float partialTicks)
 {
-    boost::shared_ptr<Ocelot> ocelot = boost::static_pointer_cast<Ocelot>(entity);
     LivingEntityRenderer::scale(entity, partialTicks);
-    if (ocelot->isTame())
+    if (entity->GetType() == EntityType::CAT)
         GlStateManager::scalef(0.8F, 0.8F, 0.8F);
 }
 
 Model* OcelotRenderer::createModel(const ModelDefinition& definition)
 {
-    return new OcelotModel(definition);
+    return new OcelotModel(definition, mCat ? L"cat" : L"ocelot");
 }

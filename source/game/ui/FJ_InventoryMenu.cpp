@@ -8,8 +8,8 @@
 #include "game/ui/fuiRenderNode.hpp"
 #include "game/util/Math.hpp"
 
-static const int s_effectSlots[28] = {-1, 12, 9,  2,  14, 11, 5,  3,  6,  13, 16, 7,  8,  1,
-                                      0,  4,  10, 15, 17, 18, 19, 20, 21, 22, 23, -1, 25, 24};
+static const int s_effectSlots[30] = {-1, 12, 9,  2,  14, 11, 5,  3,  6,  13, 16, 7,  8,  1,
+                                      0,  4,  10, 15, 17, 18, 19, 20, 21, 22, 23, -1, 25, 24, 26, 27};
 
 FJ_InventoryMenu::FJ_InventoryMenu(fuiRenderNode* renderNode) : FJ_AbstractContainerDocument(renderNode)
 {
@@ -29,7 +29,7 @@ unsigned int FJ_InventoryMenu::getType()
 void FJ_InventoryMenu::InitEffectsGroup()
 {
     char name[64];
-    for (int index = 0; index < 27; ++index)
+    for (int index = 0; index < 28; ++index)
     {
         std::sprintf(name, "EffectsGroup.Effect%d", index + 1);
         m_effectNodes[index] = getChildByName(std::string(name));
@@ -78,7 +78,7 @@ void FJ_InventoryMenu::RepositionEffects()
     int y = m_effectTopY;
     int spacing = m_effectTopY - m_effectNextY;
     int active = 0;
-    for (int index = 0; index < 27; ++index)
+    for (int index = 0; index < 28; ++index)
     {
         if (m_effectActive[index] != 0)
         {
@@ -90,7 +90,7 @@ void FJ_InventoryMenu::RepositionEffects()
     {
         spacing = Math::round(static_cast<float>(m_effectTopY - m_effectBottomY) / static_cast<float>(active - 1));
     }
-    for (int index = 0; index < 27; ++index)
+    for (int index = 0; index < 28; ++index)
     {
         if (m_effectActive[index] != 0)
         {
@@ -168,7 +168,7 @@ unsigned int FJ_InventoryMenu::UpdateEffects(int count, int* effects)
             m_effectRefreshed[slot] = 1;
         }
     }
-    for (unsigned int index = 0; index < 27; ++index)
+    for (unsigned int index = 0; index < 28; ++index)
     {
         if (m_effectActive[index] != 0 && m_effectRefreshed[index] == 0)
         {

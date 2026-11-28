@@ -1,5 +1,6 @@
 #include "game/world/generation/StructureFeature.hpp"
 
+#include <algorithm>
 #include <typeinfo>
 
 #include "game/core/BoundingBox.hpp"
@@ -92,7 +93,7 @@ bool StructureFeature::postProcess(Level* level, Random& randomSource, ChunkPos*
     restoreSavedData(level);
     int minX = chunkPos->x * 16;
     int minZ = chunkPos->z * 16;
-    bool processed = false;
+    std::vector<StructureStart*> intersecting;
     for (boost::unordered_map<long long, StructureStart*>::iterator it = mStructureMap.begin();
          it != mStructureMap.end(); ++it)
     {
@@ -100,17 +101,23 @@ bool StructureFeature::postProcess(Level* level, Random& randomSource, ChunkPos*
         if (start->isValid() && start->isValidForPostProcess(chunkPos)
             && start->getBoundingBox()->intersects(minX, minZ, minX + 15, minZ + 15))
         {
-            BoundingBox box(minX, minZ, minX + 15, minZ + 15);
-            start->postProcess(level, randomSource, &box);
-            start->notifyPostProcessAt(chunkPos);
-            processed = true;
-            if (start->isDirty())
-            {
-                saveFeature(start->getChunkX(), start->getChunkZ(), start);
-            }
+            intersecting.push_back(start);
         }
     }
-    return processed;
+    std::sort(intersecting.begin(), intersecting.end(), [](StructureStart* a, StructureStart* b) {
+        if (a->getChunkX() != b->getChunkX())
+            return a->getChunkX() < b->getChunkX();
+        return a->getChunkZ() < b->getChunkZ();
+    });
+    for (auto* start : intersecting)
+    {
+        BoundingBox box(minX, minZ, minX + 15, minZ + 15);
+        start->postProcess(level, randomSource, &box);
+        start->notifyPostProcessAt(chunkPos);
+        if (start->isDirty())
+            saveFeature(start->getChunkX(), start->getChunkZ(), start);
+    }
+    return !intersecting.empty();
 }
 
 bool StructureFeature::isIntersection(int x, int z)
@@ -238,6 +245,7 @@ BlockPos* StructureFeature::findNearestFeaturePositionBySpacing(Level* levelToSe
                                                                 int salt, bool skipKnownStructures, int maxDistance,
                                                                 bool skipExistingChunks)
 {
+    feature->restoreSavedData(levelToSearch);
     int centerX = pos.x >> 4;
     int centerZ = pos.z >> 4;
     int halfSize = levelToSearch->getLevelData()->getXZSize() / 2;
@@ -254,6 +262,8 @@ BlockPos* StructureFeature::findNearestFeaturePositionBySpacing(Level* levelToSe
 
                 int chunkX = centerX + xOffset;
                 int chunkZ = centerZ + zOffset;
+                if (chunkX < -halfSize || chunkX > halfSize || chunkZ < -halfSize || chunkZ > halfSize)
+                    continue;
                 bool flatWorld = levelToSearch->getLevelData()->getGeneratorType() == LevelType::FLAT;
                 if (!feature->isFeatureChunk(chunkX, chunkZ, flatWorld))
                 {
@@ -261,15 +271,21 @@ BlockPos* StructureFeature::findNearestFeaturePositionBySpacing(Level* levelToSe
                         break;
                     continue;
                 }
-                if (chunkX < -halfSize || chunkX > halfSize || chunkZ < -halfSize || chunkZ > halfSize)
-                    continue;
                 if (skipExistingChunks && levelToSearch->isChunkGeneratedAt(chunkX, chunkZ))
+                    continue;
+                if (!feature->isLocatableChunk(chunkX, chunkZ))
                     continue;
                 return new BlockPos(chunkX * 16 + 8, 64, chunkZ * 16 + 8);
             }
         }
     }
     return NULL;
+}
+
+bool StructureFeature::isLocatableChunk(int chunkX, int chunkZ)
+{
+    const auto entry = mStructureMap.find(ChunkPos::asLong(chunkX, chunkZ));
+    return entry == mStructureMap.end() || entry->second->isValid();
 }
 
 bool StructureFeature::canPlaceFeatureInChunk(bool defaultValue, EFeatureTypes type, int chunkX, int chunkZ)

@@ -1,4 +1,5 @@
 #include "game/core/CMinecraftApp.hpp"
+#include "game/ui/UIScene_WritableBookMenu.hpp"
 #include "game/core/VirtualPadKeys.hpp"
 #include "game/core/System.hpp"
 #include "game/core/PIXNamedEvents.hpp"
@@ -27,6 +28,7 @@
 #include "game/core/ClientMasterGameMode.hpp"
 #include "game/core/MinecartHopper.hpp"
 #include "game/core/L10N.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/client/audio/ConsoleSoundEngine.hpp"
 #include "game/client/audio/SoundEngine.hpp"
 #include "game/client/render/DLCTexturePack.hpp"
@@ -205,13 +207,6 @@ struct RepairingMenuInitData
     int z;
     int player;
     bool splitscreen;
-};
-
-struct WritingBookMenuInitData
-{
-    boost::shared_ptr<ItemInstance> item;
-    int player;
-    bool signing;
 };
 
 struct InviteJoinData
@@ -473,6 +468,12 @@ void CMinecraftApp::SetGameHostOption(unsigned int& options, eGameHostOption opt
         else
             options &= ~0x10000U;
         break;
+    case eGameHostOption_ImmediateRespawn:
+        if (value != 0)
+            options |= 0x20000U;
+        else
+            options &= ~0x20000U;
+        break;
     case eGameHostOption_DisableSaving:
         if (value != 0)
             options |= 0x40000U;
@@ -607,6 +608,8 @@ uint32_t CMinecraftApp::GetGameHostOption(unsigned int options, eGameHostOption 
         return options & 0x10000U;
     case eGameHostOption_DisableSaving:
         return options & 0x40000U;
+    case eGameHostOption_ImmediateRespawn:
+        return options & 0x20000U;
     case eGameHostOption_WasntSaveOwner:
         return options & 0x80000U;
     case eGameHostOption_WorldSize:
@@ -700,6 +703,10 @@ bool CMinecraftApp::hasArchiveFile(const std::wstring& path, bool ignoreTextureP
         return true;
 
     return mMediaArchive->hasFile(path);
+}
+std::vector<std::wstring> CMinecraftApp::getBaseArchiveFiles()
+{
+    return mMediaArchive ? mMediaArchive->getFileList() : std::vector<std::wstring>();
 }
 void CMinecraftApp::InitTime()
 {
@@ -1003,6 +1010,7 @@ void CMinecraftApp::SetDefaultHostOptions()
 {
     gApp.SetGameHostOption(eGameHostOption_MobGriefing, 1);
     gApp.SetGameHostOption(eGameHostOption_KeepInventory, 0);
+    gApp.SetGameHostOption(eGameHostOption_ImmediateRespawn, 0);
     gApp.SetGameHostOption(eGameHostOption_DoMobSpawning, 1);
     gApp.SetGameHostOption(eGameHostOption_DoMobLoot, 1);
     gApp.SetGameHostOption(eGameHostOption_DoTileDrops, 1);
@@ -2364,17 +2372,12 @@ bool CMinecraftApp::LoadBeaconMenu(int player, boost::shared_ptr<Inventory> inve
     return gConsoleUIController.NavigateToScene(player, EUIScene_BeaconMenu, data, EUILayer_Scene,
                                                 EUIGroup_PlayerDefault);
 }
-bool CMinecraftApp::LoadWritingBookMenu(int player, not_null_ptr<ItemInstance> item, bool signing)
+bool CMinecraftApp::LoadWritingBookMenu(int player, not_null_ptr<ItemInstance> item, bool signing,
+                                       const BlockPos* lectern, int page)
 {
-    WritingBookMenuInitData* data = new WritingBookMenuInitData();
-    data->item = item;
-    data->player = player;
-    data->signing = signing;
-
-    const bool result = gConsoleUIController.NavigateToScene(player, EUIScene_WritableBookMenu, data, EUILayer_Scene,
-                                                             EUIGroup_PlayerDefault);
-    delete data;
-    return result;
+    WritingBookMenuInitData data{item, player, signing, lectern ? *lectern : BlockPos(), lectern != nullptr, page};
+    return gConsoleUIController.NavigateToScene(player, EUIScene_WritableBookMenu, &data, EUILayer_Scene,
+                                                EUIGroup_PlayerDefault);
 }
 bool CMinecraftApp::IsConsoleChatCensored()
 {
@@ -3639,6 +3642,10 @@ std::wstring CMinecraftApp::getEntityName(uint64_t entityType, int32_t auxValue)
         return L10N::GetString(IDS_ZOMBIE_VILLAGER);
     if (entityType == EntityType::VINDICATION_ILLAGER)
         return L10N::GetString(IDS_VINDICATION_ILLAGER);
+    if (entityType == EntityType::PILLAGER)
+        return L10N::GetString(IDS_LCE_PILLAGER);
+        if (entityType == EntityType::RAVAGER)
+            return L10N::GetString(IDS_LCE_RAVAGER);
     if (entityType == EntityType::VEX)
         return L10N::GetString(IDS_VEX);
     if (entityType == EntityType::EVOCATION_FANGS)

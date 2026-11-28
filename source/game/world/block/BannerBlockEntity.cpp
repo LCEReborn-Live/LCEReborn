@@ -83,12 +83,13 @@ void BannerBlockEntity::setItemValues(not_null_ptr<ItemInstance> item, bool useB
 {
     delete mPatterns;
     mPatterns = NULL;
+    mBaseColor = useBannerItemColor ? getColor(item) : BannerItem::getColor(item);
     CompoundTag* tag = static_cast<CompoundTag*>(item->getTagElement(BlockItem::BLOCK_ENTITY_TAG));
     if (tag != NULL && tag->contains(TAG_PATTERNS, Tag::TAG_LIST))
     {
-        mPatterns = static_cast<ListTag*>(tag->getList(TAG_PATTERNS, Tag::TAG_COMPOUND)->copy());
+        mPatterns = BannerItem::copyBannerPatterns(mBaseColor, tag->getList(TAG_PATTERNS, Tag::TAG_COMPOUND));
     }
-    mBaseColor = useBannerItemColor ? getColor(item) : BannerItem::getColor(item);
+    mIsIllagerBanner = BannerItem::isIllagerBanner(mBaseColor, mPatterns);
 
     delete mPatternList;
     delete mColorList;
@@ -159,7 +160,9 @@ void BannerBlockEntity::load(CompoundTag* tag)
     BlockEntity::load(tag);
     mCustomName->loadFromTag(tag);
     mBaseColor = DyeColor::byItemData(tag->getInt(L"Base"));
-    mPatterns = static_cast<ListTag*>(tag->getList(TAG_PATTERNS, Tag::TAG_COMPOUND)->copy());
+    delete mPatterns;
+    mPatterns = BannerItem::copyBannerPatterns(mBaseColor, tag->getList(TAG_PATTERNS, Tag::TAG_COMPOUND));
+    mIsIllagerBanner = BannerItem::isIllagerBanner(mBaseColor, mPatterns);
 
     delete mPatternList;
     delete mColorList;

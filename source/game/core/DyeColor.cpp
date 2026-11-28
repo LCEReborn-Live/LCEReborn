@@ -120,12 +120,31 @@ const DyeColor* DyeColor::byBlockData(int blockData)
 
 const DyeColor* DyeColor::byItemData(int itemData)
 {
-    if (itemData < 0 || itemData >= 16)
-    {
-        itemData = 0;
-    }
+    itemData = colorItemData(itemData);
+    return BY_ITEM_DATA[itemData >= 0 && itemData < 16 ? itemData : 0];
+}
 
-    return BY_ITEM_DATA[itemData];
+int DyeColor::colorItemData(int itemData)
+{
+    constexpr int resourceData[] = {0, 3, 4, 15};
+    return itemData >= BlackDye && itemData < DyeItemDataCount ? resourceData[itemData - BlackDye] : itemData;
+}
+
+int DyeColor::dyeItemData(int colorData)
+{
+    switch (colorData)
+    {
+    case 0: return BlackDye;
+    case 3: return BrownDye;
+    case 4: return BlueDye;
+    case 15: return WhiteDye;
+    default: return colorData;
+    }
+}
+
+bool DyeColor::matchesDyeIngredient(int expected, int actual)
+{
+    return expected == actual || colorItemData(expected) == actual;
 }
 
 int DyeColor::getBlockData() const

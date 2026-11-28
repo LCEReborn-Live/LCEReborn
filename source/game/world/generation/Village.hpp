@@ -33,6 +33,12 @@ public:
 
     void setLevel(Level* level);
     bool isInside(const BlockPos& pos);
+    double distanceToBoundaryPointsSqr(const BlockPos& pos) const;
+    int getBoundaryRange() const;
+    bool usesPointsOfInterest() const { return !mBeds.empty(); }
+    const std::vector<BlockPos>& getBeds() const { return mBeds; }
+    void setPointsOfInterest(std::vector<BlockPos> beds, std::vector<BlockPos> workSites);
+    static constexpr int POINT_RANGE = 32;
     bool canSpawnAt(const BlockPos& size, const BlockPos& pos);
     Vec3* findRandomSpawnPos(const BlockPos& pos, int xSize, int ySize, int zSize);
     bool isDoor(const BlockPos& pos);
@@ -47,6 +53,8 @@ public:
     int getDoorCount();
     int getStableAge();
     int getPopulationSize();
+    int getCatCapacity() const;
+    bool qualifiesForGolem() const;
     std::vector<boost::shared_ptr<DoorInfo> >* getDoorInfos();
     boost::shared_ptr<DoorInfo> getClosestDoorInfo(const BlockPos& pos);
     boost::shared_ptr<DoorInfo> getBestDoorInfo(const BlockPos& pos);
@@ -71,6 +79,8 @@ public:
 private:
     Level* mLevel;
     std::vector<boost::shared_ptr<DoorInfo> > mDoors;
+    std::vector<BlockPos> mBeds;
+    std::vector<BlockPos> mWorkSites;
     BlockPos mBottom;
     BlockPos mCenter;
     int mRadius;
@@ -81,6 +91,7 @@ private:
     boost::unordered_map<std::wstring, int> mPlayerStandings;
     std::vector<Aggressor*> mAggressors;
     int mGolems;
+    int mRecentlySlept = 0;
 };
 
 #endif

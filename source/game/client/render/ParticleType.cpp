@@ -60,6 +60,8 @@ const ParticleType* PARTICLE_SPIT = new ParticleType("spit", ePARTICLE_SPIT, tru
 const ParticleType* PARTICLE_BUBBLE_POP = new ParticleType("bubble_pop", ePARTICLE_BUBBLE_POP, false, 0);
 const ParticleType* PARTICLE_CURRENT_DOWN = new ParticleType("current_down", ePARTICLE_CURRENT_DOWN, false, 0);
 const ParticleType* PARTICLE_CONDUIT = new ParticleType("conduit", ePARTICLE_CONDUIT, false, 0);
+const ParticleType* PARTICLE_CAMPFIRE_SMOKE = new ParticleType("campfire_smoke", ePARTICLE_CAMPFIRE_SMOKE, false, 0);
+const ParticleType* PARTICLE_CAMPFIRE_SIGNAL_SMOKE = new ParticleType("campfire_signal_smoke", ePARTICLE_CAMPFIRE_SIGNAL_SMOKE, false, 0);
 const ParticleType* PARTICLE_CHEST_REFILL = new ParticleType("chestrefill", ePARTICLE_CHEST_REFILL, false, 0);
 const ParticleType* PARTICLE_WINNING_INSTANT_SPELL = new ParticleType("instantSpell", ePARTICLE_WINNING_INSTANT_SPELL,
                                                                       false, 0);
@@ -128,6 +130,8 @@ void ParticleType::staticCtor()
     sParticleTypes[PARTICLE_CONDUIT->getId()] = PARTICLE_CONDUIT;
     sParticleTypes[PARTICLE_CHEST_REFILL->getId()] = PARTICLE_CHEST_REFILL;
     sParticleTypes[PARTICLE_WINNING_INSTANT_SPELL->getId()] = PARTICLE_WINNING_INSTANT_SPELL;
+    sParticleTypes[PARTICLE_CAMPFIRE_SMOKE->getId()] = PARTICLE_CAMPFIRE_SMOKE;
+    sParticleTypes[PARTICLE_CAMPFIRE_SIGNAL_SMOKE->getId()] = PARTICLE_CAMPFIRE_SIGNAL_SMOKE;
 }
 
 ParticleType::ParticleType(const std::string& name, ePARTICLE_TYPE id, bool overrideLimiter, int paramCount)

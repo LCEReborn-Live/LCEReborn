@@ -11,12 +11,14 @@
 #include "game/core/SuperflatConfig.hpp"
 #include "game/util/Random.hpp"
 #include "game/world/Level.hpp"
+#include "game/world/LevelData.hpp"
 #include "game/world/LevelGenerationOptions.hpp"
 #include "game/world/biome/Biome.hpp"
 #include "game/world/biome/BiomeSource.hpp"
 #include "game/world/block/BlockPos.hpp"
+#include "game/world/chunk/ChunkPos.hpp"
 #include "game/world/generation/FlatGeneratorInfo.hpp"
-#include "game/world/generation/VillagePieces.hpp"
+#include "game/world/generation/VillageTemplatePieces.hpp"
 
 std::vector<Biome*> VillageFeature::allowedBiomes;
 
@@ -98,51 +100,31 @@ BlockPos* VillageFeature::getNearestGeneratedFeature(Level* levelIn, const Block
 StructureStart* VillageFeature::createStructureStart(int chunkX, int chunkZ)
 {
     gApp.AddTerrainFeaturePosition((_eTerrainFeatureType)3, chunkX, chunkZ);
-    return new VillageStart(level, random, chunkX, chunkZ, mVillageSize, mSize);
+    return new VillageStart(level, random, chunkX, chunkZ, mVillageSize, mSize, mTerrain);
+}
+
+bool VillageFeature::isLocatableChunk(int chunkX, int chunkZ)
+{
+    const auto saved = mStructureMap.find(ChunkPos::asLong(chunkX, chunkZ));
+    if (saved != mStructureMap.end())
+        return saved->second->isValid();
+
+    Random candidateRandom(level->getSeed());
+    setupChunkSeed(level->getSeed(), candidateRandom, chunkX, chunkZ);
+    candidateRandom.nextInt();
+    VillageStart candidate(level, candidateRandom, chunkX, chunkZ, mVillageSize, mSize, mTerrain);
+    return candidate.isValid();
 }
 
 VillageFeature::VillageStart::VillageStart(Level* levelIn, Random& random, int chunkX, int chunkZ, int size,
-                                           int distance)
+                                           int distance, GenericOverworldLevelSource* terrain)
     : StructureStart(chunkX, chunkZ),
       mValid(false),
       mDistance(distance)
 {
-    std::list<VillagePieces::PieceWeight*>* pieceSet = VillagePieces::createPieceSet(random, size);
-    VillagePieces::StartPiece* startPiece = new VillagePieces::StartPiece(
-        levelIn->getBiomeSource(), 0, random, chunkX * 16 + 2, chunkZ * 16 + 2, pieceSet, size, levelIn);
-    mPieces.push_back(startPiece);
-    startPiece->addChildren(startPiece, &mPieces, random);
-
-    std::vector<StructurePiece*>& roadPieces = startPiece->mRoadPieces;
-    std::vector<StructurePiece*>& pendingPieces = startPiece->mPendingPieces;
-    while (!roadPieces.empty() || !pendingPieces.empty())
-    {
-        if (roadPieces.empty())
-        {
-            int index = random.nextInt((int)pendingPieces.size());
-            std::vector<StructurePiece*>::iterator it = pendingPieces.begin() + index;
-            StructurePiece* piece = *it;
-            pendingPieces.erase(it);
-            piece->addChildren(startPiece, &mPieces, random);
-        }
-        else
-        {
-            int index = random.nextInt((int)roadPieces.size());
-            std::vector<StructurePiece*>::iterator it = roadPieces.begin() + index;
-            StructurePiece* piece = *it;
-            roadPieces.erase(it);
-            piece->addChildren(startPiece, &mPieces, random);
-        }
-    }
-
+    VillageTemplatePieces::generate(levelIn, terrain, random, chunkX, chunkZ, size, distance, mPieces);
     calculateBoundingBox();
-    int nonRoadCount = 0;
-    for (std::vector<StructurePiece*>::iterator pieceIt = mPieces.begin(); pieceIt != mPieces.end(); ++pieceIt)
-    {
-        if (dynamic_cast<VillagePieces::VillageRoadPiece*>(*pieceIt) == NULL)
-            ++nonRoadCount;
-    }
-    mValid = nonRoadCount > 2;
+    mValid = mPieces.size() >= 6;
 }
 
 VillageFeature::VillageStart::VillageStart() : StructureStart(), mValid(false), mDistance(0)
@@ -156,12 +138,20 @@ StructureStart* VillageFeature::VillageStart::Create()
 
 bool VillageFeature::VillageStart::isValid()
 {
+    if (!mValid)
+        return false;
     if (mBoundingBox->x0 < -mDistance / 2 || mBoundingBox->x1 > mDistance / 2 || mBoundingBox->z0 < -mDistance / 2
         || mBoundingBox->z1 > mDistance / 2)
     {
         mValid = false;
     }
     return mValid;
+}
+
+void VillageFeature::VillageStart::load(Level* level, DataInputStream* input)
+{
+    mDistance = level->getLevelData()->getXZSize() * 16;
+    StructureStart::load(level, input);
 }
 
 void VillageFeature::VillageStart::addAdditionalSaveData(DataOutputStream* output)

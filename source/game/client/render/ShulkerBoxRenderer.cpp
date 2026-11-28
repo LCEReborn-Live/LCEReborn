@@ -151,8 +151,8 @@ void ShulkerBoxRenderer::render(boost::shared_ptr<BlockEntity> blockEntity, doub
     }
     else
     {
-        const int colour = Minecraft::GetInstance()->getColourTable()->getColour(
-            shulker->getColor()->getShulkerColor());
+        const auto* dye = shulker->getColor();
+        const int colour = dye ? Minecraft::GetInstance()->getColourTable()->getColour(dye->getShulkerColor()) : 0xffffff;
         GlStateManager::color4f((float)((colour >> 16) & 0xFF) / 255.0F, (float)((colour >> 8) & 0xFF) / 255.0F,
                                 (float)(colour & 0xFF) / 255.0F, alpha);
         if (mModel->hasOverriddenParts())

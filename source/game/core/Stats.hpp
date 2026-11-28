@@ -31,6 +31,7 @@ public:
     static Stat* mg03BestTimeScoreChallenge;
     static Stat* mg03BestTime;
     static Stat* befriendsWolf;
+    static Stat* befriendsCat;
     static Stat* totalBlocksMined;
     static Stat* timePlayed;
     static Stat* killsEnderdragon;

@@ -5,6 +5,9 @@
 #include "game/client/render/BannerRenderer.hpp"
 #include "game/client/render/BeaconRenderer.hpp"
 #include "game/client/render/BedRenderer.hpp"
+#include "game/client/render/BellRenderer.hpp"
+#include "game/client/render/CampfireRenderer.hpp"
+#include "game/client/render/LecternRenderer.hpp"
 #include "game/client/render/ChestRenderer.hpp"
 #include "game/client/render/ConduitRenderer.hpp"
 #include "game/client/render/EnderChestRenderer.hpp"
@@ -63,6 +66,9 @@ BlockEntityRenderDispatcher::BlockEntityRenderDispatcher()
     (*this)[BlockEntityType::SHULKER_BOX] = new ShulkerBoxRenderer(new ShulkerModel());
     (*this)[BlockEntityType::BED] = new BedRenderer();
     (*this)[BlockEntityType::CONDUIT] = new ConduitRenderer();
+    (*this)[BlockEntityType::BELL] = new BellRenderer();
+    (*this)[BlockEntityType::CAMPFIRE] = new CampfireRenderer();
+    (*this)[BlockEntityType::LECTERN] = new LecternRenderer();
 
     GlStateManager::disableLighting();
     for (iterator it = begin(); it != end(); ++it)

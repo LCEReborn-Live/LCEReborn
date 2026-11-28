@@ -11,6 +11,7 @@
 #include "game/core/L10N.hpp"
 #include "game/core/Minecraft.hpp"
 #include "game/item/Inventory.hpp"
+#include "game/item/ItemInstance.hpp"
 #include "game/minigame/Tutorial.hpp"
 #include "game/ui/HorseInventoryMenu.hpp"
 #include "game/ui/FJ_HorseInventoryMenu.hpp"
@@ -53,8 +54,9 @@ UIScene_HorseInventoryMenu::UIScene_HorseInventoryMenu(int player, void* data, U
     }
     else
     {
-        const bool llama = eTYPE_DERIVED_FROM(EntityType::LLAMA, m_horse->GetType());
-        if (llama)
+        if (m_horse->GetType() == EntityType::TRADER_LLAMA)
+            m_horseLabel.init(UIString(m_horse->getName()));
+        else if (m_horse->GetType() == EntityType::LLAMA)
             m_horseLabel.init(UIString(L10N::GetString(IDS_LLAMA)));
         else
         {
@@ -549,7 +551,7 @@ void UIScene_HorseInventoryMenu::setUp(bool enabled)
     }
     else
     {
-        const bool llama = eTYPE_DERIVED_FROM(EntityType::LLAMA, m_horse->GetType());
+        const bool llama = m_horse->GetType() == EntityType::LLAMA || m_horse->GetType() == EntityType::TRADER_LLAMA;
         SetInventoryType(llama ? 2 : 0);
         m_armorSlot.addSlots(1, 1);
     }
@@ -637,6 +639,23 @@ UIControl* UIScene_HorseInventoryMenu::getSection(IUIScene_AbstractContainerMenu
         break;
     }
     return control;
+}
+
+void UIScene_HorseInventoryMenu::render(int width, int height, C4JRender::eViewportType viewport)
+{
+    if (m_movie && !m_reloading && m_hasTicked)
+    {
+        const auto isEmpty = [this](int id) {
+            auto* slot = m_menu->getSlot(id);
+            return !slot->hasItem() && m_menu->GetQuickCraftItem(m_playerId, slot->mIndex)->isEmpty();
+        };
+        const bool saddle = m_horse->canBeSaddled() && isEmpty(0);
+        const bool equipment = m_horse->wearsArmor() && isEmpty(1);
+        const bool llama = m_horse->GetType() == EntityType::LLAMA || m_horse->GetType() == EntityType::TRADER_LLAMA;
+        auto* document = static_cast<FJ_HorseInventoryMenu*>(m_movie->getRootNode()->getFuiNode());
+        document->SetEquipmentHints(saddle, equipment && !llama, equipment && llama);
+    }
+    UIScene_AbstractContainerMenu::render(width, height, viewport);
 }
 
 void UIScene_HorseInventoryMenu::customDraw(const char* name, fuiRect* rect)

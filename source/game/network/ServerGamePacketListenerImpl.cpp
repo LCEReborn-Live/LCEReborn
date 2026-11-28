@@ -1,4 +1,5 @@
 #include "game/network/ServerGamePacketListenerImpl.hpp"
+#include "game/ui/TwoInputMenu.hpp"
 #include "game/item/ShieldItem.hpp"
 #include "game/core/EntityType.hpp"
 #include "game/core/GameRules.hpp"
@@ -58,6 +59,7 @@
 #include "game/core/CConsoleMinecraftApp.hpp"
 #include "game/core/CMinecraftApp.hpp"
 #include "game/core/DataInputStream.hpp"
+#include "game/world/block/LecternBlock.hpp"
 #include "game/core/DLCSkinFile.hpp"
 #include "game/core/Minecraft.hpp"
 #include "game/world/generation/MultiplayerLocalPlayer.hpp"
@@ -1056,7 +1058,9 @@ void ServerGamePacketListenerImpl::handleContainerClick(boost::shared_ptr<Server
     {
         mPlayer->mConnection->send(boost::shared_ptr<Packet>(
             new ClientboundContainerAckPacket(packet->getContainerId(), packet->getUid(), true)));
-        mPlayer->mIsChangingQuantityOnly = true;
+        // Workstations calculate results on the server and send back the
+        // authoritative slots and carried stack after a click.
+        mPlayer->mIsChangingQuantityOnly = dynamic_cast<TwoInputMenu*>(menu) == nullptr;
         mPlayer->mContainerMenu->broadcastChanges();
         mPlayer->broadcastCarriedItem();
         mPlayer->mIsChangingQuantityOnly = false;
@@ -1386,6 +1390,28 @@ bool ServerGamePacketListenerImpl::usesWideCoordinates()
 void ServerGamePacketListenerImpl::handleCustomPayload(boost::shared_ptr<ServerboundCustomPayloadPacket> packet)
 {
     std::wstring identifier = packet->getIdentifier();
+    if (identifier == LecternBlock::PageMessage)
+    {
+        auto data = packet->getData();
+        if (data.length != 4 * sizeof(int) || !data.data || mPlayer->isSpectator()
+            || !mPlayer->isAllowedToUse(Blocks::lectern))
+            return;
+        ByteArrayInputStream bytes(data);
+        DataInputStream input(&bytes);
+        const int x = input.readInt();
+        const int y = input.readInt();
+        const int z = input.readInt();
+        const int page = input.readInt();
+        bytes.reset();
+        input.close();
+
+        auto* level = mPlayer->getLevel();
+        const BlockPos pos(x, y, z);
+        if (level && !level->isOutsideBuildHeight(pos) && mPlayer->distanceToSqr(pos) <= 64
+            && level->hasChunkAt(pos) && level->mayInteract(mPlayer, pos, Blocks::lectern))
+            static_cast<LecternBlock*>(Blocks::lectern)->turnPage(level, pos, page);
+        return;
+    }
     if (ServerboundCustomPayloadPacket::CUSTOM_BOOK_PACKET == identifier)
     {
         ByteArrayInputStream bytes(packet->getData());
@@ -1631,7 +1657,10 @@ void ServerGamePacketListenerImpl::handleTradeItem(boost::shared_ptr<TradeItemPa
     if (mPlayer->mContainerMenu->m_containerId != packet->containerId)
         return;
 
-    MerchantMenu* menu = static_cast<MerchantMenu*>(mPlayer->mContainerMenu);
+    auto* menu = dynamic_cast<MerchantMenu*>(mPlayer->mContainerMenu);
+    if (!menu || !menu->stillValid(mPlayer))
+        return;
+
     MerchantRecipeList* offers = menu->getMerchant()->getOffers(mPlayer);
     if (offers == 0)
         return;
@@ -1641,17 +1670,24 @@ void ServerGamePacketListenerImpl::handleTradeItem(boost::shared_ptr<TradeItemPa
         return;
 
     MerchantRecipe* recipe = offers->at(itemIndex);
-    if (recipe->isDeprecated())
+    if (offers->isLocked(recipe) || recipe->isDeprecated())
+    {
+        mPlayer->sendTradeOffers();
         return;
+    }
 
     not_null_ptr<ItemInstance> buyA = recipe->getBuyAItem();
     not_null_ptr<ItemInstance> buyB = recipe->getBuyBItem();
     int buyACount = mPlayer->mInventory->countMatches(buyA);
     int buyBCount = mPlayer->mInventory->countMatches(buyB);
-    if (buyA->isEmpty() || buyA->getCount() > buyACount || (!buyB->isEmpty() && buyB->getCount() > buyBCount))
+    const int requiredA = buyA->getCount() + (buyA->sameItem(buyB) ? buyB->getCount() : 0);
+    if (buyA->isEmpty() || requiredA > buyACount || (!buyB->isEmpty() && buyB->getCount() > buyBCount))
+    {
+        mPlayer->refreshContainer(menu);
+        mPlayer->sendTradeOffers();
         return;
+    }
 
-    menu->getMerchant()->notifyTrade(recipe);
     mPlayer->mInventory->removeResources(buyA);
     mPlayer->mInventory->removeResources(buyB);
 
@@ -1659,6 +1695,10 @@ void ServerGamePacketListenerImpl::handleTradeItem(boost::shared_ptr<TradeItemPa
     mPlayer->awardStat(GenericStats::itemsBought(sell->getItem()), GenericStats::param_itemsBought(sell));
     if (!mPlayer->mInventory->add(sell))
         mPlayer->drop(sell, false);
+    menu->getMerchant()->notifyTrade(recipe);
+    menu->slotsChanged();
+    mPlayer->refreshContainer(menu);
+    mPlayer->sendTradeOffers();
 }
 void ServerGamePacketListenerImpl::handleDebugOptions(boost::shared_ptr<DebugOptionsPacket> packet)
 {
@@ -1777,7 +1817,8 @@ void ServerGamePacketListenerImpl::handleServerSettingsChanged(boost::shared_ptr
                                                eGameHostOption_MobGriefing,         eGameHostOption_KeepInventory,
                                                eGameHostOption_DoMobSpawning,       eGameHostOption_DoMobLoot,
                                                eGameHostOption_DoTileDrops,         eGameHostOption_DoDaylightCycle,
-                                               eGameHostOption_NaturalRegeneration, eGameHostOption_DoWeatherCycle};
+                                               eGameHostOption_NaturalRegeneration, eGameHostOption_DoWeatherCycle,
+                                               eGameHostOption_ImmediateRespawn};
             for (unsigned int i = 0; i < sizeof(options) / sizeof(options[0]); ++i)
                 gApp.SetGameHostOption(options[i], gApp.GetGameHostOption(packet->mValue, options[i]));
 
@@ -1805,6 +1846,7 @@ void ServerGamePacketListenerImpl::handleServerSettingsChanged(boost::shared_ptr
         else
         {
             gApp.SetGameHostOption(eGameHostOption_KeepInventory, 0);
+            gApp.SetGameHostOption(eGameHostOption_ImmediateRespawn, 0);
             gApp.SetGameHostOption(eGameHostOption_MobGriefing, 1);
             gApp.SetGameHostOption(eGameHostOption_DoMobSpawning, 1);
             gApp.SetGameHostOption(eGameHostOption_DoDaylightCycle, 1);

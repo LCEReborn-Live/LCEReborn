@@ -52,6 +52,7 @@ public:
     virtual bool isAttackable();
     void setOwner(const std::wstring& owner);
     void setThrower(const std::wstring& thrower);
+    void setCatGiftRecipient(const std::wstring& uuid);
     void setNoPickUpDelay();
     void setNeverPickUp();
     void setPickUpDelay(int delay);
@@ -67,6 +68,7 @@ private:
     int mHealth;
     std::wstring mThrower;
     std::wstring mOwner;
+    std::wstring mCatGiftRecipient;
 
 public:
     float mBobOffs;

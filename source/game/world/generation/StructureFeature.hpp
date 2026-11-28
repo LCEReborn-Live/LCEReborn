@@ -60,6 +60,7 @@ public:
     bool hasStructureAt(const BlockPos& pos);
 
 protected:
+    virtual bool isLocatableChunk(int chunkX, int chunkZ);
     boost::shared_ptr<StructureFeatureSavedData> mSavedData;
     boost::unordered_map<long long, StructureStart*> mStructureMap;
 };

@@ -71,6 +71,8 @@
 #include "game/world/generation/BonusChestFeature.hpp"
 #include "game/world/generation/PlayerList.hpp"
 #include "game/world/generation/VillageSiege.hpp"
+#include "game/entity/mob/PatrolSpawner.hpp"
+#include "game/world/generation/Raids.hpp"
 #include "game/world/generation/Villages.hpp"
 #include "platform/C4JEventArrayImpl.hpp"
 #include "platform/C4JThreadImpl.hpp"
@@ -401,6 +403,26 @@ Level* ServerLevel::postConstruct()
         mVillages->setLevel(this);
     }
     serverScoreboard = new ServerScoreboard(server);
+    if (mDimension->getType() == DimensionType::OVERWORLD)
+    {
+        mPatrolSpawner = boost::static_pointer_cast<PatrolSpawner>(
+            mSavedDataStorage->get(typeid(PatrolSpawner), L"patrols"));
+        if (!mPatrolSpawner)
+        {
+            mPatrolSpawner.reset(new PatrolSpawner());
+            mSavedDataStorage->set(L"patrols", mPatrolSpawner);
+        }
+    }
+    if (mDimension->getType() == DimensionType::OVERWORLD)
+    {
+        mRaids = boost::static_pointer_cast<Raids>(mSavedDataStorage->get(typeid(Raids), L"raids"));
+        if (!mRaids)
+        {
+            mRaids.reset(new Raids());
+            mSavedDataStorage->set(L"raids", mRaids);
+        }
+        mRaids->setLevel(this);
+    }
     mLootTables = new LootTables();
     return this;
 }
@@ -571,6 +593,9 @@ void ServerLevel::tick()
 
     PIXBeginNamedEvent(0.0f, "Tick villages");
     mVillages->tick();
+    if (mRaids) mRaids->tick();
+    if (mPatrolSpawner)
+        mPatrolSpawner->tick(*this, mSpawnEnemies);
     villageSiege->tick();
     PIXEndNamedEvent();
 

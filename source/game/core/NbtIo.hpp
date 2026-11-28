@@ -16,6 +16,7 @@ public:
     static Tag* readUnnamedTag(DataInput* input, int depth);
     static CompoundTag* read(DataInput* input);
     static CompoundTag* readCompressed(InputStream* stream);
+    static CompoundTag* readChecked(arrayWithLength<unsigned char> bytes);
     static void writeUnnamedTag(Tag* tag, DataOutput* output);
     static void write(CompoundTag* tag, DataOutput* output);
     static void writeCompressed(CompoundTag* tag, OutputStream* stream);

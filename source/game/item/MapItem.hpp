@@ -41,6 +41,7 @@ public:
     virtual void registerIcons(IconRegister* iconRegister);
 
 private:
+    static void lockMap(not_null_ptr<ItemInstance> item, Level* level);
     TextureAtlasSprite* mIcon;
 };
 

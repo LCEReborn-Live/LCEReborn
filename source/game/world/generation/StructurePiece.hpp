@@ -87,7 +87,10 @@ enum EStructurePiece
     eStructurePiece_WoodlandMansionPiece = 62,
     eStructurePiece_BuriedTreasurePiece = 63,
     eStructurePiece_ShipwreckPiece = 64,
-    eStructurePiece_OceanRuin = 65
+    eStructurePiece_OceanRuin = 65,
+    eStructurePiece_ModernVillagePlot = 66,
+    eStructurePiece_VillageTemplate = 67,
+    eStructurePiece_OutpostTemplate = 68
 };
 
 class StructurePiece

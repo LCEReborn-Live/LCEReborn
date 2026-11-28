@@ -1,4 +1,6 @@
 #include "game/network/ClientPacketListener.hpp"
+#include "game/entity/mob/EntityEvent.hpp"
+#include "game/util/ResourceLocation.hpp"
 
 #include "game/core/ChatScreen.hpp"
 #include "game/core/LceLeaderboardManager.hpp"
@@ -200,6 +202,7 @@
 #include "game/network/ClientboundRemoveMobEffectPacket.hpp"
 #include "game/network/ClientboundSetEntityDataPacket.hpp"
 #include "game/network/ClientboundSetEntityLinkPacket.hpp"
+#include "game/network/PendingEntityLinks.hpp"
 #include "game/network/ClientboundSetPassengersPacket.hpp"
 #include "game/network/ClientboundSetPlayerTeamPacket.hpp"
 #include "game/network/ClientboundSetSpawnPositionPacket.hpp"
@@ -293,7 +296,6 @@ void replaceFirst(std::wstring& value, const std::wstring& key, const std::wstri
 }
 
 C4JCriticalSection ClientPacketListener::s_deferredLinkMutex;
-std::vector<ClientPacketListener::DeferredEntityLinkPacket> ClientPacketListener::s_deferredLinks;
 
 ClientPacketListener::ClientPacketListener(Minecraft* minecraft, Socket* socket, int playerId)
     : m_closed(false),
@@ -318,6 +320,7 @@ ClientPacketListener::ClientPacketListener(Minecraft* minecraft, Socket* socket,
       m_nextMap(0)
 {
     InitializeCriticalSection(&m_mutex);
+    mPendingEntityLinks.reset(new PendingEntityLinks());
     m_savedDataStorage = new SavedDataMemoryStorage();
     if (playerId < 0)
         m_playerId = gProfile->GetPrimaryPad();
@@ -414,6 +417,12 @@ void ClientPacketListener::handleBlockEntityDataInternal(boost::shared_ptr<Clien
         break;
     case 11:
         loadTag = eTYPE_DERIVED_FROM(BlockEntityType::BED, blockEntity->GetType());
+        break;
+    case 14:
+        loadTag = eTYPE_DERIVED_FROM(BlockEntityType::CAMPFIRE, blockEntity->GetType());
+        break;
+    case 15:
+        loadTag = eTYPE_DERIVED_FROM(BlockEntityType::LECTERN, blockEntity->GetType());
         break;
     default:
         break;
@@ -809,32 +818,8 @@ boost::shared_ptr<Entity> ClientPacketListener::getEntity(int entityId)
 void ClientPacketListener::checkDeferredEntityLinkPackets(int entityId)
 {
     EnterCriticalSection(&s_deferredLinkMutex);
-    if (!s_deferredLinks.empty())
-    {
-        for (unsigned int i = 0; i < s_deferredLinks.size(); i++)
-        {
-            DeferredEntityLinkPacket* deferred = &s_deferredLinks[i];
-            bool remove = false;
-            int deltaTime = GetTickCount() - deferred->mTick;
-            if (deltaTime < 1000)
-            {
-                if (deferred->mPacket->getDestId() == entityId)
-                {
-                    handleEntityLinkPacket(deferred->mPacket);
-                    remove = true;
-                }
-            }
-            else
-            {
-                remove = true;
-            }
-            if (remove)
-            {
-                s_deferredLinks.erase(s_deferredLinks.begin() + i);
-                i--;
-            }
-        }
-    }
+    if (m_level)
+        mPendingEntityLinks->entityAdded(*m_level, entityId);
     LeaveCriticalSection(&s_deferredLinkMutex);
 }
 
@@ -1215,6 +1200,7 @@ void ClientPacketListener::handleAddPlayer(boost::shared_ptr<ClientboundAddPlaye
 
     if (m_level != NULL)
         m_level->putEntity(packet->getEntityId(), player);
+    checkDeferredEntityLinkPackets(packet->getEntityId());
 
     std::vector<DataItem*>* unpackedData = packet->getUnpackedData();
     if (unpackedData != NULL)
@@ -1364,7 +1350,12 @@ void ClientPacketListener::handleRemoveEntity(boost::shared_ptr<ClientboundRemov
     if (m_level != 0)
     {
         for (unsigned int i = 0; i < packet->entityIds.length; ++i)
+        {
+            EnterCriticalSection(&s_deferredLinkMutex);
+            mPendingEntityLinks->entityRemoved(packet->entityIds.data[i]);
+            LeaveCriticalSection(&s_deferredLinkMutex);
             m_level->removeEntity(packet->entityIds.data[i]);
+        }
     }
 }
 
@@ -1765,6 +1756,9 @@ void ClientPacketListener::handleChat(boost::shared_ptr<ClientboundChatPacket> p
 
     switch (packet->message)
     {
+    case ClientboundChatPacket::eChatPacketMessage_RaidExpired:
+        text = L10N::GetString(0x48d072ea);
+        break;
     case ClientboundChatPacket::eChatPacketMessage_BedOccupied:
         text = L10N::GetString(IDS_TILE_BED_OCCUPIED);
         break;
@@ -2714,6 +2708,7 @@ void ClientPacketListener::handleAddMob(boost::shared_ptr<ClientboundAddMobPacke
         CompoundTag* tag = packet->getAdditionalContructionDataTag();
         if (tag != 0)
             living->readAdditionContructionTag(tag);
+        checkDeferredEntityLinkPackets(living->getId());
     }
 }
 
@@ -2755,36 +2750,9 @@ void ClientPacketListener::handleEntityLinkPacket(boost::shared_ptr<ClientboundS
 {
     if (m_level == 0)
         return;
-    MultiPlayerLevel* level = dynamic_cast<MultiPlayerLevel*>(m_level);
-    if (level == 0)
-        return;
-    boost::shared_ptr<Entity> source = level->getEntity(packet->getSourceId());
-    boost::shared_ptr<Entity> dest = level->getEntity(packet->getDestId());
-    if (dest == 0 && packet->getDestId() >= 0)
-    {
-        EnterCriticalSection(&s_deferredLinkMutex);
-        s_deferredLinks.push_back(DeferredEntityLinkPacket(packet));
-        LeaveCriticalSection(&s_deferredLinkMutex);
-        return;
-    }
-    if (source == 0)
-        return;
-    if (eTYPE_DERIVED_FROM(EntityType::MOB, source->GetType()))
-    {
-        boost::shared_ptr<Mob> mob = boost::static_pointer_cast<Mob>(source);
-        if (dest != 0)
-            mob->setLeashedTo(dest, false);
-        else
-            mob->dropLeash(false, false);
-    }
-    else if (eTYPE_DERIVED_FROM(EntityType::BOAT, source->GetType()))
-    {
-        boost::shared_ptr<Boat> boat = boost::static_pointer_cast<Boat>(source);
-        if (dest != 0)
-            boat->setLeashedTo(dest, false);
-        else
-            boat->dropLeash(false, false);
-    }
+    EnterCriticalSection(&s_deferredLinkMutex);
+    mPendingEntityLinks->receive(*m_level, packet);
+    LeaveCriticalSection(&s_deferredLinkMutex);
 }
 
 void ClientPacketListener::handleEntityEvent(boost::shared_ptr<ClientboundEntityEventPacket> packet)
@@ -2793,6 +2761,18 @@ void ClientPacketListener::handleEntityEvent(boost::shared_ptr<ClientboundEntity
     if (entity == 0)
         return;
     const unsigned char eventId = packet->getEventId();
+    if (eventId == EntityEvent::RAID_HERO_REWARD || eventId == EntityEvent::RAID_BAD_OMEN)
+    {
+        if (entity == m_minecraft->mLocalPlayers[m_playerId])
+        {
+            static const ResourceLocation heroIcon(L"misc/village_hero_effect");
+            static const ResourceLocation omenIcon(L"misc/bad_omen_effect");
+            const auto* icon = eventId == EntityEvent::RAID_HERO_REWARD ? &heroIcon : &omenIcon;
+            if (File(L"Common/res/TitleUpdate/res/" + icon->getPath() + L".png").exists())
+                m_minecraft->mGameRenderer->displayIconActivation(icon, m_playerId);
+        }
+        return;
+    }
     if (eventId == 0x15)
     {
         m_minecraft->mSoundEngine->ConsoleSoundEngine::play(
@@ -2967,6 +2947,9 @@ void ClientPacketListener::handleRespawn(boost::shared_ptr<ClientboundRespawnPac
         }
 
         m_level->removeEntity(m_minecraft->mLocalPlayers[m_playerId]);
+        EnterCriticalSection(&s_deferredLinkMutex);
+        mPendingEntityLinks->clear();
+        LeaveCriticalSection(&s_deferredLinkMutex);
         m_level = level;
 
         boost::shared_ptr<MultiplayerLocalPlayer> activePlayer = m_minecraft->mPlayer;
@@ -3054,12 +3037,12 @@ void ClientPacketListener::handleContainerOpen(boost::shared_ptr<ClientboundCont
     }
     else if (packet->getType() == ClientboundContainerOpenPacket::TRADER_NPC)
     {
-        boost::shared_ptr<Villager> villager = boost::dynamic_pointer_cast<Villager>(getEntity(packet->getEntityId()));
+        const auto entity = getEntity(packet->getEntityId());
+        const auto npc = boost::dynamic_pointer_cast<Merchant>(entity);
         boost::shared_ptr<Player> trader = player;
-        boost::shared_ptr<ClientSideMerchant> merchant(
-            new ClientSideMerchant(trader, packet->hasCustomName() ? packet->getTitle() : villager->getDisplayName()));
-        merchant->setVillager(villager);
-        const std::wstring name = packet->hasCustomName() ? packet->getTitle() : villager->getDisplayName();
+        const std::wstring name = packet->hasCustomName() || !npc ? packet->getTitle() : npc->getDisplayName();
+        boost::shared_ptr<ClientSideMerchant> merchant(new ClientSideMerchant(trader, name));
+        merchant->setMerchantEntity(entity);
         if (player->openTrading(merchant, name, packet->getEntityId()))
             player->mContainerMenu->m_containerId = packet->getContainerId();
         else
@@ -3709,10 +3692,10 @@ void ClientPacketListener::handleCustomPayload(boost::shared_ptr<ClientboundCust
         {
             if (containerId == m_minecraft->mLocalPlayers[m_playerId]->mContainerMenu->m_containerId)
             {
-                UIScene_TradingMenu* tradingMenu = static_cast<UIScene_TradingMenu*>(
+                auto* tradingMenu = dynamic_cast<UIScene_TradingMenu*>(
                     gConsoleUIController.GetTopScene(m_playerId, EUILayer_Scene, EUIGroup_PlayerDefault));
-                boost::shared_ptr<Merchant> merchant = tradingMenu->getMerchant();
-                merchant->overrideOffers(MerchantRecipeList::createFromStream(&input));
+                if (tradingMenu)
+                    tradingMenu->setOffers(MerchantRecipeList::createFromStream(&input));
             }
         }
     }
@@ -4454,12 +4437,4 @@ void ClientPacketListener::handleVote(boost::shared_ptr<VotePacket> packet)
 void ClientPacketListener::staticCtor()
 {
     InitializeCriticalSection(&s_deferredLinkMutex);
-}
-
-
-ClientPacketListener::DeferredEntityLinkPacket::DeferredEntityLinkPacket(
-    boost::shared_ptr<ClientboundSetEntityLinkPacket> packet)
-{
-    mTick = GetTickCount();
-    mPacket = packet;
 }

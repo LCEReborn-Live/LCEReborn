@@ -12,6 +12,7 @@
 #include "game/core/Merchant.hpp"
 #include "game/core/Rarity.hpp"
 #include "game/core/Minecraft.hpp"
+#include "game/core/Mth.hpp"
 #include "game/core/StringUtils.hpp"
 #include "game/item/Inventory.hpp"
 #include "game/item/Item.hpp"
@@ -33,7 +34,9 @@
 #include "game/world/generation/Player.hpp"
 #include "game/core/GameSettings.hpp"
 
+#include <algorithm>
 #include <cstdio>
+#include <memory>
 
 extern ConsoleUIController gConsoleUIController;
 
@@ -44,6 +47,9 @@ struct TradingMenuData
     Level* level;
 };
 
+// Display-only slots follow the merchant container slots and seven offer icons.
+static constexpr int TradeResultSlot = 48;
+
 UIScene_TradingMenu::UIScene_TradingMenu(int iPad, void* initData, UILayer* layer)
     : UIScene(iPad, layer),
       m_merchant(),
@@ -52,6 +58,7 @@ UIScene_TradingMenu::UIScene_TradingMenu(int iPad, void* initData, UILayer* laye
       m_tradingBar(),
       m_request1(),
       m_request2(),
+      m_result(),
       m_hotBar(),
       m_inventory(),
       m_inventoryLabel(),
@@ -61,7 +68,6 @@ UIScene_TradingMenu::UIScene_TradingMenu(int iPad, void* initData, UILayer* laye
       m_request2Label()
 {
     initialiseMovie();
-    m_tradeCount = 0;
     m_tradeFocusSet = false;
     m_scrollRightShown = true;
     m_merchantMenu = NULL;
@@ -93,6 +99,7 @@ UIScene_TradingMenu::UIScene_TradingMenu(int iPad, void* initData, UILayer* laye
     m_request1.addSlots(0x27, 1);
     m_request2.addSlots(0x28, 1);
     m_tradingBar.addSlots(0x29, 7);
+    m_result.addSlot(TradeResultSlot);
     m_inventory.addSlots(3, 0x1b);
     m_hotBar.addSlots(0x1e, 9);
 
@@ -111,13 +118,10 @@ UIScene_TradingMenu::UIScene_TradingMenu(int iPad, void* initData, UILayer* laye
 
 UIScene_TradingMenu::~UIScene_TradingMenu()
 {
+    const auto& player = Minecraft::GetInstance()->mLocalPlayers[m_playerId];
+    if (player && player->mContainerMenu == m_merchantMenu)
+        player->closeContainer();
     delete m_merchantMenu;
-    if (Minecraft::GetInstance()->mLocalPlayers[m_playerId].get() != 0)
-    {
-        if (Minecraft::GetInstance()->mLocalPlayers[m_playerId].get()->mContainerMenu->m_containerId
-            == m_merchantMenu->m_containerId)
-            Minecraft::GetInstance()->mLocalPlayers[m_playerId].get()->closeContainer();
-    }
 }
 
 unsigned int UIScene_TradingMenu::mapElementsAndNames()
@@ -143,21 +147,23 @@ unsigned int UIScene_TradingMenu::mapElementsAndNames()
             m_request2.setupControl(this, currentNode, std::string("Request2"));
             m_controls.push_back(&m_request2);
         }
+        if (m_result.setupControl(this, currentNode, "Result"))
+            m_controls.push_back(&m_result);
         {
             m_villagerText.setupControl(this, currentNode, std::string("VillagerText"));
             m_controls.push_back(&m_villagerText);
         }
         {
-            m_requiredLabel.setupControl(this, currentNode, std::string("RequiredLabel"));
-            m_controls.push_back(&m_requiredLabel);
+            if (m_requiredLabel.setupControl(this, currentNode, "RequiredLabel"))
+                m_controls.push_back(&m_requiredLabel);
         }
         {
-            m_request1Label.setupControl(this, currentNode, std::string("Request1Label"));
-            m_controls.push_back(&m_request1Label);
+            if (m_request1Label.setupControl(this, currentNode, "Request1Label"))
+                m_controls.push_back(&m_request1Label);
         }
         {
-            m_request2Label.setupControl(this, currentNode, std::string("Request2Label"));
-            m_controls.push_back(&m_request2Label);
+            if (m_request2Label.setupControl(this, currentNode, "Request2Label"))
+                m_controls.push_back(&m_request2Label);
         }
         {
             m_hotBar.setupControl(this, currentNode, std::string("HotBar"));
@@ -227,27 +233,15 @@ std::vector<HtmlString>* UIScene_TradingMenu::GetItemDescription(not_null_ptr<It
 
 bool UIScene_TradingMenu::canMake(MerchantRecipe* recipe)
 {
-    bool canMake = false;
-    if (recipe != 0)
-    {
-        if (recipe->isDeprecated())
-            return false;
+    if (!recipe || recipe->isDeprecated() || recipe->getTradeLevel() > m_tradeLevel)
+        return false;
 
-        not_null_ptr<ItemInstance> buyA = recipe->getBuyAItem();
-        not_null_ptr<ItemInstance> buyB = recipe->getBuyBItem();
-
-        boost::shared_ptr<Player> player = Minecraft::GetInstance()->mLocalPlayers[m_playerId];
-
-        const int matchesA = player.get()->mInventory.get()->countMatches(buyA);
-        const bool haveEnoughA = (matchesA > 0) ? !(matchesA < buyA.get()->getCount()) : buyA.get()->isEmpty();
-
-        const int matchesB = player.get()->mInventory.get()->countMatches(buyB);
-        if (matchesB > 0)
-            canMake = haveEnoughA && matchesB >= buyB.get()->getCount();
-        else
-            canMake = haveEnoughA && buyB.get()->isEmpty();
-    }
-    return canMake;
+    const auto buyA = recipe->getBuyAItem();
+    const auto buyB = recipe->getBuyBItem();
+    const auto& inventory = Minecraft::GetInstance()->mLocalPlayers[m_playerId]->mInventory;
+    const int requiredA = buyA->getCount() + (buyA->sameItem(buyB) ? buyB->getCount() : 0);
+    return !buyA->isEmpty() && inventory->countMatches(buyA) >= requiredA
+        && (buyB->isEmpty() || inventory->countMatches(buyB) >= buyB->getCount());
 }
 
 void UIScene_TradingMenu::setTradeRedBox(int trade, bool show)
@@ -289,125 +283,100 @@ void UIScene_TradingMenu::setRequest2RedBox(bool show)
 
 void UIScene_TradingMenu::updateDisplay()
 {
-    int tooltipHint = -1;
+    auto player = Minecraft::GetInstance()->mLocalPlayers[m_playerId];
+    auto* offers = m_merchant->getOffers(player);
+    auto* trading = static_cast<FJ_TradingMenu*>(m_movie->getRootNode()->getFuiNode());
+    m_tradeLevel = offers ? offers->getTradeLevel() : 0;
+    m_trades.clear();
 
-    MerchantRecipeList* offers = m_merchant.get()->getOffers(Minecraft::GetInstance()->mLocalPlayers[m_playerId]);
-
-    if (offers != 0)
+    if (offers)
     {
-        m_trades.clear();
-        int bestIndex = 0x7fffffff;
-        int index = 0;
-        for (MerchantRecipeList::iterator it = offers->begin(); it != offers->end(); ++it)
+        for (int index = 0; index < offers->size(); ++index)
         {
-            MerchantRecipe* recipe = *it;
-            if (!recipe->isDeprecated())
-            {
-                m_trades.push_back(std::make_pair(recipe, index));
-                if (index < bestIndex)
-                    bestIndex = index;
-            }
-            ++index;
-        }
-
-        if (!m_tradeFocusSet && bestIndex != 0 && static_cast<unsigned int>(bestIndex) < offers->size())
-        {
-            m_merchantMenu->setSelectionHint(bestIndex);
-
-            ByteArrayOutputStream byteStream;
-            DataOutputStream dataStream(&byteStream);
-            dataStream.writeInt(bestIndex);
-
-            Minecraft::GetInstance()
-                ->getConnection(m_playerId)
-                ->send(boost::shared_ptr<Packet>(new ServerboundCustomPayloadPacket(
-                    ServerboundCustomPayloadPacket::TRADER_SELECTION_PACKET, byteStream.toByteArray())));
-        }
-
-        if (m_trades.size() < static_cast<unsigned int>(m_tradeOffset + 7))
-        {
-            const int newOffset = static_cast<int>(m_trades.size()) - 7;
-            m_tradeOffset = newOffset < 0 ? 0 : newOffset;
-        }
-
-        for (int slot = 0; slot < 7; ++slot)
-        {
-            bool redBox = false;
-            const int tradeIndex = m_tradeOffset + slot;
-            if (!m_trades.empty() && static_cast<unsigned int>(tradeIndex) < m_trades.size())
-                redBox = !canMake(m_trades.at(tradeIndex).first);
-            setTradeRedBox(slot, redBox);
-        }
-
-        if (m_trades.empty() || static_cast<unsigned int>(m_tradeRow + m_tradeOffset) >= m_trades.size())
-        {
-            setTitle(m_merchant.get()->getDisplayName());
-            setRequest1Name(std::wstring(L""));
-            setRequest2Name(std::wstring(L""));
-            setRequest1RedBox(false);
-            setRequest2RedBox(false);
-            std::vector<HtmlString> emptyDescription;
-            setOfferDescription(&emptyDescription);
-            m_tradeFocusSet = true;
-        }
-        else
-        {
-            MerchantRecipe* recipe = m_trades.at(m_tradeRow + m_tradeOffset).first;
-
-            std::wstring villagerText = L10N::GetString(IDS_VILLAGER_OFFERS_ITEM);
-            villagerText = replaceAll(villagerText, std::wstring(L"{*VILLAGER_TYPE*}"),
-                                      m_merchant.get()->getDisplayName());
-            villagerText.replace(villagerText.find(L"%s"), 2, recipe->getSellItem().get()->getHoverName());
-            setTitle(villagerText.c_str());
-            std::vector<HtmlString>* description = GetItemDescription(recipe->getSellItem());
-            setOfferDescription(description);
-
-            not_null_ptr<ItemInstance> buyA = recipe->getBuyAItem();
-            not_null_ptr<ItemInstance> buyB = recipe->getBuyBItem();
-            if (!buyA.get()->isEmpty())
-            {
-                setRequest1Name(buyA.get()->getHoverName());
-                setRequest2Name(buyB.get()->isEmpty() ? std::wstring(L"") : buyB.get()->getHoverName());
-            }
-            else
-            {
-                setRequest1Name(std::wstring(L""));
-                setRequest2Name(buyB.get()->isEmpty() ? std::wstring(L"") : buyB.get()->getHoverName());
-            }
-
-            boost::shared_ptr<Player> player = Minecraft::GetInstance()->mLocalPlayers[m_playerId];
-            const int matchesA = player.get()->mInventory.get()->countMatches(buyA);
-            bool haveEnoughA;
-            if (matchesA < 1)
-            {
-                setRequest1RedBox(true);
-                haveEnoughA = false;
-            }
-            else
-            {
-                setRequest1RedBox(matchesA < buyA.get()->getCount());
-                haveEnoughA = buyA.get()->getCount() <= matchesA;
-            }
-
-            const int matchesB = player.get()->mInventory.get()->countMatches(buyB);
-            if (matchesB < 1)
-            {
-                setRequest2RedBox(!buyB.get()->isEmpty());
-                if (haveEnoughA && buyB.get()->isEmpty())
-                    tooltipHint = IDS_TOOLTIPS_TRADE;
-            }
-            else
-            {
-                setRequest2RedBox(matchesB < buyB.get()->getCount());
-                if (haveEnoughA && buyB.get()->getCount() <= matchesB)
-                    tooltipHint = IDS_TOOLTIPS_TRADE;
-            }
-            m_tradeFocusSet = true;
+            auto* recipe = offers->at(index);
+            if (m_tradeLevel > 0 || !recipe->isDeprecated())
+                m_trades.emplace_back(recipe, index);
         }
     }
 
-    gConsoleUIController.SetTooltips(m_playerId, tooltipHint, IDS_TOOLTIPS_EXIT, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                                     -1, -1, -1, -1, false, false);
+    constexpr int visibleSlots = 7;
+    const int last = std::max(0, static_cast<int>(m_trades.size()) - 1);
+    const int selected = std::min(m_tradeOffset + m_tradeRow, last);
+    m_tradeOffset = Mth::clamp(m_tradeOffset, 0, std::max(0, last + 1 - visibleSlots));
+    m_tradeRow = selected - m_tradeOffset;
+    trading->SetSelectorSlot(m_tradeRow);
+
+    for (int slot = 0; slot < visibleSlots; ++slot)
+    {
+        const int index = m_tradeOffset + slot;
+        auto* recipe = index < m_trades.size() ? m_trades[index].first : nullptr;
+        const bool locked = recipe && offers->isLocked(recipe);
+        const bool soldOut = recipe && recipe->isDeprecated();
+        trading->SetOfferState(slot, locked, soldOut);
+        setTradeRedBox(slot, recipe && !locked && !soldOut && !canMake(recipe));
+    }
+
+    const auto levelName = [](int level) {
+        constexpr unsigned int levelFormat = 0xF77D295E; // TU80: Level %s
+        return replaceAll(std::wstring(L10N::GetString(levelFormat)), std::wstring(L"%s"), std::to_wstring(level));
+    };
+    const std::wstring merchantName = m_merchant->getDisplayName();
+    setTitle(m_tradeLevel ? levelName(m_tradeLevel) + L" - " + merchantName : merchantName);
+    std::vector<HtmlString> emptyDescription;
+    setOfferDescription(&emptyDescription);
+    setRequest1Name(L"");
+    setRequest2Name(L"");
+    setRequest1RedBox(false);
+    setRequest2RedBox(false);
+
+    std::wstring tradeLabel;
+    float progress = 0.0f;
+    float preview = 0.0f;
+    bool locked = false;
+    bool soldOut = false;
+    bool canTrade = false;
+    if (!m_trades.empty())
+    {
+        auto* recipe = m_trades[selected].first;
+        locked = offers->isLocked(recipe);
+        soldOut = recipe->isDeprecated();
+        canTrade = canMake(recipe);
+        const auto buyA = recipe->getBuyAItem();
+        const auto buyB = recipe->getBuyBItem();
+        setRequest1Name(buyA->isEmpty() ? L"" : buyA->getHoverName());
+        setRequest2Name(buyB->isEmpty() ? L"" : buyB->getHoverName());
+        setRequest1RedBox(!buyA->isEmpty() && player->mInventory->countMatches(buyA) < buyA->getCount());
+        setRequest2RedBox(!buyB->isEmpty() && player->mInventory->countMatches(buyB) < buyB->getCount());
+        std::unique_ptr<std::vector<HtmlString>> description(GetItemDescription(recipe->getSellItem()));
+        setOfferDescription(description.get());
+
+        if (m_tradeLevel)
+        {
+            constexpr unsigned int ranks[] = {0x07960F18, 0x1536049B, 0xD279B4E2, 0xE293078E, 0x5A64E9BC};
+            const int required = recipe->getTradeLevel() > 0 ? recipe->getTradeLevel() : m_tradeLevel;
+            tradeLabel = levelName(required) + L"\n" + L10N::GetString(ranks[Mth::clamp(required, 1, 5) - 1]);
+
+            const int start = MerchantRecipeList::experienceForLevel(m_tradeLevel);
+            const int next = MerchantRecipeList::experienceForLevel(m_tradeLevel + 1);
+            const int xp = offers->getTradeExperience() - start;
+            const int gain = canTrade ? recipe->getTradeExperience() : 0;
+            progress = next == start ? 1.0f : Mth::clamp(float(xp) / (next - start), 0.0f, 1.0f);
+            preview = next == start ? 1.0f : Mth::clamp(float(xp + gain) / (next - start), progress, 1.0f);
+        }
+
+        if (!m_result.getFuiRenderNode())
+        {
+            std::wstring title = replaceAll(std::wstring(L10N::GetString(IDS_VILLAGER_OFFERS_ITEM)),
+                                            std::wstring(L"{*VILLAGER_TYPE*}"), merchantName);
+            setTitle(replaceAll(title, std::wstring(L"%s"), recipe->getSellItem()->getHoverName()));
+        }
+    }
+
+    trading->SetTradeProgress(tradeLabel, progress, preview, locked);
+    trading->ShowTradeUnavailable(soldOut && !locked);
+    m_tradeFocusSet = offers != nullptr;
+    gConsoleUIController.SetTooltips(m_playerId, canTrade ? static_cast<int>(IDS_TOOLTIPS_TRADE) : -1, IDS_TOOLTIPS_EXIT,
+                                    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, false, false);
 }
 
 void UIScene_TradingMenu::handleReload()
@@ -415,6 +384,7 @@ void UIScene_TradingMenu::handleReload()
     m_request1.addSlots(0x27, 1);
     m_request2.addSlots(0x28, 1);
     m_tradingBar.addSlots(0x29, 7);
+    m_result.addSlot(TradeResultSlot);
     m_inventory.addSlots(3, 0x1b);
     m_hotBar.addSlots(0x1e, 9);
     updateDisplay();
@@ -515,34 +485,14 @@ bool UIScene_TradingMenu::handleKeyDown(int iPad, int action, bool)
             return true;
 
         MerchantRecipe* recipe = m_trades.at(selectedIndex).first;
-        if (recipe->isDeprecated())
-            return true;
-
-        not_null_ptr<ItemInstance> buyA = recipe->getBuyAItem();
-        not_null_ptr<ItemInstance> buyB = recipe->getBuyBItem();
-        boost::shared_ptr<MultiplayerLocalPlayer> player = Minecraft::GetInstance()->mLocalPlayers[m_playerId];
-
-        const int matchesA = player.get()->mInventory.get()->countMatches(buyA);
-        const int matchesB = player.get()->mInventory.get()->countMatches(buyB);
-
-        if (buyA.get()->isEmpty() || matchesA < buyA.get()->getCount()
-            || (!buyB.get()->isEmpty() && matchesB < buyB.get()->getCount()))
+        if (!canMake(recipe))
             return true;
 
         const int originalIndex = m_trades.at(selectedIndex).second;
-        m_merchant.get()->notifyTrade(recipe);
-
-        player.get()->mInventory.get()->removeResources(buyA);
-        player.get()->mInventory.get()->removeResources(buyB);
-
-        not_null_ptr<ItemInstance> sellItemCopy = recipe->getSellItem().get()->copy();
-        if (!player.get()->mInventory.get()->add(sellItemCopy))
-            player.get()->Player::drop(sellItemCopy, false);
-
-        player.get()->mPacketListener->send(
+        auto player = minecraft->mLocalPlayers[m_playerId];
+        player->mPacketListener->send(
             boost::shared_ptr<Packet>(new TradeItemPacket(m_merchantMenu->m_containerId, originalIndex)));
 
-        updateDisplay();
         return true;
     }
 
@@ -562,12 +512,10 @@ bool UIScene_TradingMenu::handleKeyDown(int iPad, int action, bool)
         break;
 
     case EControllerActions_MenuRight:
+        if (static_cast<unsigned int>(m_tradeOffset + m_tradeRow + 1) >= m_trades.size())
+            return true;
         if (m_tradeRow == 6)
         {
-            if (m_trades.empty())
-                return true;
-            if (static_cast<unsigned int>(m_tradeOffset + 7) >= m_trades.size())
-                return true;
             ++m_tradeOffset;
         }
         else
@@ -618,19 +566,23 @@ void UIScene_TradingMenu::customDraw(const char* name, fuiRect* rect)
 
     not_null_ptr<ItemInstance> item = ItemInstance::EMPTY;
     int slotId = -1;
-    std::sscanf(name, "slot_%d", &slotId);
+    if (std::sscanf(name, "slot_%d", &slotId) != 1 || slotId < 0 || slotId > TradeResultSlot)
+        return;
 
     if (slotId < 0x27)
     {
         Slot* slot = m_merchantMenu->getSlot(slotId);
         item = slot->getItem();
     }
-    else if (slotId < 0x29)
+    else if (slotId < 0x29 || slotId == TradeResultSlot)
     {
         if (!m_trades.empty() && static_cast<unsigned int>(m_tradeRow + m_tradeOffset) < m_trades.size())
         {
-            item = (slotId != 0x28) ? m_trades.at(m_tradeRow + m_tradeOffset).first->getBuyAItem()
-                                    : m_trades.at(m_tradeRow + m_tradeOffset).first->getBuyBItem();
+            MerchantRecipe* recipe = m_trades.at(m_tradeRow + m_tradeOffset).first;
+            if (slotId == TradeResultSlot)
+                item = recipe->getSellItem();
+            else
+                item = slotId == 0x27 ? recipe->getBuyAItem() : recipe->getBuyBItem();
         }
     }
     else if (!m_trades.empty() && static_cast<unsigned int>(slotId - 0x29 + m_tradeOffset) < m_trades.size())
@@ -656,6 +608,14 @@ void UIScene_TradingMenu::HandleMessage(EUIMessage message, void* data)
 boost::shared_ptr<Merchant> UIScene_TradingMenu::getMerchant()
 {
     return m_merchant;
+}
+
+void UIScene_TradingMenu::setOffers(MerchantRecipeList* offers)
+{
+    m_trades.clear();
+    m_merchant->overrideOffers(offers);
+    m_merchantMenu->slotsChanged();
+    updateDisplay();
 }
 
 int UIScene_TradingMenu::getSceneType()

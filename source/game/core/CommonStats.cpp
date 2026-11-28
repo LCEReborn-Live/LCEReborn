@@ -134,6 +134,10 @@ Stat* CommonStats::get_tamedEntity(unsigned long long entityType)
     {
         return Stats::befriendsWolf;
     }
+    if (entityType == EntityType::CAT)
+    {
+        return Stats::befriendsCat;
+    }
     if (entityType == EntityType::HORSE)
     {
         return Achievements::saddleUp;

@@ -57,6 +57,7 @@
 #include "game/client/render/PigZombieRenderer.hpp"
 #include "game/client/render/PlayerRenderer.hpp"
 #include "game/client/render/PolarBearRenderer.hpp"
+#include "game/client/render/PandaRenderer.hpp"
 #include "game/client/render/PufferfishRenderer.hpp"
 #include "game/client/render/RabbitRenderer.hpp"
 #include "game/client/render/SheepFurModel.hpp"
@@ -88,6 +89,8 @@
 #include "game/client/render/VillagerGolemRenderer.hpp"
 #include "game/client/render/VillagerRenderer.hpp"
 #include "game/client/render/VindicationIllagerRenderer.hpp"
+#include "game/client/render/PillagerRenderer.hpp"
+#include "game/client/render/RavagerRenderer.hpp"
 #include "game/client/render/WitchRenderer.hpp"
 #include "game/client/render/WitherBossRenderer.hpp"
 #include "game/client/render/WitherSkeletonRenderer.hpp"
@@ -141,6 +144,7 @@ EntityRenderDispatcher::EntityRenderDispatcher(Textures* textures, ItemRenderer*
     (*this)[EntityType::WOLF] = new WolfRenderer(this, new WolfModel(), 0.5F);
     (*this)[EntityType::CHICKEN] = new ChickenRenderer(this, new ChickenModel(), 0.3F);
     (*this)[EntityType::OCELOT] = new OcelotRenderer(this);
+    (*this)[EntityType::CAT] = new OcelotRenderer(this, true);
     (*this)[EntityType::RABBIT] = new RabbitRenderer(this);
     (*this)[EntityType::PARROT] = new ParrotRenderer(this);
     (*this)[EntityType::SILVERFISH] = new SilverfishRenderer(this);
@@ -170,14 +174,18 @@ EntityRenderDispatcher::EntityRenderDispatcher(Textures* textures, ItemRenderer*
     (*this)[EntityType::TURTLE] = new TurtleRenderer(this);
     (*this)[EntityType::DOLPHIN] = new DolphinRenderer(this);
     (*this)[EntityType::VILLAGER] = new VillagerRenderer(this);
+    (*this)[EntityType::WANDERING_TRADER] = new WanderingTraderRenderer(this);
     (*this)[EntityType::VILLAGER_GOLEM] = new VillagerGolemRenderer(this);
     (*this)[EntityType::BAT] = new BatRenderer(this);
     (*this)[EntityType::GUARDIAN] = new GuardianRenderer(this);
     (*this)[EntityType::ELDER_GUARDIAN] = new ElderGuardianRenderer(this);
     (*this)[EntityType::SHULKER] = new ShulkerRenderer(this);
     (*this)[EntityType::POLAR_BEAR] = new PolarBearRenderer(this);
+    (*this)[EntityType::PANDA] = new PandaRenderer(this);
     (*this)[EntityType::EVOCATION_ILLAGER] = new EvocationIllagerRenderer(this);
     (*this)[EntityType::VINDICATION_ILLAGER] = new VindicationIllagerRenderer(this);
+    (*this)[EntityType::PILLAGER] = new PillagerRenderer(this);
+    (*this)[EntityType::RAVAGER] = new RavagerRenderer(this);
     (*this)[EntityType::VEX] = new VexRenderer(this);
     (*this)[EntityType::PHANTOM] = new PhantomRenderer(this);
     (*this)[EntityType::ILLUSION_ILLAGER] = new IllusionIllagerRenderer(this);
@@ -224,6 +232,7 @@ EntityRenderDispatcher::EntityRenderDispatcher(Textures* textures, ItemRenderer*
     (*this)[EntityType::MULE] = new ChestedHorseRenderer(this, 0.92F);
     (*this)[EntityType::DONKEY] = new ChestedHorseRenderer(this, 0.87F);
     (*this)[EntityType::LLAMA] = new LlamaRenderer(this);
+    (*this)[EntityType::TRADER_LLAMA] = new LlamaRenderer(this);
     (*this)[EntityType::LLAMA_SPIT] = new LlamaSpitRenderer(this);
     (*this)[EntityType::LIGHTNING_BOLT] = new LightningBoltRenderer(this);
     (*this)[EntityType::THROWN_TRIDENT] = new ThrownTridentRenderer(this);

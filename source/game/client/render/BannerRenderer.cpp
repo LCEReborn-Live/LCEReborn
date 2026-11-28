@@ -4,9 +4,11 @@
 #include <string>
 
 #include "game/client/render/BannerModel.hpp"
+#include "game/client/render/BlockEntityRenderDispatcher.hpp"
 #include "game/client/render/ModelDefinition.hpp"
 #include "game/client/render/ModelPartSkin.hpp"
 #include "game/client/render/Renderer.hpp"
+#include "game/client/render/Textures.hpp"
 #include "game/core/BannerPattern.hpp"
 #include "game/core/ColourTable.hpp"
 #include "game/core/DyeColor.hpp"
@@ -18,6 +20,7 @@
 #include "game/world/block/Blocks.hpp"
 
 static ResourceLocation* BANNER_LOCATION = new ResourceLocation(TN_ITEM_BANNER_BANNER_BASE);
+static const ResourceLocation ILLAGER_BANNER_LOCATION(L"item/banner/banner_pattern_illager");
 static int BANNER_PATTERN_TEXTURES[2] = {146, 147};
 static ResourceLocation* BANNER_PATTERN_LOCATION = new ResourceLocation(
     arrayWithLength<int>(BANNER_PATTERN_TEXTURES, 2));
@@ -150,7 +153,16 @@ void BannerRenderer::render(boost::shared_ptr<BlockEntity> blockEntity, double x
     mModel->mFlag->mXRot = (-0.0125F + 0.01F * cosf(phase * 3.1415927F * 0.02F)) * 3.1415927F;
     GlStateManager::enableRescaleNormal();
 
-    if (hasTexture(blockEntity))
+    const auto banner = boost::static_pointer_cast<BannerBlockEntity>(blockEntity);
+    if (banner->isIllagerBanner() && mDispatcher->mTextures)
+    {
+        mDispatcher->mTextures->bindTexture(&ILLAGER_BANNER_LOCATION);
+        GlStateManager::pushMatrix();
+        GlStateManager::scalef(scale, -scale, -scale);
+        mModel->render();
+        GlStateManager::popMatrix();
+    }
+    else if (hasTexture(blockEntity))
     {
         bindTexture(BANNER_LOCATION);
         GlStateManager::pushMatrix();
@@ -160,7 +172,6 @@ void BannerRenderer::render(boost::shared_ptr<BlockEntity> blockEntity, double x
         mModel->mFlag->mShow = true;
         bindTextureLayers(BANNER_PATTERN_LOCATION);
         gRenderer->TextureBindMask(1);
-        boost::shared_ptr<BannerBlockEntity> banner = boost::static_pointer_cast<BannerBlockEntity>(blockEntity);
         setupLayeredParams(banner->getPatterns(), banner->getColors(), false);
         mModel->mPole->mShow = false;
         mModel->mBar->mShow = false;

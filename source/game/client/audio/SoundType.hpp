@@ -18,6 +18,7 @@ public:
     static const SoundType* LADDER;
     static const SoundType* ANVIL;
     static const SoundType* SLIME;
+    static const SoundType* SCAFFOLDING;
 
     static void StaticCtor();
 

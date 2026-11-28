@@ -51,6 +51,7 @@ public:
     float getHeadEatAngleScale(float partialTick);
     bool isSheared();
     void setSheared(bool sheared);
+    bool shear();
     const DyeColor* getColor();
     virtual bool mobInteract(const boost::shared_ptr<Player>& player, InteractionHand::EInteractionHand hand);
     static void addDataWalkers(DataFixerUpper* fixer);

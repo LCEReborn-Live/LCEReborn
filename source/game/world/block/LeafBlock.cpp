@@ -3,15 +3,18 @@
 #include "game/client/audio/SoundType.hpp"
 #include "game/client/render/ParticleType.hpp"
 #include "game/core/FoliageColor.hpp"
+#include "game/core/GameRules.hpp"
 #include "game/core/IconRegister.hpp"
 #include "game/item/Item.hpp"
 #include "game/item/ItemInstance.hpp"
+#include "game/item/Items.hpp"
 #include "game/util/Random.hpp"
 #include "game/world/Level.hpp"
 #include "game/world/LevelSource.hpp"
 #include "game/world/biome/arrayWithLength.hpp"
 #include "game/world/biome/BiomeColors.hpp"
 #include "game/world/block/BlockPos.hpp"
+#include "game/world/block/BlockId.hpp"
 #include "game/world/block/Blocks.hpp"
 #include "game/world/block/BooleanProperty.hpp"
 #include "game/world/block/Material.hpp"
@@ -115,6 +118,9 @@ void LeafBlock::die(Level* level, const BlockPos& pos)
 {
     const BlockState* state = level->getBlockState(pos);
     Block::spawnResources(level, pos, state, 0);
+    if (level->getGameRules()->getBoolean(GameRules::RULE_DOBLOCKDROPS) && level->mRandom->nextInt(50) == 0)
+        Block::popResource(level, pos, not_null_ptr<ItemInstance>(new ItemInstance(Items::stick,
+                                                                                 1 + level->mRandom->nextInt(2))));
     level->removeBlock(pos);
 }
 
@@ -149,7 +155,12 @@ void LeafBlock::tick(Level* level, const BlockPos& pos, const BlockState* state,
                     checkPos.z = pz + zo;
                     const BlockState* nearbyState = level->getBlockState(checkPos);
                     Block* nearbyBlock = nearbyState->getBlock();
-                    if (nearbyBlock == Blocks::log || nearbyBlock == Blocks::log2)
+                    const int id = Block::getId(nearbyBlock);
+                    if (nearbyBlock == Blocks::log || nearbyBlock == Blocks::log2
+                        || (id >= BlockId::STRIPPED_LOG_SPRUCE && id <= BlockId::STRIPPED_LOG_OAK)
+                        || (id >= BlockId::BARK_SPRUCE && id <= BlockId::BARK_OAK)
+                        || (id >= BlockId::STRIPPED_WOOD_FIRST
+                            && id < BlockId::STRIPPED_WOOD_FIRST + BlockId::WOOD_SPECIES_COUNT))
                         mLeafDistance[(xo + WO) * WW + (yo + WO) * W + zo + WO] = 0;
                     else if (nearbyState->getMaterial() == Material::LEAVES)
                         mLeafDistance[(xo + WO) * WW + (yo + WO) * W + zo + WO] = -2;

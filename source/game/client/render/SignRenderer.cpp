@@ -1,6 +1,8 @@
 #include "game/client/render/SignRenderer.hpp"
 
 #include "game/client/render/Font.hpp"
+#include "game/client/render/BlockEntityRenderDispatcher.hpp"
+#include "game/client/render/Textures.hpp"
 #include "game/client/render/ModelDefinition.hpp"
 #include "game/client/render/ModelPartSkin.hpp"
 #include "game/client/render/Renderer.hpp"
@@ -17,6 +19,7 @@
 #include "game/util/ResourceLocation.hpp"
 #include "game/world/block/Blocks.hpp"
 #include "game/world/block/SignBlockEntity.hpp"
+#include "game/world/block/StandingSignBlock.hpp"
 #include "game/core/StringIds.hpp"
 #include "game/core/XLanguage.hpp"
 
@@ -58,7 +61,7 @@ void SignRenderer::render(boost::shared_ptr<BlockEntity> blockEntity, double x, 
     Block* block = sign->getBlock();
 
     GlStateManager::pushMatrix();
-    if (block == Blocks::standing_sign)
+    if (dynamic_cast<StandingSignBlock*>(block))
     {
         GlStateManager::translatef((float)x + 0.5f, (float)y + 0.5f, (float)z + 0.5f);
         GlStateManager::rotatef(-((float)(sign->getData() * 360) * 0.0625f), 0.0f, 1.0f, 0.0f);
@@ -91,7 +94,14 @@ void SignRenderer::render(boost::shared_ptr<BlockEntity> blockEntity, double x, 
     }
     else
     {
-        bindTexture(&SIGN_LOCATION);
+        static const wchar_t* textures[] = {L"item/sign_spruce", L"item/sign_birch", L"item/sign_jungle",
+                                            L"item/sign_acacia", L"item/sign_darkoak"};
+        auto* signBlock = dynamic_cast<SignBlock*>(block);
+        const int wood = signBlock ? signBlock->getWoodType() : 0;
+        if (wood != 0 && mDispatcher->mTextures)
+            mDispatcher->mTextures->bindTexture(textures[wood - 1]);
+        else
+            bindTexture(&SIGN_LOCATION);
     }
 
     GlStateManager::pushMatrix();

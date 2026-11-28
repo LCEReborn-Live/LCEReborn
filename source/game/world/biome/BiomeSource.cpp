@@ -128,6 +128,7 @@ unsigned char BiomeSource::getBiomeGroup(int biomeId)
     case 134:
     case 149:
     case 151:
+    case Biome::eBiomeIDs_BambooJungle:
         return 3;
 
     case 2:

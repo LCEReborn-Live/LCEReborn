@@ -94,10 +94,9 @@ int FishingHook::retrieve()
     }
     else if (mTicksCatchable > 0)
     {
-        LootTableContext::Builder* builder = new LootTableContext::Builder(static_cast<ServerLevel*>(mLevel));
-        builder->withLuck((float)mLuck + mOwner->getLuck());
-
-        LootTableContext context = builder->build();
+        LootTableContext::Builder builder(static_cast<ServerLevel*>(mLevel));
+        LootTableContext context = builder.withLuck((float)mLuck + mOwner->getLuck())
+                                       ->withLootedEntity(shared_from_this())->withDamageSource(nullptr)->build();
         LootTable* lootTable = BuiltInLootTables::getLootTable(&BuiltInLootTables::FISHING);
         std::vector<not_null_ptr<ItemInstance> >* items = lootTable->getRandomItems(mRandom, context);
 
@@ -120,7 +119,6 @@ int FishingHook::retrieve()
         }
 
         delete items;
-        delete builder;
         result = 1;
     }
 

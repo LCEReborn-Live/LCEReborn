@@ -2,12 +2,14 @@
 #define GAME_UI_FJ_TRADINGMENU_HPP
 
 #include <string>
+#include <vector>
 
 #include "game/ui/FJ_Document.hpp"
 
 class FJ_Event;
 class FJ_FuiNode;
 class fuiRenderNode;
+class fuiRenderNodeCodeGenRect;
 
 class FJ_TradingMenu : public FJ_Document
 {
@@ -24,6 +26,9 @@ public:
     void MoveSelector(bool right);
     void SetSelectorSlot(int slot);
     void SetOfferDescription(const std::wstring& description);
+    void SetTradeProgress(const std::wstring& levelLabel, float progress, float preview, bool locked);
+    void SetOfferState(int slot, bool locked, bool soldOut);
+    void ShowTradeUnavailable(bool show);
     void ShowScrollRightArrow(bool show);
     void ShowScrollLeftArrow(bool show);
     int getTotalTradingSlots();
@@ -34,6 +39,9 @@ private:
     int m_slotWidth;
     int m_visibleSlots;
     int m_selectorSlot;
+    std::vector<FJ_FuiNode*> m_offerLocks;
+    std::vector<FJ_FuiNode*> m_offerCrosses;
+    fuiRenderNodeCodeGenRect* m_previewBar = nullptr;
 };
 
 #endif

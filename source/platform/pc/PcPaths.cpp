@@ -1,10 +1,15 @@
 #include "platform/pc/PcPaths.hpp"
 
 #include <filesystem>
+#include <fstream>
+#include <utility>
 
 #include <SDL3/SDL.h>
+#include <zlib.h>
 
+#include "game/core/StringConversion.hpp"
 #include "platform/pc/PcLaunchOptions.hpp"
+#include "platform/pc/Log.hpp"
 
 static std::string RootFromOption(const std::string& option, const char* fallback)
 {
@@ -96,6 +101,115 @@ const std::string& PcResourceRoot()
 {
     static std::string root = ResourceRootFromOption(PcGetLaunchOptions().resourceDir);
     return root;
+}
+
+std::wstring PcVillageTemplateRoot()
+{
+    const auto& configured = PcGetLaunchOptions().villageTemplatesDir;
+    if (configured.empty())
+        return (std::filesystem::u8path(PcContentRoot()) / "custom-villages").lexically_normal().generic_wstring();
+    std::error_code error;
+    const auto absolute = std::filesystem::absolute(std::filesystem::u8path(configured), error);
+    if (error)
+        return std::filesystem::u8path(configured).generic_wstring();
+    return absolute.lexically_normal().generic_wstring();
+}
+
+std::vector<std::wstring> PcListVillageTemplates(const std::wstring& root)
+{
+    std::vector<std::wstring> names;
+    std::error_code error;
+    constexpr Logger log("VillageTemplates");
+    const auto rootUtf8 = convWstringToString(root);
+    if (!std::filesystem::is_directory(root, error))
+    {
+        if (!PcGetLaunchOptions().villageTemplatesDir.empty())
+            LOG_WARN(log, "Template directory is unavailable: %s", rootUtf8.c_str());
+        return names;
+    }
+    error.clear();
+    const std::filesystem::path directory(root);
+    for (std::filesystem::recursive_directory_iterator file(directory,
+             std::filesystem::directory_options::skip_permission_denied, error), end;
+         !error && file != end; file.increment(error))
+    {
+        std::error_code statusError;
+        const auto status = file->symlink_status(statusError);
+        if (statusError || !std::filesystem::is_regular_file(status))
+            continue;
+        auto extension = file->path().extension().wstring();
+        for (auto& ch : extension)
+            if (ch >= L'A' && ch <= L'Z')
+                ch += L'a' - L'A';
+        if (extension == L".nbt")
+            names.push_back(file->path().lexically_relative(directory).generic_wstring());
+    }
+    if (error)
+        LOG_WARN(log, "Could not finish scanning template directory %s: %s", rootUtf8.c_str(), error.message().c_str());
+    else if (names.empty() && !PcGetLaunchOptions().villageTemplatesDir.empty())
+        LOG_INFO(log, "No NBT templates found in %s", rootUtf8.c_str());
+    return names;
+}
+
+std::string PcReadVillagePoolConfiguration(const std::wstring& root)
+{
+    constexpr Logger log("VillageTemplates");
+    const auto path = std::filesystem::path(root) / "village-pools.tsv";
+    std::error_code error;
+    if (!std::filesystem::exists(path, error))
+        return {};
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    const auto size = file.tellg();
+    if (size < 0 || size > 1024 * 1024)
+    {
+        LOG_WARN(log, "Cannot read village-pools.tsv in %s", convWstringToString(root).c_str());
+        return {};
+    }
+    std::string text(static_cast<size_t>(size), '\0');
+    file.seekg(0);
+    if (!text.empty() && !file.read(&text[0], size))
+    {
+        LOG_WARN(log, "Cannot read village-pools.tsv in %s", convWstringToString(root).c_str());
+        return {};
+    }
+    return text;
+}
+
+std::vector<unsigned char> PcReadVillageTemplate(const std::wstring& root, const std::wstring& relativePath)
+{
+    constexpr unsigned int maxSize = 8 * 1024 * 1024;
+    std::ifstream file(std::filesystem::path(root) / relativePath, std::ios::binary | std::ios::ate);
+    const auto size = file.tellg();
+    if (size <= 0 || size > maxSize)
+        return {};
+
+    std::vector<unsigned char> bytes(static_cast<size_t>(size));
+    file.seekg(0);
+    if (!file.read(reinterpret_cast<char*>(bytes.data()), size))
+        return {};
+    if (bytes.size() < 2 || bytes[0] != 0x1f || bytes[1] != 0x8b)
+        return bytes;
+    if (bytes.size() < 18)
+        return {};
+
+    const auto* footer = bytes.data() + bytes.size() - 4;
+    const auto originalSize = static_cast<unsigned int>(footer[0]) | (static_cast<unsigned int>(footer[1]) << 8)
+        | (static_cast<unsigned int>(footer[2]) << 16) | (static_cast<unsigned int>(footer[3]) << 24);
+    if (originalSize == 0 || originalSize > maxSize)
+        return {};
+
+    std::vector<unsigned char> raw(originalSize);
+    z_stream stream{};
+    if (inflateInit2(&stream, MAX_WBITS + 16) != Z_OK)
+        return {};
+    stream.next_in = bytes.data();
+    stream.avail_in = static_cast<uInt>(bytes.size());
+    stream.next_out = raw.data();
+    stream.avail_out = originalSize;
+    const bool complete = inflate(&stream, Z_FINISH) == Z_STREAM_END && stream.avail_in == 0
+        && stream.total_out == originalSize;
+    inflateEnd(&stream);
+    return complete ? std::move(raw) : std::vector<unsigned char>{};
 }
 
 static std::string DisplayPath(const std::string& path)

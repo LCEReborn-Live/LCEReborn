@@ -13,6 +13,7 @@
 #include "game/core/GameRules.hpp"
 #include "game/core/GenericStats.hpp"
 #include "game/core/Ocelot.hpp"
+#include "game/core/Cat.hpp"
 #include "game/data/CompoundTag.hpp"
 #include "game/entity/ai/AvoidEntityGoal.hpp"
 #include "game/entity/ai/FloatGoal.hpp"
@@ -73,6 +74,7 @@ void Creeper::registerGoals()
     mGoalSelector.addGoal(1, new FloatGoal(this), true);
     mGoalSelector.addGoal(2, new SwellGoal(this), true);
     mGoalSelector.addGoal(3, new AvoidEntityGoal(this, typeid(Ocelot), 6.0f, 1.0, 1.2), true);
+    mGoalSelector.addGoal(3, new AvoidEntityGoal(this, typeid(Cat), 6.0f, 1.0, 1.2), true);
     mGoalSelector.addGoal(4, new MeleeAttackGoal(this, 1.0, false), true);
     mGoalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0), true);
     mGoalSelector.addGoal(6, new LookAtPlayerGoal(this, typeid(Player), 8.0f), true);
@@ -240,7 +242,8 @@ void Creeper::die(const DamageSource* source)
 
     if (mLevel->getGameRules()->getBoolean(GameRules::RULE_DOMOBLOOT))
     {
-        if (source->getEntity() != NULL && eTYPE_DERIVED_FROM(EntityType::SKELETON, source->getEntity()->GetType()))
+        if (source->getEntity() != NULL && (eTYPE_DERIVED_FROM(EntityType::SKELETON, source->getEntity()->GetType())
+                                            || source->getEntity()->GetType() == EntityType::STRAY))
         {
             int firstRecord = Item::VALIDgetId(Items::record13);
             int recordCount = Item::VALIDgetId(Items::recordWait) - firstRecord + 1;

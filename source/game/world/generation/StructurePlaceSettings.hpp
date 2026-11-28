@@ -1,6 +1,8 @@
 #ifndef GAME_WORLD_GENERATION_STRUCTUREPLACESETTINGS_HPP
 #define GAME_WORLD_GENERATION_STRUCTUREPLACESETTINGS_HPP
 
+#include <functional>
+
 #include <boost/unordered_map.hpp>
 
 class Block;
@@ -47,6 +49,8 @@ public:
     const BlockState* getSwappedBlock(const BlockState* state);
     void placeWaterBelowSeaLevel(bool placeWater);
     bool isPlacingWaterBelowSeaLevel() const;
+    std::function<int(const BlockPos&)> verticalOffset;
+    bool findSafeMobPosition = false;
 
     void setChunkPos(ChunkPos* chunkPos);
     void setSeed(long long seed);

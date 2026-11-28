@@ -102,12 +102,14 @@ bool BuriedTreasureFeature::BuriedTreasurePiece::postProcess(Level* levelIn, Ran
 {
     BlockPos origin(getWorldX(0, 0), getWorldY(1), getWorldZ(0, 0));
     if (!box->isInside(origin))
-        return false;
+        return true;
 
     origin = BlockPos(origin.x, levelIn->getTopSolidBlockPos(origin).y, origin.z);
     origin = origin.offset(0, -(randomIn.nextInt(3) + 3), 0);
-    while (levelIn->getBlock(origin.below()) == Blocks::air)
+    while (origin.y > 1 && levelIn->getBlock(origin.below()) == Blocks::air)
         origin = origin.below();
+    if (origin.y < 1 || levelIn->getBlock(origin.below()) == Blocks::air)
+        return true;
 
     levelIn->setBlock(origin, Blocks::chest->defaultBlockState(), Block::UPDATE_ALL, false);
     boost::shared_ptr<BlockEntity> blockEntity = levelIn->getBlockEntity(origin);
@@ -167,6 +169,11 @@ void BuriedTreasureFeature::BuriedTreasurePiece::handleDataMarker(const std::wst
 EStructurePiece BuriedTreasureFeature::BuriedTreasurePiece::GetType()
 {
     return eStructurePiece_BuriedTreasurePiece;
+}
+
+StructurePiece* BuriedTreasureFeature::BuriedTreasurePiece::Create()
+{
+    return new BuriedTreasurePiece(0, 0);
 }
 
 BuriedTreasureFeature::BuriedTreasureStart::BuriedTreasureStart(BuriedTreasureFeature* feature, Level* levelIn, Random&,

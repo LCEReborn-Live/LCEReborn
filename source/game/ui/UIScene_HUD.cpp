@@ -300,6 +300,8 @@ void UIScene_HUD::updateEffectsDisplay()
     {
         std::sort(effects->begin(), effects->end(), SORTBYTIMELEFT);
         int slot = 0;
+        const int visibleCount = static_cast<int>(std::count_if(effects->begin(), effects->end(),
+            [](MobEffectInstance* effect) { return effect->getEffect()->hasIcon(); }));
         for (std::vector<MobEffectInstance*>::iterator it = effects->begin(); it != effects->end(); ++it)
         {
             MobEffectInstance* instance = *it;
@@ -318,7 +320,7 @@ void UIScene_HUD::updateEffectsDisplay()
                 alpha = pulse * blink + fadeIn;
             }
 
-            getFJ_Hud()->UpdateStatusEffectTile(static_cast<int>(effects->size()), slot, effect->getIcon(),
+            getFJ_Hud()->UpdateStatusEffectTile(visibleCount, slot, effect->getIcon(),
                                                 effect->isBeneficial(), alpha);
             ++slot;
         }
@@ -333,10 +335,10 @@ void UIScene_HUD::SetNumBossBars(int count)
         getFJ_Hud()->SetNumBossBars(count);
 }
 
-void UIScene_HUD::SetBossBar(int index, float progress, const std::wstring& name)
+void UIScene_HUD::SetBossBar(int index, float progress, const std::wstring& name, int color, int overlay)
 {
     if (getFJ_Hud() != 0)
-        getFJ_Hud()->SetBossBar(index, progress, name);
+        getFJ_Hud()->SetBossBar(index, progress, name, color, overlay);
 }
 
 void UIScene_HUD::HideSelectedLabel()
@@ -384,7 +386,7 @@ void UIScene_HUD::tick()
                 std::wstring name = L10N::GetString(bossEvent->getNameId());
                 if (!bossEvent->getName().empty())
                     name = bossEvent->getName();
-                SetBossBar(index, bossEvent->getPercent(), name);
+                SetBossBar(index, bossEvent->getPercent(), name, bossEvent->getColor(), bossEvent->getOverlay());
             }
             ++index;
         }

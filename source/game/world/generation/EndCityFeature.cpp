@@ -41,11 +41,8 @@ bool EndCityFeature::isFeatureChunk(int chunkX, int chunkZ, bool)
     return chunkX == area->x && chunkZ == area->z && chunkRandom.nextDouble() < 0.33;
 }
 
-int EndCityFeature::getYPositionForFeature(int chunkX, int chunkZ, TheEndLevelSource* source)
+int EndCityFeature::getYPositionForFeature(int chunkX, int chunkZ, TheEndLevelSource* source, Rotation* rotation)
 {
-    int seed = chunkX + chunkZ * 10387313;
-    Random random(seed);
-    Rotation* rotation = Rotation::VALUES[random.nextInt(4)];
     arrayWithLength<unsigned short> elements(65536, true);
     ChunkPrimer primer(true, elements);
     source->prepareHeights(chunkX, chunkZ, &primer);
@@ -91,21 +88,25 @@ EndCityFeature::EndCityStart::EndCityStart(Level* levelIn, TheEndLevelSource* so
     create(levelIn, source, random, chunkX, chunkZ);
 }
 
+StructureStart* EndCityFeature::EndCityStart::Create()
+{
+    return new EndCityStart();
+}
+
 void EndCityFeature::EndCityStart::create(Level* levelIn, TheEndLevelSource* source, Random& random, int chunkX,
                                           int chunkZ)
 {
     Rotation* rotation = Rotation::getRandom(random);
-    int y = EndCityFeature::getYPositionForFeature(chunkX, chunkZ, source);
+    int y = EndCityFeature::getYPositionForFeature(chunkX, chunkZ, source, rotation);
     BlockPos position(chunkX * 16 + 8, y, chunkZ * 16 + 8);
     EndCityPieces::startHouseTower(levelIn->getLevelStorage()->getStructureManager(), position, rotation, mPieces,
                                    random);
     calculateBoundingBox();
-    mValid = true;
 }
 
 bool EndCityFeature::EndCityStart::isValid()
 {
-    return mValid;
+    return !mPieces.empty();
 }
 
 EStructureStart EndCityFeature::EndCityStart::GetType()

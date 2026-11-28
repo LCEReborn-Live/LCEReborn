@@ -52,7 +52,8 @@ bool SlabBlockItem::tryConvertTargetBlock(boost::shared_ptr<Player> player, not_
             {
                 const BlockState* fullState = mFullSlab->defaultBlockState()->setBoxedValue(property, currentType);
                 const AABB* box = mFullSlab->getClipAABB(fullState, level, pos);
-                if (level->isUnobstructed(box) && level->setBlock(pos, fullState, Block::UPDATE_ALL, false))
+                if (box != Block::NULL_AABB && level->isUnobstructed(box->move(pos))
+                    && level->setBlock(pos, fullState, Block::UPDATE_ALL, false))
                 {
                     const SoundType* soundType = mFullSlab->mSoundType;
                     level->playSound(player, pos, soundType->getPlaceSound(), SoundSource::eSoundSource_Blocks,

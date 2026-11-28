@@ -294,6 +294,8 @@ const DyeColor* ShulkerBoxBlock::getColorFromBlock(Block* block)
 
 Block* ShulkerBoxBlock::getBlockByColor(const DyeColor* color)
 {
+    if (!color)
+        return Blocks::undyed_shulker_box;
     switch (color->getBlockData())
     {
     case 0:

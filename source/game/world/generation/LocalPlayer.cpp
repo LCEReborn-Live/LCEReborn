@@ -25,6 +25,7 @@
 #include "game/ui/AbstractContainerMenu.hpp"
 #include "game/network/ServerboundContainerClosePacket.hpp"
 #include "game/world/block/BlockPos.hpp"
+#include "game/ui/LocalMenuContainer.hpp"
 #include "game/core/Direction.hpp"
 #include "game/network/ServerboundPlayerActionPacket.hpp"
 #include "game/network/ServerboundChatPacket.hpp"
@@ -541,7 +542,8 @@ int LocalPlayer::openContainer(boost::shared_ptr<Container> container)
         result = static_cast<int>(gApp.LoadContainerMenu(mUserIndex, mInventory, container));
     else if (typeId == ClientboundContainerOpenPacket::HOPPER)
         result = static_cast<int>(gApp.LoadHopperMenu(mUserIndex, mInventory, container));
-    else if (typeId == ClientboundContainerOpenPacket::FURNACE)
+    else if (typeId == ClientboundContainerOpenPacket::FURNACE || typeId == ClientboundContainerOpenPacket::SMOKER
+             || typeId == ClientboundContainerOpenPacket::BLAST_FURNACE)
         result = static_cast<int>(gApp.LoadFurnaceMenu(mUserIndex, mInventory, container));
     else if (typeId == ClientboundContainerOpenPacket::BREWING_STAND)
         result = static_cast<int>(gApp.LoadBrewingStandMenu(mUserIndex, mInventory, container));
@@ -582,6 +584,14 @@ int LocalPlayer::startBlockInteraction(InteractionObject& interaction)
     else if (interaction.getTypeId(false) == ClientboundContainerOpenPacket::REPAIR_TABLE)
     {
         result = (int)gApp.LoadRepairingMenu(mUserIndex, mInventory, mLevel, (int)mX, (int)mY, (int)mZ);
+    }
+    else if (interaction.getTypeId(false) == ClientboundContainerOpenPacket::CARTOGRAPHY
+             || interaction.getTypeId(false) == ClientboundContainerOpenPacket::GRINDSTONE
+             || interaction.getTypeId(false) == ClientboundContainerOpenPacket::STONECUTTER
+             || interaction.getTypeId(false) == ClientboundContainerOpenPacket::LOOM)
+    {
+        boost::shared_ptr<Container> menu(new LocalMenuContainer(interaction.getTypeId(false), L"", 3));
+        result = gApp.LoadFurnaceMenu(mUserIndex, mInventory, menu);
     }
     else
     {
@@ -1183,6 +1193,8 @@ void LocalPlayer::awardStat(Stat* stat, arrayWithLength<unsigned char> params)
         if (stats->getTotalValue(gStats->get_tamedEntity(EntityType::WOLF)) >= 5u)
             awardStat(GenericStats::leaderOfThePack(), GenericStats::param_noArgs());
     }
+    if (stat == gStats->get_tamedEntity(EntityType::CAT) && stats->getTotalValue(stat) >= 20u)
+        awardStat(GenericStats::achievement(eAward_PlethoraOfCats), GenericStats::param_noArgs());
 
     Stat* toolStats[4][5] = {
         {gStats->get_itemsCrafted(Item::VALIDgetId(Items::woodenShovel)),

@@ -15,6 +15,7 @@
 #include "game/item/SwordItem.hpp"
 #include "game/item/Item.hpp"
 #include "game/item/Items.hpp"
+#include "game/item/SignItem.hpp"
 #include "game/ui/FurnaceMenu.hpp"
 #include "game/world/Level.hpp"
 #include "game/world/block/Block.hpp"
@@ -31,12 +32,13 @@ arrayWithLength<int> FurnaceBlockEntity::SLOTS_FOR_UP(furnaceUpSlots, 1);
 arrayWithLength<int> FurnaceBlockEntity::SLOTS_FOR_DOWN(furnaceDownSlots, 2);
 arrayWithLength<int> FurnaceBlockEntity::SLOTS_FOR_SIDES(furnaceSideSlots, 1);
 
-FurnaceBlockEntity::FurnaceBlockEntity()
+FurnaceBlockEntity::FurnaceBlockEntity(FurnaceKind kind)
     : LockableContainerBlockEntity(),
       WorldlyContainer(),
       mItems(NonNullList<not_null_ptr<ItemInstance> >::withSize(3, ItemInstance::EMPTY)),
       mOpenersThisTick(),
-      mOpeners()
+      mOpeners(),
+      mKind(kind)
 {
     mLitTime = 0;
     mLitDuration = 0;
@@ -110,7 +112,7 @@ not_null_ptr<ItemInstance> FurnaceBlockEntity::removeItemNoUpdate(int slot)
 
 int FurnaceBlockEntity::getTotalCookTime(not_null_ptr<ItemInstance> item)
 {
-    return 200;
+    return mKind == FurnaceKind::Furnace ? 200 : 100;
 }
 
 void FurnaceBlockEntity::setItem(unsigned int slot, not_null_ptr<ItemInstance> item)
@@ -173,6 +175,12 @@ int FurnaceBlockEntity::getBurnDuration(not_null_ptr<ItemInstance> item)
         return 100;
     if (itemType == Item::byBlock(Blocks::carpet))
         return 67;
+    if (itemType == Item::byBlock(Blocks::deadbush))
+        return 100;
+    if (itemType == Items::bamboo)
+        return 50;
+    if (itemType == Item::byBlock(Blocks::scaffolding))
+        return 400;
     if (itemType != Item::byBlock(Blocks::ladder))
     {
         if (itemType == Item::byBlock(Blocks::wooden_button))
@@ -207,7 +215,7 @@ int FurnaceBlockEntity::getBurnDuration(not_null_ptr<ItemInstance> item)
                 return 100;
             if (itemType != Items::bow && itemType != Items::crossbow && itemType != Items::fishingRod)
             {
-                if (itemType == Items::sign)
+                if (dynamic_cast<SignItem*>(itemType) != nullptr)
                     return 200;
                 if (itemType == Items::coal)
                     return 1600;
@@ -247,6 +255,8 @@ bool FurnaceBlockEntity::canPlaceItem(int slot, not_null_ptr<ItemInstance> item)
         not_null_ptr<ItemInstance> fuel = mItems[1];
         return isFuel(item) || (FurnaceFuelSlot::isBucket(item) && fuel->getItem() != Items::bucket);
     }
+    if (mKind != FurnaceKind::Furnace && slot == 0)
+        return !FurnaceRecipes::getInstance()->getCookingResult(item, mKind)->isEmpty();
     return true;
 }
 
@@ -305,7 +315,12 @@ AbstractContainerMenu* FurnaceBlockEntity::createMenu(boost::shared_ptr<Inventor
 
 int FurnaceBlockEntity::getTypeId(bool large)
 {
-    return ClientboundContainerOpenPacket::FURNACE;
+    switch (mKind)
+    {
+    case FurnaceKind::Smoker: return ClientboundContainerOpenPacket::SMOKER;
+    case FurnaceKind::BlastFurnace: return ClientboundContainerOpenPacket::BLAST_FURNACE;
+    default: return ClientboundContainerOpenPacket::FURNACE;
+    }
 }
 
 InteractionObject::NameData FurnaceBlockEntity::GetNetworkNameData()
@@ -364,7 +379,10 @@ void FurnaceBlockEntity::load(CompoundTag* tag)
     mLitTime = tag->getShort(L"BurnTime");
     mCookingProgress = tag->getShort(L"CookTime");
     mCookingTotalTime = tag->getShort(L"CookTimeTotal");
-    mLitDuration = std::max(mLitTime, getBurnDuration(mItems[1]));
+    mKind = tag->getBoolean(L"BlastFurnace") ? FurnaceKind::BlastFurnace
+        : tag->getBoolean(L"Smoker") ? FurnaceKind::Smoker : FurnaceKind::Furnace;
+    mLitDuration = mKind == FurnaceKind::Furnace ? std::max(mLitTime, getBurnDuration(mItems[1]))
+        : std::max(mLitTime, static_cast<int>(tag->getShort(L"BurnDuration")));
     mName->loadFromTag(tag);
     mCharcoalUsed = tag->getBoolean(L"CharcoalUsed");
 }
@@ -378,6 +396,11 @@ CompoundTag* FurnaceBlockEntity::save(CompoundTag* tag)
     ContainerHelper::saveAllItems(tag, mItems);
     mName->saveToTag(tag);
     tag->putBoolean(L"CharcoalUsed", mCharcoalUsed);
+    if (mKind != FurnaceKind::Furnace)
+    {
+        tag->putBoolean(mKind == FurnaceKind::Smoker ? L"Smoker" : L"BlastFurnace", true);
+        tag->putShort(L"BurnDuration", static_cast<short>(mLitDuration));
+    }
     return tag;
 }
 
@@ -395,7 +418,7 @@ bool FurnaceBlockEntity::canBurn()
 {
     if (mItems[0]->isEmpty())
         return false;
-    ItemInstance* result = FurnaceRecipes::getInstance()->getResult(mItems[0]);
+    ItemInstance* result = FurnaceRecipes::getInstance()->getCookingResult(mItems[0], mKind);
     if (result->isEmpty())
         return false;
     not_null_ptr<ItemInstance> output = mItems[2];
@@ -415,7 +438,7 @@ void FurnaceBlockEntity::burn()
     if (!canBurn())
         return;
     not_null_ptr<ItemInstance> input = mItems[0];
-    ItemInstance* result = FurnaceRecipes::getInstance()->getResult(input);
+    ItemInstance* result = FurnaceRecipes::getInstance()->getCookingResult(input, mKind);
     not_null_ptr<ItemInstance> output = mItems[2];
     if (!output->isEmpty())
     {
@@ -452,6 +475,8 @@ void FurnaceBlockEntity::tick()
             if (!isLit() && canBurn())
             {
                 mLitTime = getBurnDuration(fuel);
+                if (mKind != FurnaceKind::Furnace)
+                    mLitTime /= 2;
                 mLitDuration = mLitTime;
                 if (isLit())
                 {
@@ -527,7 +552,7 @@ void FurnaceBlockEntity::tick()
 
 boost::shared_ptr<BlockEntity> FurnaceBlockEntity::clone()
 {
-    boost::shared_ptr<FurnaceBlockEntity> result(new FurnaceBlockEntity());
+    boost::shared_ptr<FurnaceBlockEntity> result(new FurnaceBlockEntity(mKind));
     BlockEntity::clone(result);
     result->mCookingProgress = mCookingProgress;
     result->mCookingTotalTime = mCookingTotalTime;

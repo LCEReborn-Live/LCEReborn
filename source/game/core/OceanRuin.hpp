@@ -37,7 +37,7 @@ public:
     const StructureTemplate* placeRuin(Random& random, StructureManager* structureManager, Level* level,
                                        const BlockPos& pos, StructurePlaceSettings& settings);
     BlockPos adaptPosition(const BlockPos& pos, Mirror* mirror, Rotation* rotation, Level* level);
-    void fillBelow(const BlockPos& pos, Mirror* mirror, Rotation* rotation, Level* level);
+    void fillBelow(const BlockPos& pos, Level* level, BoundingBox* clip);
     virtual bool postProcess(Level* level, Random& random, BoundingBox* box);
     virtual void addAdditionalSaveData(DataOutputStream* output);
     virtual void readAdditionalSaveData(DataInputStream* input, StructureManager* structureManager);

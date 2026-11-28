@@ -7,13 +7,19 @@
 #include "game/core/MineShaftStart.hpp"
 #include "game/core/NetherBridgePieces.hpp"
 #include "game/core/OceanMonumentPieces.hpp"
+#include "game/core/ShipwreckPiece.hpp"
 #include "game/core/StrongholdPieces.hpp"
 #include "game/data/ByteArrayTag.hpp"
 #include "game/world/Level.hpp"
 #include "game/world/generation/BuriedTreasureFeature.hpp"
+#include "game/world/generation/EndCityFeature.hpp"
 #include "game/world/generation/LargeFeature.hpp"
+#include "game/world/generation/ModernVillagePieces.hpp"
+#include "game/world/generation/VillageTemplatePieces.hpp"
 #include "game/world/generation/NetherBridgeFeature.hpp"
 #include "game/world/generation/OceanMonumentFeature.hpp"
+#include "game/world/generation/OceanRuinFeature.hpp"
+#include "game/world/generation/PillagerOutpostFeature.hpp"
 #include "game/world/generation/RandomScatteredLargeFeature.hpp"
 #include "game/world/generation/ScatteredFeaturePieces.hpp"
 #include "game/world/generation/ShipwreckFeature.hpp"
@@ -28,7 +34,7 @@ boost::unordered_map<std::wstring, StructureFeatureIO::StructureStartFactory> St
 boost::unordered_map<unsigned int, std::wstring> StructureFeatureIO::startIds;
 boost::unordered_map<std::wstring, StructureFeatureIO::StructurePieceFactory> StructureFeatureIO::pieceFactories;
 boost::unordered_map<unsigned int, std::wstring> StructureFeatureIO::pieceIds;
-int StructureFeatureIO::version = 0;
+thread_local int StructureFeatureIO::version = 0;
 
 void StructureFeatureIO::staticCtor()
 {
@@ -39,20 +45,28 @@ void StructureFeatureIO::staticCtor()
     setStartId(eStructureStart_ScatteredFeature, RandomScatteredLargeFeature::ScatteredFeatureStart::Create,
                LargeFeature::TEMPLE);
     setStartId(eStructureStart_OceanMonument, OceanMonumentFeature::OceanMonumentStart::Create, LargeFeature::MONUMENT);
+    setStartId(eStructureStart_EndCity, EndCityFeature::EndCityStart::Create, LargeFeature::END_CITY);
     setStartId(eStructureStart_WoodlandMansion, WoodlandMansionFeature::WoodlandMansionStart::Create,
                LargeFeature::MANSION);
     setStartId(eStructureStart_BuriedTreasure, BuriedTreasureFeature::BuriedTreasureStart::Create,
                LargeFeature::BURIED_TREASURE);
     setStartId(eStructureStart_Shipwreck, ShipwreckFeature::ShipwreckStart::Create, LargeFeature::SHIPWRECK);
+    setStartId(eStructureStart_OceanRuin, OceanRuinFeature::OceanRuinStart::Create, LargeFeature::RUIN);
 
     MineShaftPieces::loadStatic();
     VillagePieces::loadStatic();
+    ModernVillagePieces::registerPieces();
+    VillageTemplatePieces::registerPieces();
+    PillagerOutpostFeature::registerPieces();
     NetherBridgePieces::loadStatic();
     StrongholdPieces::loadStatic();
     ScatteredFeaturePieces::loadStatic();
     OceanMonumentPieces::loadStatic();
     EndCityPieces::loadStatic();
     WoodlandMansionPieces::loadStatic();
+    setPieceId(eStructurePiece_ShipwreckPiece, ShipwreckPiece::Create, L"ShipwreckPiece");
+    setPieceId(eStructurePiece_BuriedTreasurePiece, BuriedTreasureFeature::BuriedTreasurePiece::Create,
+               L"BuriedTreasurePiece");
 }
 
 void StructureFeatureIO::setStartId(EStructureStart id, StructureStartFactory factory, const std::wstring& name)
@@ -127,8 +141,9 @@ StructureStart* StructureFeatureIO::loadStaticStart(ByteArrayTag* tag, Level* le
             if (!discard)
             {
                 start->load(level, &input);
+                discard = start->getPieces()->empty();
             }
-            else
+            if (discard)
             {
                 delete start;
                 start = NULL;

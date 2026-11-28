@@ -6,7 +6,7 @@
 #include <mutex>
 #include <vector>
 
-#include "platform/pc/audio/BinkAudioDecoder.hpp"
+#include "platform/pc/audio/PcAudioDecoder.hpp"
 
 struct SDL_AudioStream;
 
@@ -43,7 +43,7 @@ private:
         bool muted;
         bool paused;
         unsigned int generation;
-        BinkAudioDecoder decoder;
+        PcAudioDecoder decoder;
         std::vector<unsigned char> owned;
         std::vector<float> frames;
         long long framesBase;

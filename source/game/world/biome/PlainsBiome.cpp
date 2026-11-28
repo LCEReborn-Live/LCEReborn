@@ -44,7 +44,7 @@ FlowerBlock::Flower* PlainsBiome::getRandomFlower(Random& random, const BlockPos
     }
     else if (random.nextInt(3) > 0)
     {
-        const int flower = random.nextInt(3);
+        const int flower = random.nextInt(4);
         if (flower == 0)
         {
             return FlowerBlock::Flower::POPPY;
@@ -53,7 +53,7 @@ FlowerBlock::Flower* PlainsBiome::getRandomFlower(Random& random, const BlockPos
         {
             return FlowerBlock::Flower::HOUSTONIA;
         }
-        return FlowerBlock::Flower::OXEYE_DAISY;
+        return flower == 2 ? FlowerBlock::Flower::OXEYE_DAISY : FlowerBlock::Flower::CORNFLOWER;
     }
     else
     {

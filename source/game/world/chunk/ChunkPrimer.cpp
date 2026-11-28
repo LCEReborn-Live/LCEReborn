@@ -120,11 +120,10 @@ unsigned short ChunkPrimer::getEmissiveMaxHeight()
 
 int ChunkPrimer::getHighestNonAirPos(int x, int z)
 {
-    int columnTop = ((x << 11) | (z << 7)) + 127;
-
-    for (int y = 127; y >= 0; y--)
+    const int maxY = mElementIds.length > 0x8000 ? 255 : 127;
+    for (int y = maxY; y >= 0; --y)
     {
-        if (Block::byId(mElementIds[columnTop + y] >> 4) != Blocks::air)
+        if (getState(x, y, z)->getBlock() != Blocks::air)
         {
             return y;
         }
@@ -135,13 +134,11 @@ int ChunkPrimer::getHighestNonAirPos(int x, int z)
 
 int ChunkPrimer::getHighestSolidPos(int x, int z)
 {
-    int columnTop = ((x << 11) | (z << 7)) + 127;
-
-    for (int y = 127; y >= 0; y--)
+    const int maxY = mElementIds.length > 0x8000 ? 255 : 127;
+    for (int y = maxY; y >= 0; --y)
     {
-        Block* block = Block::byId(mElementIds[columnTop + y] >> 4);
-
-        if (block->mMaterial->blocksMotion() && block->mMaterial != Material::LEAVES)
+        auto* material = getState(x, y, z)->getMaterial();
+        if (material->blocksMotion() && material != Material::LEAVES)
         {
             return y;
         }

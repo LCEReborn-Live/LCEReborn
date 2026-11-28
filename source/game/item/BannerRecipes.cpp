@@ -92,7 +92,7 @@ void BannerRecipes::addRecipes(Recipes* recipes)
             {
                 recipes->addShapelessRecipe(createOutputItem(dye, hashname), Recipes::eRecipeCategory_Banners, L"zzzbg",
                                             BannerItem::makeBanner(DyeColor::WHITE, NULL), pattern->getPatternItem(),
-                                            new ItemInstance(Items::dye, 1, dye), pattern->getAtlasIndex(),
+                                            new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(dye)), pattern->getAtlasIndex(),
                                             pattern->getCraftingMenuTab());
             }
         }
@@ -104,7 +104,7 @@ void BannerRecipes::addRecipes(Recipes* recipes)
                 ItemInstance* output = createOutputItem(dye, hashname);
                 recipes->addShapedRecipe(output, Recipes::eRecipeCategory_Banners, L"sssczczbg", rows.data[0].c_str(),
                                          rows.data[1].c_str(), rows.data[2].c_str(), L'#',
-                                         new ItemInstance(Items::dye, 1, dye), L'*',
+                                         new ItemInstance(Items::dye, 1, DyeColor::dyeItemData(dye)), L'*',
                                          BannerItem::makeBanner(DyeColor::WHITE, NULL), pattern->getAtlasIndex(),
                                          pattern->getCraftingMenuTab());
             }
@@ -177,7 +177,7 @@ const BannerPattern* BannerRecipes::BannerAddPatternRecipe::matchPatterns(
 
                     if (item->getItem() != Items::dye)
                         matches = false;
-                    if (color != -1 && color != item->getAuxValue())
+                    if (color != -1 && color != DyeColor::colorItemData(item->getAuxValue()))
                     {
                         matches = false;
                         break;
@@ -188,7 +188,7 @@ const BannerPattern* BannerRecipes::BannerAddPatternRecipe::matchPatterns(
                         matches = false;
                         break;
                     }
-                    color = item->getAuxValue();
+                    color = DyeColor::colorItemData(item->getAuxValue());
                 }
             }
             else
@@ -252,7 +252,7 @@ not_null_ptr<ItemInstance> BannerRecipes::BannerAddPatternRecipe::assemble(
             if (item->isEmpty() || item->getItem() != Items::dye)
                 continue;
 
-            color = item->getAuxValue();
+            color = DyeColor::colorItemData(item->getAuxValue());
             break;
         }
         CompoundTag* tag = static_cast<CompoundTag*>(result->getOrCreateTagElement(BlockItem::BLOCK_ENTITY_TAG));

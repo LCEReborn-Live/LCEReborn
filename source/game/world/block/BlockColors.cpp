@@ -269,6 +269,8 @@ BlockColors* BlockColors::createDefault()
         virtual int getColor(const BlockState* state, LevelSource* levelSource, const BlockPos* pos, int tintIndex)
         {
             const DyeColor* dyeColor = static_cast<ShulkerBoxBlock*>(state->getBlock())->getDyeColor();
+            if (!dyeColor)
+                return 0xffffff;
             ColourTable* colourTable = Minecraft::GetInstance()->getColourTable();
             eMinecraftColour colour = dyeColor->getShulkerColor();
             return colourTable->getColour(colour);
@@ -281,8 +283,8 @@ BlockColors* BlockColors::createDefault()
         Blocks::pink_shulker_box,       Blocks::gray_shulker_box,   Blocks::silver_shulker_box,
         Blocks::cyan_shulker_box,       Blocks::purple_shulker_box, Blocks::blue_shulker_box,
         Blocks::brown_shulker_box,      Blocks::green_shulker_box,  Blocks::red_shulker_box,
-        Blocks::black_shulker_box};
-    blockColors->registerColor(new ShulkerBox_BlockColor(), arrayWithLength<Block*>(shulkerBoxBlocks, 16));
+        Blocks::black_shulker_box,      Blocks::undyed_shulker_box};
+    blockColors->registerColor(new ShulkerBox_BlockColor(), arrayWithLength<Block*>(shulkerBoxBlocks, 17));
 
     return blockColors;
 }

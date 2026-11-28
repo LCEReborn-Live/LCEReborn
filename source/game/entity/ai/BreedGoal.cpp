@@ -137,7 +137,8 @@ void BreedGoal::breed()
     child->setAge(-24000);
     child->moveTo(mAnimal->mX, mAnimal->mY, mAnimal->mZ, 0.0f, 0.0f);
     child->setDespawnProtected();
-    mLevel->addEntity(child);
+    if (mLevel->addEntity(child) && player && child->GetType() == EntityType::PANDA)
+        player->awardStat(GenericStats::achievement(eAward_Zoologist), GenericStats::param_noArgs());
 
     Random* random = mAnimal->getRandom();
     for (int i = 0; i < 7; ++i)

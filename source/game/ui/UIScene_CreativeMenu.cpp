@@ -1,4 +1,6 @@
 #include "game/ui/UIScene_CreativeMenu.hpp"
+#include "game/item/SignItem.hpp"
+#include "game/world/block/DecorativeStone.hpp"
 #include "game/core/VirtualPadKeys.hpp"
 
 #include <algorithm>
@@ -18,6 +20,8 @@
 #include "game/item/ItemInstance.hpp"
 #include "game/item/Inventory.hpp"
 #include "game/item/Items.hpp"
+#include "game/item/BannerItem.hpp"
+#include "game/item/BannerStencilItem.hpp"
 #include "game/item/Potions.hpp"
 #include "game/item/SimpleContainer.hpp"
 #include "game/core/Slot.hpp"
@@ -34,6 +38,7 @@
 #include "game/world/generation/MultiPlayerGameMode.hpp"
 #include "game/world/generation/LocalPlayer.hpp"
 #include "game/world/block/Blocks.hpp"
+#include "game/world/block/BlockId.hpp"
 #include "game/world/block/Block.hpp"
 #include "game/item/Enchantment.hpp"
 #include "game/item/EnchantmentInstance.hpp"
@@ -897,6 +902,7 @@ void UIScene_CreativeMenu::staticCtor()
     MenuBuilder builder;
     builder.mItems = &s_groupItems[ECreative_Inventory_Groups_BuildingBlocks];
     builder.ITEM_BLOCKSTATE(Blocks::stone->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::smooth_stone->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::grass->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::grass_path->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::dirt->defaultBlockState());
@@ -974,6 +980,11 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ITEM_BLOCKSTATE(Blocks::stripped_log_jungle->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::stripped_log_acacia->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::stripped_log_dark_oak->defaultBlockState());
+    for (Block* bark : {Blocks::bark_oak, Blocks::bark_spruce, Blocks::bark_birch, Blocks::bark_jungle,
+                        Blocks::bark_acacia, Blocks::bark_dark_oak})
+        builder.ITEM_BLOCKSTATE(bark->defaultBlockState());
+    for (int species = 0; species < BlockId::WOOD_SPECIES_COUNT; ++species)
+        builder.ITEM_BLOCKSTATE(Block::byId(BlockId::STRIPPED_WOOD_FIRST + species)->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::gravel->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::brick_block->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::mossy_cobblestone->defaultBlockState());
@@ -988,6 +999,19 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ITEM_BLOCKSTATE(Blocks::glowstone->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::magma->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::sea_lantern->defaultBlockState());
+    for (int id = BlockId::SMOOTH_SANDSTONE; id <= BlockId::SMOOTH_QUARTZ; ++id)
+        builder.ITEM_BLOCKSTATE(Block::byId(id)->defaultBlockState());
+    for (int material = 0; material < DecorativeStone::MaterialCount; ++material)
+    {
+        if (material < DecorativeStone::StairCount)
+        {
+            builder.ITEM_BLOCKSTATE(Block::byId(BlockId::DECOR_STAIRS_FIRST + material)->defaultBlockState());
+            auto* slab = Block::byId(BlockId::DECOR_SLAB_FIRST + material / DecorativeStone::SlabTypesPerBlock);
+            builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(slab, 1, material % DecorativeStone::SlabTypesPerBlock)));
+        }
+        if (DecorativeStone::materials[material].wall)
+            builder.ITEM_BLOCKSTATE(Block::byId(BlockId::DECOR_WALL_FIRST + material)->defaultBlockState());
+    }
     builder.ITEM_BLOCKSTATE(
         Blocks::prismarine->defaultBlockState()->setValue(PrismarineBlock::VARIANT, PrismarineBlock::Variant::ROUGH));
     builder.ITEM_BLOCKSTATE(
@@ -995,6 +1019,7 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ITEM_BLOCKSTATE(
         Blocks::prismarine->defaultBlockState()->setValue(PrismarineBlock::VARIANT, PrismarineBlock::Variant::DARK));
     builder.ITEM_BLOCKSTATE(Blocks::slime->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::scaffolding->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::fence->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::spruce_fence->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::birch_fence->defaultBlockState());
@@ -1139,6 +1164,7 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ITEM_BLOCKSTATE(Blocks::vine->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::waterlily->defaultBlockState());
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Blocks::torch, 1, 5)));
+    builder.ITEM_BLOCKSTATE(Blocks::lantern->defaultBlockState());
     builder.ITEM_AUX(Blocks::tallgrass, TallGrassBlock::VARIANT, TallGrassBlock::Variant::DEAD_BUSH);
     builder.ITEM_AUX(Blocks::tallgrass, TallGrassBlock::VARIANT, TallGrassBlock::Variant::GRASS);
     builder.ITEM_BLOCKSTATE(
@@ -1157,6 +1183,8 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ITEM_AUX(Blocks::red_flower, Blocks::red_flower->getFlowerProperty(), FlowerBlock::Flower::WHITE_TULIP);
     builder.ITEM_AUX(Blocks::red_flower, Blocks::red_flower->getFlowerProperty(), FlowerBlock::Flower::PINK_TULIP);
     builder.ITEM_AUX(Blocks::red_flower, Blocks::red_flower->getFlowerProperty(), FlowerBlock::Flower::OXEYE_DAISY);
+    builder.ITEM_AUX(Blocks::red_flower, Blocks::red_flower->getFlowerProperty(), FlowerBlock::Flower::LILY_OF_THE_VALLEY);
+    builder.ITEM_AUX(Blocks::red_flower, Blocks::red_flower->getFlowerProperty(), FlowerBlock::Flower::CORNFLOWER);
     builder.ITEM_BLOCKSTATE(Blocks::double_plant->defaultBlockState()->setValue(DoublePlantBlock::VARIANT,
                                                                                 DoublePlantBlock::Variant::SUNFLOWER));
     builder.ITEM_AUX(Blocks::double_plant, DoublePlantBlock::VARIANT, DoublePlantBlock::Variant::SYRINGA);
@@ -1174,7 +1202,8 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ITEM_BLOCKSTATE(Blocks::glass->defaultBlockState());
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::painting, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::itemFrame, 1, 0)));
-    builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::sign, 1, 0)));
+    for (int wood = 0; wood < BlockId::WOOD_SPECIES_COUNT; ++wood)
+        builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(SignItem::byWoodType(wood))));
     builder.ITEM_BLOCKSTATE(Blocks::bookshelf->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::hay_block->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::bone_block->defaultBlockState());
@@ -1249,6 +1278,9 @@ void UIScene_CreativeMenu::staticCtor()
     builder.BANNER(DyeColor::BLACK, NULL);
     builder.BANNER(DyeColor::GREEN, NULL);
     builder.BANNER(DyeColor::BROWN, NULL);
+    builder.ADD(BannerItem::makeIllagerBanner());
+    for (int variant = 0; variant < BannerStencilItem::Count; ++variant)
+        builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::bannerStencil, 1, variant)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Blocks::wool, 1, 15)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Blocks::wool, 1, 11)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Blocks::wool, 1, 3)));
@@ -1413,6 +1445,20 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ITEM_BLOCKSTATE(Blocks::enchanting_table->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::beacon->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::conduit->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::barrel->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::cartography_table->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::loom->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::lectern->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::blast_furnace->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::smoker->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::campfire->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::composter->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::grindstone->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::stonecutter->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::fletching_table->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::smithing_table->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::bell->defaultBlockState());
+    builder.ITEM_BLOCKSTATE(Blocks::undyed_shulker_box->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::black_shulker_box->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::blue_shulker_box->defaultBlockState());
     builder.ITEM_BLOCKSTATE(Blocks::light_blue_shulker_box->defaultBlockState());
@@ -1493,7 +1539,9 @@ void UIScene_CreativeMenu::staticCtor()
     builder.DEBUG_SPAWN_EGG(L"evocation_illager", L"");
     builder.DEBUG_SPAWN_EGG(L"vex", L"");
     builder.DEBUG_SPAWN_EGG(L"vindication_illager", L"");
+    builder.DEBUG_SPAWN_EGG(L"pillager", L"");
     builder.DEBUG_SPAWN_EGG(L"villager", L"");
+    builder.DEBUG_SPAWN_EGG(L"wandering_trader", L"");
     builder.DEBUG_SPAWN_EGG(L"bat", L"");
     builder.DEBUG_SPAWN_EGG(L"pig", L"");
     builder.DEBUG_SPAWN_EGG(L"sheep", L"");
@@ -1510,12 +1558,15 @@ void UIScene_CreativeMenu::staticCtor()
     builder.DEBUG_SPAWN_EGG(L"wolf", L"");
     builder.DEBUG_SPAWN_EGG(L"ocelot", L"");
     builder.DEBUG_SPAWN_EGG(L"polar_bear", L"");
+    builder.DEBUG_SPAWN_EGG(L"panda", L"");
+    builder.DEBUG_SPAWN_EGG(L"cat", L"");
     builder.DEBUG_SPAWN_EGG(L"horse", L"");
     builder.DEBUG_SPAWN_EGG(L"donkey", L"");
     builder.DEBUG_SPAWN_EGG(L"mule", L"");
     builder.DEBUG_SPAWN_EGG(L"skeleton_horse", L"");
     builder.DEBUG_SPAWN_EGG(L"zombie_horse", L"");
     builder.DEBUG_SPAWN_EGG(L"llama", L"");
+    builder.DEBUG_SPAWN_EGG(L"trader_llama", L"");
     builder.DEBUG_SPAWN_EGG(L"turtle", L"");
     builder.DEBUG_SPAWN_EGG(L"dolphin", L"");
     builder.DEBUG_SPAWN_EGG(L"phantom", L"");
@@ -1544,6 +1595,8 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::melon, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::mushroomStew, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::rabbitStew, 1, 0)));
+    builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::sweetBerries, 1, 0)));
+    builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::bamboo)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::beetrootSoup, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::bread, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::cake, 1, 0)));
@@ -1745,6 +1798,8 @@ void UIScene_CreativeMenu::staticCtor()
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::chorusFruitPopped, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::turtleShellPiece, 1, 0)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, 0)));
+    for (int dye = DyeColor::BlackDye; dye < DyeColor::DyeItemDataCount; ++dye)
+        builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, dye)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, 4)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, 12)));
     builder.ADD(not_null_ptr<ItemInstance>(new ItemInstance(Items::dye, 1, 6)));

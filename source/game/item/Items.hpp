@@ -172,6 +172,9 @@ public:
     static Item* itemFrame;
     static Item* flowerPot;
     static Item* carrot;
+    static Item* sweetBerries;
+    static Item* bamboo;
+    static Item* bannerStencil;
     static Item* potato;
     static Item* bakedPotato;
     static Item* poisonousPotato;

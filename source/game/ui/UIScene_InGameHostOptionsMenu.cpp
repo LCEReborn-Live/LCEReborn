@@ -1,5 +1,6 @@
 #include "game/ui/UIScene_InGameHostOptionsMenu.hpp"
 #include "game/core/StringIds.hpp"
+#include "game/core/ExtraStrings.hpp"
 
 #include <cwchar>
 #include <string>
@@ -38,6 +39,11 @@
 
 extern ConsoleUIController gConsoleUIController;
 
+namespace
+{
+constexpr int ImmediateRespawnControl = 0x13;
+}
+
 UIScene_InGameHostOptionsMenu::UIScene_InGameHostOptionsMenu(int sceneType, void*, UILayer* layer)
     : UIScene(sceneType, layer),
       m_hostOptions()
@@ -68,6 +74,8 @@ void UIScene_InGameHostOptionsMenu::Init()
                                      gApp.GetGameHostOption(eGameHostOption_DoDaylightCycle) != 0);
         m_hostOptions.AddNewCheckbox(std::wstring(L10N::GetString(IDS_KEEP_INVENTORY)), 3,
                                      gApp.GetGameHostOption(eGameHostOption_KeepInventory) != 0);
+        m_hostOptions.AddNewCheckbox(std::wstring(L10N::GetString(IDS_LCE_IMMEDIATE_RESPAWN)), ImmediateRespawnControl,
+                                     gApp.GetGameHostOption(eGameHostOption_ImmediateRespawn) != 0);
         m_hostOptions.AddNewCheckbox(std::wstring(L10N::GetString(IDS_MOB_SPAWNING)), 4,
                                      gApp.GetGameHostOption(eGameHostOption_DoMobSpawning) != 0);
         m_hostOptions.AddNewCheckbox(std::wstring(L10N::GetString(IDS_MOB_GRIEFING)), 5,
@@ -158,6 +166,8 @@ void UIScene_InGameHostOptionsMenu::handleInput(int playerId, int action, bool r
             {
                 gApp.SetGameHostOption(options, eGameHostOption_DoDaylightCycle, m_hostOptions.GetCheckboxValue(2));
                 gApp.SetGameHostOption(options, eGameHostOption_KeepInventory, m_hostOptions.GetCheckboxValue(3));
+                gApp.SetGameHostOption(options, eGameHostOption_ImmediateRespawn,
+                                       m_hostOptions.GetCheckboxValue(ImmediateRespawnControl));
                 gApp.SetGameHostOption(options, eGameHostOption_DoMobSpawning, m_hostOptions.GetCheckboxValue(4));
                 gApp.SetGameHostOption(options, eGameHostOption_MobGriefing, m_hostOptions.GetCheckboxValue(5));
                 gApp.SetGameHostOption(options, eGameHostOption_DoWeatherCycle, m_hostOptions.GetCheckboxValue(9));

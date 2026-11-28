@@ -4,7 +4,7 @@
 
 #include "game/core/IconRegister.hpp"
 #include "game/item/ItemInstance.hpp"
-#include "game/item/Items.hpp"
+#include "game/item/SignItem.hpp"
 #include "game/ui/BlockTooltipDataHolder.hpp"
 #include "game/util/AABB.hpp"
 #include "game/util/Random.hpp"
@@ -12,6 +12,7 @@
 #include "game/world/LevelSource.hpp"
 #include "game/world/generation/MultiplayerLocalPlayer.hpp"
 #include "game/world/block/Block.hpp"
+#include "game/world/block/BlockId.hpp"
 #include "game/world/block/BlockEntity.hpp"
 #include "game/world/block/BlockPos.hpp"
 #include "game/world/block/BlockState.hpp"
@@ -23,6 +24,21 @@ static const AABB* gSignShape = AABB::newPermanent(0.25, 0.0, 0.25, 0.75, 1.0, 0
 
 SignBlock::SignBlock() : BaseEntityBlock(Material::WOOD)
 {
+}
+
+Block* SignBlock::byWoodType(int woodType, bool standing)
+{
+    if (woodType == 0)
+        return standing ? Blocks::standing_sign : Blocks::wall_sign;
+    return Block::byId((standing ? BlockId::STANDING_WOOD_SIGN_FIRST : BlockId::WALL_WOOD_SIGN_FIRST)
+                       + woodType - 1);
+}
+
+int SignBlock::getWoodType()
+{
+    const int id = Block::getId(this);
+    return id < BlockId::STANDING_WOOD_SIGN_FIRST
+        ? 0 : 1 + (id - BlockId::STANDING_WOOD_SIGN_FIRST) % (BlockId::WOOD_SPECIES_COUNT - 1);
 }
 
 boost::shared_ptr<BlockEntity> SignBlock::newBlockEntity(Level* level, int)
@@ -69,12 +85,12 @@ bool SignBlock::isPossibleToRespawnInThis()
 
 Item* SignBlock::getResource(const BlockState*, Random*, int)
 {
-    return Items::sign;
+    return SignItem::byWoodType(getWoodType());
 }
 
 not_null_ptr<ItemInstance> SignBlock::getCloneItemInstance(Level*, const BlockPos&, const BlockState*)
 {
-    return not_null_ptr<ItemInstance>(new ItemInstance(Items::sign));
+    return not_null_ptr<ItemInstance>(new ItemInstance(SignItem::byWoodType(getWoodType())));
 }
 
 bool SignBlock::use(Level* level, const BlockPos& pos, const BlockState*, boost::shared_ptr<Player> player,
@@ -114,7 +130,7 @@ unsigned int SignBlock::GetInteractTooltip(const BlockTooltipDataHolder& tooltip
 
 TextureAtlasSprite* SignBlock::getTexture(const Direction* direction, const BlockState* state)
 {
-    return Blocks::planks->getTexture(direction);
+    return Blocks::planks->getTexture(direction, Blocks::planks->getBlockState(getWoodType()));
 }
 
 void SignBlock::registerIcons(IconRegister*)

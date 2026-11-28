@@ -25,6 +25,8 @@ class SignBlock : public BaseEntityBlock
 {
 public:
     SignBlock();
+    static Block* byWoodType(int woodType, bool standing);
+    int getWoodType();
     virtual ~SignBlock() {}
 
     virtual boost::shared_ptr<BlockEntity> newBlockEntity(Level* level, int data);

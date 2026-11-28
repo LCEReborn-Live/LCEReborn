@@ -38,6 +38,9 @@ public:
     static void appendHoverTextFromBannerBlockEntityTag(not_null_ptr<ItemInstance> itemInstance,
                                                         std::vector<HtmlString>* lines);
     static ItemInstance* makeBanner(const DyeColor* color, ListTag* patterns);
+    static not_null_ptr<ItemInstance> makeIllagerBanner();
+    static bool isIllagerBanner(const DyeColor* color, ListTag* patterns);
+    static ListTag* copyBannerPatterns(const DyeColor* color, ListTag* patterns);
     static int getFirstPatternName(not_null_ptr<ItemInstance> itemInstance);
 };
 

@@ -8,6 +8,7 @@
 #include "game/command/chat/ClearChatCommand.hpp"
 #include "game/command/chat/DefaultGameModeChatCommand.hpp"
 #include "game/command/chat/DifficultyChatCommand.hpp"
+#include "game/command/chat/GameRuleChatCommand.hpp"
 #include "game/command/chat/EffectChatCommand.hpp"
 #include "game/command/chat/EnchantChatCommand.hpp"
 #include "game/command/chat/ExecuteChatCommand.hpp"
@@ -79,6 +80,7 @@ std::vector<ChatCommand*>& Storage()
                                          new ExperienceChatCommand(),
                                          new SpawnpointChatCommand(),
                                          new DifficultyChatCommand(),
+                                         new GameRuleChatCommand(),
                                          new DefaultGameModeChatCommand(),
                                          new SetWorldSpawnChatCommand(),
                                          new ToggleDownfallChatCommand(),

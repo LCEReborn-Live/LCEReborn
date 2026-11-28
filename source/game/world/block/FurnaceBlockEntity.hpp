@@ -11,6 +11,7 @@
 #include "game/data/CompoundTag.hpp"
 #include "game/data/DataFixerUpper.hpp"
 #include "game/item/Container.hpp"
+#include "game/item/FurnaceKind.hpp"
 #include "game/item/ItemInstance.hpp"
 #include "game/item/ItemListDataWalker.hpp"
 #include "game/item/NonNullList.hpp"
@@ -27,7 +28,7 @@ class FurnaceMenu;
 class FurnaceBlockEntity : public LockableContainerBlockEntity, public WorldlyContainer
 {
 public:
-    FurnaceBlockEntity();
+    explicit FurnaceBlockEntity(FurnaceKind kind = FurnaceKind::Furnace);
     virtual ~FurnaceBlockEntity();
     virtual unsigned long long GetType();
 
@@ -87,6 +88,7 @@ private:
     int mLitDuration;
     int mCookingProgress;
     int mCookingTotalTime;
+    FurnaceKind mKind;
     boost::shared_ptr<CensoredString> mName;
 };
 

@@ -313,7 +313,8 @@ unsigned long long StrongholdPieces::loadStatic()
     StructureFeatureIO::setPieceId(eStructurePiece_RightTurn, &RightTurn::Create, L"SHRT");
     StructureFeatureIO::setPieceId(eStructurePiece_StrongholdRoomCrossing, &RoomCrossing::Create, L"SHRC");
     StructureFeatureIO::setPieceId(eStructurePiece_StairsDown, &StairsDown::Create, L"SHSD");
-    StructureFeatureIO::setPieceId(eStructurePiece_StrongholdStartPiece, &StairsDown::Create, L"SHStart");
+    StructureFeatureIO::setPieceId(eStructurePiece_StrongholdStartPiece,
+                                   []() -> StructurePiece* { return new StartPiece(); }, L"SHStart");
     StructureFeatureIO::setPieceId(eStructurePiece_Straight, &Straight::Create, L"SHS");
     StructureFeatureIO::setPieceId(eStructurePiece_StraightStairsDown, &StraightStairsDown::Create, L"SHSSD");
     return 0;

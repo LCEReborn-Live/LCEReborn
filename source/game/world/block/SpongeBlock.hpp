@@ -27,6 +27,7 @@ public:
     int removeWaterBreadthFirstSearch(Level* level, const BlockPos& pos);
     void tryAbsorbWater(Level* level, const BlockPos& pos, const BlockState* state);
     virtual void onPlace(Level* level, const BlockPos& pos, const BlockState* state);
+    void tick(Level* level, const BlockPos& pos, const BlockState* state, Random* random) override;
     virtual void neighborChanged(const BlockState* state, Level* level, const BlockPos& pos, Block* block,
                                  const BlockPos& fromPos);
     virtual const BlockState* getBlockState(int data);

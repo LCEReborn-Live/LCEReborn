@@ -5,12 +5,14 @@
 #include "game/core/CMinecraftApp.hpp"
 #include "game/core/SuperflatConfig.hpp"
 #include "game/util/Random.hpp"
+#include "game/world/Dimension.hpp"
 #include "game/world/Level.hpp"
 #include "game/world/LevelGenerationOptions.hpp"
 #include "game/world/biome/Biome.hpp"
 #include "game/world/biome/BiomeSource.hpp"
 #include "game/world/block/BlockPos.hpp"
 #include "game/world/generation/ScatteredFeaturePieces.hpp"
+#include "game/world/generation/StructureTerrain.hpp"
 
 static std::vector<Biome*> gRandomScatteredLargeFeatureBiomes;
 
@@ -123,7 +125,7 @@ BlockPos* RandomScatteredLargeFeature::getNearestGeneratedFeature(Level* levelIn
 
 StructureStart* RandomScatteredLargeFeature::createStructureStart(int chunkX, int chunkZ)
 {
-    return new ScatteredFeatureStart(level, random, chunkX, chunkZ);
+    return new ScatteredFeatureStart(level, random, chunkX, chunkZ, mTerrain);
 }
 
 bool RandomScatteredLargeFeature::isSwamphut(const BlockPos& pos)
@@ -146,7 +148,7 @@ std::vector<Biome::MobSpawnerData*>* RandomScatteredLargeFeature::getSwamphutEne
 }
 
 RandomScatteredLargeFeature::ScatteredFeatureStart::ScatteredFeatureStart(Level* levelIn, Random& randomIn, int chunkX,
-                                                                          int chunkZ)
+                                                                          int chunkZ, GenericOverworldLevelSource* source)
     : StructureStart(chunkX, chunkZ)
 {
     Biome* biome = levelIn->getBiome(BlockPos(chunkX * 16 + 8, 0, chunkZ * 16 + 8));
@@ -167,6 +169,13 @@ RandomScatteredLargeFeature::ScatteredFeatureStart::ScatteredFeatureStart(Level*
     else if (biome == Biome::ICE_PLAINS || biome == Biome::COLD_TAIGA)
     {
         mPieces.push_back(new ScatteredFeaturePieces::Igloo(levelIn, randomIn, x, z));
+    }
+    if (source && !mPieces.empty() && biome != Biome::DESERT && biome != Biome::DESERT_HILLS)
+    {
+        StructureTerrain terrain(levelIn, source);
+        const int offset = biome == Biome::ICE_PLAINS || biome == Biome::COLD_TAIGA ? -1 : 0;
+        auto* piece = static_cast<ScatteredFeaturePieces::ScatteredFeaturePiece*>(mPieces.front());
+        piece->alignToTerrain(terrain, offset, levelIn->mDimension->getSpawnYPosition());
     }
     calculateBoundingBox();
 }

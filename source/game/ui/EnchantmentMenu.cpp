@@ -320,7 +320,7 @@ not_null_ptr<ItemInstance> EnchantmentMenu::quickMoveStack(boost::shared_ptr<Pla
                     return ItemInstance::EMPTY;
             }
         }
-        else if (stack->getItem() == Items::dye && DyeColor::byItemData(stack->getAuxValue()) == DyeColor::BLUE)
+        else if (stack->getItem() == Items::dye && stack->getAuxValue() == DyeColor::BLUE->getItemData())
         {
             if (!moveItemStackTo(stack, 1, 2, true, true, true))
                 return ItemInstance::EMPTY;

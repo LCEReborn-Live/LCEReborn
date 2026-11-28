@@ -1,5 +1,7 @@
 #include "game/item/FurnaceRecipes.hpp"
 #include "game/world/block/StoneBrickBlock.hpp"
+#include "game/world/block/BlockId.hpp"
+#include "game/world/block/StoneBlock.hpp"
 #include "game/core/DyeColor.hpp"
 
 #include "game/item/FishFoodItem.hpp"
@@ -26,6 +28,14 @@ FurnaceRecipes::FurnaceRecipes()
     addFurnaceRecipe(Items::mutton, new ItemInstance(Items::cookedMutton), 0.35f);
     addFurnaceRecipe(Items::kelp, new ItemInstance(Items::driedKelp), 0.05f);
     addFurnaceRecipe(Blocks::cobblestone, new ItemInstance(Blocks::stone), 0.1f);
+    addFurnaceRecipe(new ItemInstance(Blocks::stone, 1, StoneBlock::Variant::STONE->getData()),
+                     new ItemInstance(Blocks::smooth_stone), 0.1f);
+    addFurnaceRecipe(new ItemInstance(Blocks::sandstone, 1, 0),
+                     new ItemInstance(Block::byId(BlockId::SMOOTH_SANDSTONE)), 0.1f);
+    addFurnaceRecipe(new ItemInstance(Blocks::red_sandstone, 1, 0),
+                     new ItemInstance(Block::byId(BlockId::SMOOTH_RED_SANDSTONE)), 0.1f);
+    addFurnaceRecipe(new ItemInstance(Blocks::quartz_block, 1, 0),
+                     new ItemInstance(Block::byId(BlockId::SMOOTH_QUARTZ)), 0.1f);
     addFurnaceRecipe(new ItemInstance(Blocks::stonebrick, 1, StoneBrickBlock::DEFAULT_META),
                      new ItemInstance(Blocks::stonebrick, 1, StoneBrickBlock::CRACKED_META), 0.1f);
     addFurnaceRecipe(Items::clayBall, new ItemInstance(Items::brick), 0.3f);
@@ -141,6 +151,29 @@ ItemInstance* FurnaceRecipes::getResult(not_null_ptr<ItemInstance> item)
         }
     }
     return ItemInstance::EMPTY.get();
+}
+
+ItemInstance* FurnaceRecipes::getCookingResult(not_null_ptr<ItemInstance> item, FurnaceKind kind)
+{
+    if (kind == FurnaceKind::Smoker)
+    {
+        Item* input = item->getItem();
+        if (input != Items::beef && input != Items::porkchop && input != Items::chicken
+            && input != Items::rabbit && input != Items::mutton && input != Items::potato
+            && input != Items::fish && input != Items::kelp)
+            return ItemInstance::EMPTY.get();
+    }
+    ItemInstance* result = getResult(item);
+    if (kind == FurnaceKind::BlastFurnace && !result->isEmpty())
+    {
+        Block* ore = Block::byItem(item->getItem());
+        const bool isOre = ore == Blocks::iron_ore || ore == Blocks::gold_ore || ore == Blocks::diamond_ore
+            || ore == Blocks::emerald_ore || ore == Blocks::coal_ore || ore == Blocks::redstone_ore
+            || ore == Blocks::lapis_ore || ore == Blocks::quartz_ore;
+        if (!isOre && result->getItem() != Items::ironNugget && result->getItem() != Items::goldNugget)
+            return ItemInstance::EMPTY.get();
+    }
+    return result;
 }
 
 FurnaceRecipes* FurnaceRecipes::getInstance()

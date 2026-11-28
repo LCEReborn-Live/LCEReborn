@@ -17,10 +17,12 @@ static boost::unordered_map<unsigned long long, Mob::SpawnPlacementType> placeme
     placements[EntityType::MULE] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::MUSHROOM_COW] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::OCELOT] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
+    placements[EntityType::CAT] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::PIG] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::RABBIT] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::SHEEP] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::PARROT] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
+    placements[EntityType::PANDA] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::SNOW_MAN] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;
     placements[EntityType::SQUID] = Mob::SPAWN_PLACEMENT_TYPE_IN_OPEN_WATER;
     placements[EntityType::TURTLE] = Mob::SPAWN_PLACEMENT_TYPE_ON_GROUND;

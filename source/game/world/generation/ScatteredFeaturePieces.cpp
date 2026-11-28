@@ -1,4 +1,7 @@
 #include "game/world/generation/ScatteredFeaturePieces.hpp"
+#include "game/world/generation/StructureTerrain.hpp"
+#include "game/data/LevelStorage.hpp"
+#include "game/core/Cat.hpp"
 #include "game/core/EntityType.hpp"
 
 #include "game/core/BoundingBox.hpp"
@@ -153,6 +156,19 @@ void ScatteredFeaturePieces::ScatteredFeaturePiece::readAdditionalSaveData(DataI
     mPlaceSettings.read(input);
 }
 
+void ScatteredFeaturePieces::ScatteredFeaturePiece::alignToTerrain(StructureTerrain& terrain, int offset,
+                                                                  int minimumHeight)
+{
+    int total = 0;
+    for (int x = mBoundingBox->x0; x <= mBoundingBox->x1; ++x)
+        for (int z = mBoundingBox->z0; z <= mBoundingBox->z1; ++z)
+            total += std::max(minimumHeight, terrain.surface(x, z).ground + 1);
+
+    mHeightPosition = total / (mBoundingBox->getXSpan() * mBoundingBox->getZSpan());
+    move(0, mHeightPosition - terrainBaseY() + offset, 0);
+    setDirty();
+}
+
 bool ScatteredFeaturePieces::ScatteredFeaturePiece::updateAverageGroundHeight(Level* level, BoundingBox* box,
                                                                               int offset, bool useSpawnHeight)
 {
@@ -190,10 +206,15 @@ bool ScatteredFeaturePieces::ScatteredFeaturePiece::updateAverageGroundHeight(Le
     if (count == 0)
         return false;
 
-    BoundingBox* bounds = mBoundingBox;
     mHeightPosition = total / count;
-    bounds->move(0, mHeightPosition - bounds->y0 + offset, 0);
+    move(0, mHeightPosition - terrainBaseY() + offset, 0);
+    setDirty();
     return true;
+}
+
+int ScatteredFeaturePieces::ScatteredFeaturePiece::terrainBaseY() const
+{
+    return mBoundingBox->y0;
 }
 
 ScatteredFeaturePieces::DesertPyramidPiece::DesertPyramidPiece() : ScatteredFeaturePiece()
@@ -518,6 +539,41 @@ ScatteredFeaturePieces::Igloo::Igloo(Level* level, Random& random, int x, int z)
     mPlaceSettings.setIgnoreBlock(Blocks::structure_void);
     mHasBasement = random.nextDouble() < 0.5;
     mBasementDepth = random.nextInt(8) + 4;
+
+    auto* manager = level->getLevelStorage()->getStructureManager();
+    mPlaceSettings.setRotation(getRotation());
+    const auto* top = manager->getOrCreate(eMinecraftStructureTemplate_Igloo_Top);
+    const auto size = top->getSize();
+    const auto last = StructureTemplate::transform(BlockPos(size.x - 1, 0, size.z - 1),
+                                                    Mirror::NONE, getRotation());
+    mOrigin = BlockPos(mBoundingBox->x0 - std::min(0, last.x), mBoundingBox->y0,
+                       mBoundingBox->z0 - std::min(0, last.z));
+    setBoundingBox(top->getTransformedBounds(mOrigin, Mirror::NONE, getRotation()));
+    if (mHasBasement)
+    {
+        const auto* middle = manager->getOrCreate(eMinecraftStructureTemplate_Igloo_Middle);
+        const auto* bottom = manager->getOrCreate(eMinecraftStructureTemplate_Igloo_Bottom);
+        const auto expand = [&](const StructureTemplate* piece, const BlockPos& connector, const BlockPos& target) {
+            const auto offset = top->calculateConnectedPosition(&mPlaceSettings, connector, &mPlaceSettings, target);
+            std::unique_ptr<BoundingBox> bounds(piece->getTransformedBounds(mOrigin.offset(offset), Mirror::NONE,
+                                                                           getRotation()));
+            mBoundingBox->expand(bounds.get());
+        };
+        for (int i = 0; i < mBasementDepth; ++i)
+            expand(middle, BlockPos(3, -1 - i * 3, 5), BlockPos(1, 2, 1));
+        expand(bottom, BlockPos(3, -1 - mBasementDepth * 3, 5), BlockPos(3, 5, 7));
+    }
+}
+
+void ScatteredFeaturePieces::Igloo::move(int x, int y, int z)
+{
+    StructurePiece::move(x, y, z);
+    mOrigin = mOrigin.offset(x, y, z);
+}
+
+int ScatteredFeaturePieces::Igloo::terrainBaseY() const
+{
+    return mOrigin.y;
 }
 
 bool ScatteredFeaturePieces::Igloo::postProcess(Level* level, Random& random, BoundingBox* box)
@@ -525,25 +581,24 @@ bool ScatteredFeaturePieces::Igloo::postProcess(Level* level, Random& random, Bo
     if (!updateAverageGroundHeight(level, box, -1, true))
         return false;
 
-    BlockPos origin(getWorldX(0, 0) + 2, getWorldY(0), getWorldZ(0, 0) + 2);
+    const BlockPos origin = mOrigin;
     mPlaceSettings.setBoundingBox(box);
     mPlaceSettings.setRotation(getRotation());
 
-    const StructureTemplate* top = Minecraft::GetInstance()->getStructureManager()->get(
-        eMinecraftStructureTemplate_Igloo_Top);
+    auto* manager = level->getLevelStorage()->getStructureManager();
+    const auto* top = manager->getOrCreate(eMinecraftStructureTemplate_Igloo_Top);
     top->placeInWorld(level, origin, &mPlaceSettings);
 
     if (!mHasBasement)
     {
         BlockPos snowPos = StructureTemplate::calculateRelativePosition(&mPlaceSettings, BlockPos(3, 0, 5));
-        level->setBlock(origin.offset(snowPos), Blocks::snow->defaultBlockState(), Block::UPDATE_ALL, false);
+        if (box->isInside(origin.offset(snowPos)))
+            level->setBlock(origin.offset(snowPos), Blocks::snow->defaultBlockState(), Block::UPDATE_ALL, false);
         return true;
     }
 
-    const StructureTemplate* middle = Minecraft::GetInstance()->getStructureManager()->get(
-        eMinecraftStructureTemplate_Igloo_Middle);
-    const StructureTemplate* bottom = Minecraft::GetInstance()->getStructureManager()->get(
-        eMinecraftStructureTemplate_Igloo_Bottom);
+    const auto* middle = manager->getOrCreate(eMinecraftStructureTemplate_Igloo_Middle);
+    const auto* bottom = manager->getOrCreate(eMinecraftStructureTemplate_Igloo_Bottom);
 
     int basementDepth = mBasementDepth;
     for (int i = 0; i < basementDepth; ++i)
@@ -581,6 +636,9 @@ void ScatteredFeaturePieces::Igloo::addAdditionalSaveData(DataOutputStream* outp
     ScatteredFeaturePiece::addAdditionalSaveData(output);
     output->writeBoolean(mHasBasement);
     output->writeInt(mBasementDepth);
+    output->writeInt(mOrigin.x);
+    output->writeInt(mOrigin.y);
+    output->writeInt(mOrigin.z);
 }
 
 void ScatteredFeaturePieces::Igloo::readAdditionalSaveData(DataInputStream* input, StructureManager* structureManager)
@@ -590,6 +648,14 @@ void ScatteredFeaturePieces::Igloo::readAdditionalSaveData(DataInputStream* inpu
     {
         mHasBasement = input->readBoolean();
         mBasementDepth = input->readInt();
+    }
+    mOrigin = BlockPos(getWorldX(0, 0) + 2, getWorldY(0), getWorldZ(0, 0) + 2);
+    if (StructureFeatureIO::getVersion() >= 5)
+    {
+        const int x = input->readInt();
+        const int y = input->readInt();
+        const int z = input->readInt();
+        mOrigin = BlockPos(x, y, z);
     }
 }
 
@@ -887,14 +953,16 @@ ScatteredFeaturePieces::SwamplandHut::SwamplandHut(Level* level, Random& random,
 void ScatteredFeaturePieces::SwamplandHut::addAdditionalSaveData(DataOutputStream* output)
 {
     ScatteredFeaturePiece::addAdditionalSaveData(output);
-    output->writeBoolean(mHasWitch);
+    output->writeByte(static_cast<unsigned char>((mHasWitch ? 1 : 0) | (mHasCat ? 2 : 0)));
 }
 
 void ScatteredFeaturePieces::SwamplandHut::readAdditionalSaveData(DataInputStream* input,
                                                                   StructureManager* structureManager)
 {
     ScatteredFeaturePiece::readAdditionalSaveData(input, structureManager);
-    mHasWitch = input->readBoolean();
+    const auto inhabitants = input->readUnsignedByte();
+    mHasWitch = (inhabitants & 1) != 0;
+    mHasCat = (inhabitants & 2) != 0;
 }
 
 bool ScatteredFeaturePieces::SwamplandHut::postProcess(Level* level, Random& random, BoundingBox* box)
@@ -978,6 +1046,23 @@ bool ScatteredFeaturePieces::SwamplandHut::postProcess(Level* level, Random& ran
             witch->moveTo((double)x + 0.5, (double)y, (double)z + 0.5, 0.0f, 0.0f);
             witch->finalizeMobSpawn(level->getCurrentDifficultyAt(BlockPos(x, y, z)), NULL, L"");
             level->addEntity(witch);
+        }
+    }
+    if (!mHasCat)
+    {
+        const BlockPos pos(getWorldX(4, 4), getWorldY(2), getWorldZ(4, 4));
+        if (box->isInside(pos))
+        {
+            auto cat = boost::shared_ptr<Cat>(new Cat(level));
+            cat->setPersistenceRequired(true);
+            cat->moveTo(pos.x + 0.5, pos.y, pos.z + 0.5, 0.0f, 0.0f);
+            cat->finalizeMobSpawn(level->getCurrentDifficultyAt(pos), nullptr, L"");
+            cat->setCatType(Cat::AllBlack);
+            if (level->addEntity(cat))
+            {
+                mHasCat = true;
+                setDirty();
+            }
         }
     }
     return true;

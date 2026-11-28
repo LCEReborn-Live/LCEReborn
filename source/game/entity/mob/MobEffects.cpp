@@ -3,6 +3,8 @@
 #include "game/entity/mob/MobEffect.hpp"
 #include "game/util/ResourceLocation.hpp"
 
+MobEffect* MobEffects::BAD_OMEN = NULL;
+MobEffect* MobEffects::HERO_OF_THE_VILLAGE = NULL;
 MobEffect* MobEffects::MOVEMENT_SPEED = NULL;
 MobEffect* MobEffects::MOVEMENT_SLOWDOWN = NULL;
 MobEffect* MobEffects::DIG_SPEED = NULL;
@@ -40,6 +42,8 @@ MobEffect* MobEffects::get(const std::wstring& name)
 
 void MobEffects::staticCtor()
 {
+    BAD_OMEN = get(L"bad_omen");
+    HERO_OF_THE_VILLAGE = get(L"hero_of_the_village");
     MOVEMENT_SPEED = get(L"speed");
     MOVEMENT_SLOWDOWN = get(L"slowness");
     DIG_SPEED = get(L"haste");

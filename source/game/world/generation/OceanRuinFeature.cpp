@@ -1,4 +1,5 @@
 #include "game/world/generation/OceanRuinFeature.hpp"
+#include "game/world/generation/StructureTerrain.hpp"
 
 #include <algorithm>
 
@@ -58,7 +59,7 @@ StructureStart* OceanRuinFeature::createStructureStart(int chunkX, int chunkZ)
 {
     OceanRuinConfiguration configuration =
         level->getBiome(BlockPos(chunkX << 4, 64, chunkZ << 4))->getOceanRuinConfig();
-    return new OceanRuinStart(level, random, chunkX, chunkZ, configuration);
+    return new OceanRuinStart(level, random, chunkX, chunkZ, configuration, mTerrain);
 }
 
 bool OceanRuinFeature::isFeatureChunk(int chunkX, int chunkZ, bool)
@@ -91,11 +92,24 @@ bool OceanRuinFeature::isFeatureChunk(int chunkX, int chunkZ, bool)
 }
 
 OceanRuinFeature::OceanRuinStart::OceanRuinStart(Level* level, Random& random, int chunkX, int chunkZ,
-                                                 const OceanRuinConfiguration& configuration)
+                                                 const OceanRuinConfiguration& configuration,
+                                                 GenericOverworldLevelSource* source)
     : StructureStart(chunkX, chunkZ),
       mLevel(level)
 {
     create(random, chunkX, chunkZ, configuration);
+    if (source)
+    {
+        StructureTerrain terrain(level, source);
+        for (auto* piece : mPieces)
+            static_cast<OceanRuin*>(piece)->alignToTerrain(terrain, -2, 3);
+        calculateBoundingBox();
+    }
+}
+
+StructureStart* OceanRuinFeature::OceanRuinStart::Create()
+{
+    return new OceanRuinStart();
 }
 
 std::vector<BlockPos>* OceanRuinFeature::OceanRuinStart::allPositions(Random& random, int x, int z)

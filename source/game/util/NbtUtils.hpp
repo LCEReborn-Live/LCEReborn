@@ -14,8 +14,9 @@ public:
     static bool compareNbt(Tag* first, Tag* second, bool compareLists);
     static BlockPos readBlockPos(CompoundTag* tag);
     static CompoundTag* writeBlockPos(const BlockPos& pos);
-    static void mapToBlock(std::wstring& name, int& data);
-    static const BlockState* readBlockState(CompoundTag* tag);
+    static void mapToBlock(std::wstring& name, int& data, bool flattened = false);
+    static const BlockState* readBlockState(CompoundTag* tag, bool flattened = false, bool requireKnownBlock = false,
+                                           std::wstring* problem = nullptr);
 };
 
 #endif

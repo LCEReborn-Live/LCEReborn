@@ -1,4 +1,5 @@
 #include "game/core/BuiltInLootTables.hpp"
+#include "game/world/generation/NativeVillageLoot.hpp"
 
 #include <string>
 #include <utility>
@@ -40,7 +41,25 @@
 #include "game/world/block/LootItemEntityPropertyCondition.hpp"
 #include "game/world/generation/LootItemKilledByPlayerCondition.hpp"
 #include "game/core/LootItemCondition.hpp"
+#include "game/core/DyeColor.hpp"
+#include "game/entity/mob/Entity.hpp"
+#include "game/world/biome/Biome.hpp"
 
+namespace
+{
+class FishingInJungle : public LootItemCondition
+{
+public:
+    bool applies(Random*, LootTableContext& context) override
+    {
+        const auto hook = context.getEntity(LootTableContext::THIS);
+        if (!hook)
+            return false;
+        return context.mLevel->getBiome(BlockPos(hook->mX, hook->mY, hook->mZ))->getBiomeType()
+               == Biome::eBiomeType_Jungle;
+    }
+};
+}
 
 ResourceLocation* BuiltInLootTables::EMPTY = NULL;
 
@@ -66,6 +85,10 @@ ResourceLocation BuiltInLootTables::UNDERWATER_RUIN_BIG(L"minecraft", L"chests/u
 ResourceLocation BuiltInLootTables::UNDERWATER_RUIN_SMALL(L"minecraft", L"chests/underwater_ruin_small");
 ResourceLocation BuiltInLootTables::VILLAGE_BLACKSMITH(L"minecraft", L"chests/village_blacksmith");
 ResourceLocation BuiltInLootTables::VILLAGE_TWO_ROOM_HOUSE(L"minecraft", L"chests/village_two_room_house");
+ResourceLocation BuiltInLootTables::VILLAGE_HOME_SUPPLIES(L"minecraft", L"chests/village/home_supplies");
+ResourceLocation BuiltInLootTables::PILLAGER_OUTPOST(L"minecraft", L"chests/pillager_outpost");
+ResourceLocation BuiltInLootTables::VILLAGE_FARM_SUPPLIES(L"minecraft", L"chests/village/farm_supplies");
+ResourceLocation BuiltInLootTables::VILLAGE_WORKSHOP_SUPPLIES(L"minecraft", L"chests/village/workshop_supplies");
 ResourceLocation BuiltInLootTables::WOODLAND_MANSION(L"minecraft", L"chests/woodland_mansion");
 ResourceLocation BuiltInLootTables::ARMOR_SET_CHAIN(L"minecraft", L"entities/armor_set_chain");
 ResourceLocation BuiltInLootTables::ARMOR_SET_DIAMOND(L"minecraft", L"entities/armor_set_diamond");
@@ -992,6 +1015,72 @@ void BuiltInLootTables::staticLootTable_VILLAGE_TWO_ROOM_HOUSE()
     entries->push_back(new LootItem(Items::woodenHoe, 1, 0, functions, NULL, NULL));
     pools->push_back(new LootPool(entries, NULL, RandomValueBounds(6, 8), RandomValueBounds(0), NULL));
     lootTables.insert(std::make_pair(&VILLAGE_TWO_ROOM_HOUSE, new LootTable(pools)));
+}
+
+void BuiltInLootTables::staticLootTable_VILLAGE_SUPPLIES()
+{
+    struct Supply
+    {
+        Item* item;
+        int weight;
+        int minCount;
+        int maxCount;
+    };
+    const auto registerSupplies = [](ResourceLocation& location, std::initializer_list<Supply> supplies) {
+        auto* entries = new std::vector<LootPoolEntry*>;
+        for (const auto& supply : supplies)
+        {
+            auto* functions = new std::vector<LootItemFunction*>;
+            functions->push_back(new SetItemCountFunction(NULL, RandomValueBounds(supply.minCount, supply.maxCount)));
+            entries->push_back(new LootItem(supply.item, supply.weight, 0, functions, NULL, NULL));
+        }
+        auto* pools = new std::vector<LootPool*>;
+        pools->push_back(new LootPool(entries, NULL, RandomValueBounds(3, 6), RandomValueBounds(0), NULL));
+        lootTables.insert(std::make_pair(&location, new LootTable(pools)));
+    };
+    registerSupplies(VILLAGE_HOME_SUPPLIES, {
+        {Items::bread, 12, 1, 4}, {Items::apple, 8, 1, 3}, {Items::potato, 8, 1, 4},
+        {Items::emerald, 2, 1, 2}, {Item::byBlock(Blocks::sapling), 4, 1, 2}, {Items::book, 4, 1, 2}});
+    registerSupplies(VILLAGE_FARM_SUPPLIES, {
+        {Items::wheat, 12, 2, 6}, {Items::wheatSeeds, 10, 2, 5}, {Items::carrot, 10, 2, 5},
+        {Items::potato, 10, 2, 5}, {Items::beetrootSeeds, 4, 1, 3}, {Items::bread, 6, 1, 3}});
+    registerSupplies(VILLAGE_WORKSHOP_SUPPLIES, {
+        {Items::coal, 12, 1, 4}, {Items::ironIngot, 8, 1, 3}, {Items::bread, 8, 1, 4},
+        {Items::paper, 8, 1, 5}, {Items::leather, 6, 1, 3}, {Items::emerald, 2, 1, 2}});
+}
+
+void BuiltInLootTables::staticLootTable_PILLAGER_OUTPOST()
+{
+    auto* resources = new std::vector<LootPoolEntry*>;
+    const auto addStack = [&](Item* item, int weight, int minimum, int maximum, int data = -1) {
+        auto* functions = new std::vector<LootItemFunction*>;
+        functions->push_back(new SetItemCountFunction(nullptr, RandomValueBounds(minimum, maximum)));
+        if (data >= 0)
+            functions->push_back(new SetItemDataFunction(nullptr, RandomValueBounds(data)));
+        resources->push_back(new LootItem(item, weight, 0, functions, nullptr, nullptr));
+    };
+
+    addStack(Items::wheat, 7, 3, 5);
+    addStack(Items::carrot, 5, 3, 5);
+    addStack(Items::potato, 5, 2, 5);
+    addStack(Items::arrow, 4, 2, 7);
+    addStack(Items::string, 4, 1, 6);
+    addStack(Items::ironIngot, 3, 1, 3);
+    addStack(Items::experienceBottle, 3, 1, 1);
+    addStack(Items::crossbow, 2, 1, 1);
+    addStack(Item::byBlock(Blocks::tripwire_hook), 2, 1, 3);
+    auto* books = new std::vector<LootItemFunction*>{
+        new EnchantRandomlyFunction(nullptr, std::vector<Enchantment*>())};
+    resources->push_back(new LootItem(Items::book, 1, 0, books, nullptr, nullptr));
+    auto* wood = new std::vector<LootPoolEntry*>;
+    auto* woodFunctions = new std::vector<LootItemFunction*>{
+        new SetItemCountFunction(nullptr, RandomValueBounds(2, 3)),
+        new SetItemDataFunction(nullptr, RandomValueBounds(1))};
+    wood->push_back(new LootItem(Item::byBlock(Blocks::log2), 1, 0, woodFunctions, nullptr, nullptr));
+    auto* pools = new std::vector<LootPool*>;
+    pools->push_back(new LootPool(resources, nullptr, RandomValueBounds(3, 6), RandomValueBounds(0), nullptr));
+    pools->push_back(new LootPool(wood, nullptr, RandomValueBounds(1, 2), RandomValueBounds(0), nullptr));
+    lootTables.insert(std::make_pair(&PILLAGER_OUTPOST, new LootTable(pools)));
 }
 
 void BuiltInLootTables::staticLootTable_WOODLAND_MANSION()
@@ -2426,6 +2515,12 @@ void BuiltInLootTables::staticLootTable_JUNK()
     entries->push_back(new LootItem(Items::dye, 1, 0, functions, NULL, NULL));
     entries->push_back(new LootItem(Item::byBlock(Blocks::tripwire_hook), 10, 0, NULL, NULL, NULL));
     entries->push_back(new LootItem(Items::rottenFlesh, 10, 0, NULL, NULL, NULL));
+    auto* bambooConditions = new std::vector<LootItemCondition*>{new FishingInJungle()};
+    entries->push_back(new LootItem(Items::bamboo, 10, 0, NULL, bambooConditions, NULL));
+    auto* cocoaConditions = new std::vector<LootItemCondition*>{new FishingInJungle()};
+    functions = new std::vector<LootItemFunction*>{
+        new SetItemDataFunction(NULL, RandomValueBounds(DyeColor::BROWN->getItemData()))};
+    entries->push_back(new LootItem(Items::dye, 10, 0, functions, cocoaConditions, NULL));
     pools->push_back(new LootPool(entries, NULL, RandomValueBounds(1), RandomValueBounds(0), NULL));
     lootTables.insert(std::make_pair(&JUNK, new LootTable(pools)));
 }
@@ -2477,6 +2572,9 @@ void BuiltInLootTables::staticCtor()
     staticLootTable_UNDERWATER_RUIN_SMALL();
     staticLootTable_VILLAGE_BLACKSMITH();
     staticLootTable_VILLAGE_TWO_ROOM_HOUSE();
+    staticLootTable_VILLAGE_SUPPLIES();
+    staticLootTable_PILLAGER_OUTPOST();
+    NativeVillageRegistry::registerLoot();
     staticLootTable_WOODLAND_MANSION();
     staticLootTable_ARMOR_SET_CHAIN();
     staticLootTable_ARMOR_SET_DIAMOND();

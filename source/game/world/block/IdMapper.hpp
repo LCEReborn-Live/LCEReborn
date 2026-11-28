@@ -5,6 +5,7 @@
 
 #include <boost/unordered_map.hpp>
 
+#include "game/world/block/BlockId.hpp"
 #include "game/world/block/IdMap.hpp"
 
 class BlockState;
@@ -56,7 +57,7 @@ template <> class IdMapper<const BlockState*> : public IdMap<const BlockState*>
 public:
     enum
     {
-        BLOCK_STATE_COUNT = 5104
+        BLOCK_STATE_COUNT = BlockId::COUNT * 16
     };
 
     IdMapper();

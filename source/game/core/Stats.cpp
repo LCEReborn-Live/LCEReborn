@@ -43,6 +43,7 @@ Stat* Stats::mg03RingCount = NULL;
 Stat* Stats::mg03BestTimeScoreChallenge = NULL;
 Stat* Stats::mg03BestTime = NULL;
 Stat* Stats::befriendsWolf = NULL;
+Stat* Stats::befriendsCat = NULL;
 Stat* Stats::totalBlocksMined = NULL;
 Stat* Stats::timePlayed = NULL;
 Stat* Stats::killsEnderdragon = NULL;
@@ -114,6 +115,7 @@ void Stats::staticCtor()
     totalBlocksMined = (new GeneralStat(2020, L"stat.totalBlocksMined"))->postConstruct(true);
 
     timePlayed = (new GeneralStat(2021, L"stat.timePlayed"))->setAwardLocallyOnly()->postConstruct(true);
+    befriendsCat = (new GeneralStat(2022, L"stat.befriendsCat"))->postConstruct(true);
 
     buildBlockStats();
     Achievements::init();

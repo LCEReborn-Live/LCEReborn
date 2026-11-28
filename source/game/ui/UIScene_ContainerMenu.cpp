@@ -1,5 +1,6 @@
 #include "game/ui/UIScene_ContainerMenu.hpp"
 #include "game/core/StringIds.hpp"
+#include "game/core/ExtraStrings.hpp"
 
 #include "game/core/CMinecraftApp.hpp"
 #include "game/core/CConsoleMinecraftApp.hpp"
@@ -60,6 +61,8 @@ UIScene_ContainerMenu::UIScene_ContainerMenu(int playerId, void* data, UILayer* 
         m_chestLabel.init(UIString(L10N::GetString(IDS_CONTAINER_MINECART)));
     else if (typeId == ClientboundContainerOpenPacket::SHULKER_BOX)
         m_chestLabel.init(UIString(L10N::GetString(IDS_CONTAINER_SHULKER_BOX)));
+    else if (typeId == ClientboundContainerOpenPacket::BARREL)
+        m_chestLabel.init(UIString(L10N::GetString(IDS_LCE_TILE_BARREL)));
     else
         m_chestLabel.init(UIString(L10N::GetString(IDS_CHEST)));
 

@@ -36,6 +36,7 @@ class LevelGenerators;
 class LevelRules;
 class LevelRuleset;
 class Block;
+class BlockPos;
 class Player;
 class LocalPlayer;
 class Inventory;
@@ -84,6 +85,7 @@ enum eGameHostOption
     eGameHostOption_HostCanFly = 0x10,
     eGameHostOption_HostCanChangeHunger = 0x11,
     eGameHostOption_HostCanBeInvisible = 0x12,
+    eGameHostOption_ImmediateRespawn = 0x13,
     eGameHostOption_WorldSize = 0x14,
     eGameHostOption_DoWeatherCycle = 0x15,
     eGameHostOption_DisableSaving = 0x16,
@@ -275,6 +277,7 @@ public:
     void loadMediaArchive();
     arrayWithLength<unsigned char> getArchiveFile(const std::wstring& path, bool ignoreTexturePack);
     bool hasArchiveFile(const std::wstring& path, bool ignoreTexturePack);
+    std::vector<std::wstring> getBaseArchiveFiles();
     void InitTime();
     uint32_t IsActionPending(int player, eXuiAction action);
     static bool isValidStateTransition(eXuiAction current, eXuiAction next);
@@ -365,7 +368,8 @@ public:
     bool LoadHorseMenu(int player, boost::shared_ptr<Inventory> inventory, boost::shared_ptr<Container> container,
                        boost::shared_ptr<AbstractHorse> horse);
     bool LoadBeaconMenu(int player, boost::shared_ptr<Inventory> inventory, boost::shared_ptr<Container> container);
-    bool LoadWritingBookMenu(int player, not_null_ptr<ItemInstance> item, bool signing);
+    bool LoadWritingBookMenu(int player, not_null_ptr<ItemInstance> item, bool signing,
+                             const BlockPos* lectern = nullptr, int page = 0);
     bool IsConsoleChatCensored();
     uint32_t IsUUIDLocal(const std::wstring& uuid);
     bool GetTutorialMode(PlayerUID uid);

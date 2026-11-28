@@ -17,11 +17,13 @@ int IdMapper<const BlockState*>::getId(const BlockState* state)
 
 const BlockState* IdMapper<const BlockState*>::byId(int id)
 {
+    if (id < 0 || id >= BLOCK_STATE_COUNT)
+        return mBlockStates[0];
     const BlockState* state = mBlockStates[id];
     if (state == NULL)
     {
-        int data = id & 0xF;
-        state = Block::byId(id >> 4)->getBlockState(data);
+        Block* block = Block::byId(id >> 4);
+        state = block ? block->getBlockState(id & 0xF) : mBlockStates[0];
     }
 
     return state;

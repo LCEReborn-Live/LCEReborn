@@ -35,6 +35,7 @@ public:
     public:
         StrongholdStart(Level* level, Random& random, int chunkX, int chunkZ);
         StrongholdStart();
+        void load(Level* level, DataInputStream* input) override;
         virtual EStructureStart GetType();
         static StructureStart* Create();
     };

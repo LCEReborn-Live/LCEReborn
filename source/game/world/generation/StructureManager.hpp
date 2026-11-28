@@ -1,13 +1,23 @@
 #ifndef GAME_WORLD_GENERATION_STRUCTUREMANAGER_HPP
 #define GAME_WORLD_GENERATION_STRUCTUREMANAGER_HPP
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include <boost/unordered_map.hpp>
 
 class ByteArrayInputStream;
 class DataFixerUpper;
+class LocalVillageCatalog;
 class StructureTemplate;
+
+struct LocalVillageTemplateEntry
+{
+    std::wstring path;
+    int weight = 1;
+    bool followTerrain = false;
+};
 
 enum eMinecraftStructureTemplate
 {
@@ -209,6 +219,8 @@ class StructureManager
 {
 private:
     boost::unordered_map<int, const StructureTemplate*> templates;
+    boost::unordered_map<std::wstring, const StructureTemplate*> namedTemplates;
+    std::shared_ptr<const LocalVillageCatalog> localVillages;
     DataFixerUpper* fixerUpper;
 
 public:
@@ -220,6 +232,10 @@ public:
     bool load(eMinecraftStructureTemplate type);
     const StructureTemplate* get(eMinecraftStructureTemplate type);
     const StructureTemplate* getOrCreate(eMinecraftStructureTemplate type);
+    const StructureTemplate* getNamed(const std::wstring& archivePath);
+    std::vector<LocalVillageTemplateEntry> getLocalVillageTemplates(const std::wstring& biome,
+                                                                    const std::wstring& pool) const;
+    std::vector<LocalVillageTemplateEntry> getLocalVillageStarts(const std::wstring& biome) const;
 };
 
 #endif

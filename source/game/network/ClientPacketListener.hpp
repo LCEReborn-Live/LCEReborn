@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <memory>
 #include <boost/shared_ptr.hpp>
 #include "game/command/ChatCommands.hpp"
 #include "game/network/ClientGamePacketListener.hpp"
@@ -112,17 +113,10 @@ class VotePacket;
 class MultiplayerLocalPlayer;
 class Entity;
 class Packet;
+class PendingEntityLinks;
 class ClientPacketListener : public ClientGamePacketListener
 {
 public:
-    class DeferredEntityLinkPacket
-    {
-    public:
-        DeferredEntityLinkPacket(boost::shared_ptr<ClientboundSetEntityLinkPacket> packet);
-        unsigned int mTick;
-        boost::shared_ptr<ClientboundSetEntityLinkPacket> mPacket;
-    };
-
     ClientPacketListener(Minecraft* minecraft, Socket* socket, int playerId);
     virtual ~ClientPacketListener();
     static void handleBlockEntityDataInternal(boost::shared_ptr<ClientboundBlockEntityDataPacket> packet, Level* level);
@@ -242,7 +236,7 @@ public:
     void applyNextGameMode();
     static void staticCtor();
     static C4JCriticalSection s_deferredLinkMutex;
-    static std::vector<DeferredEntityLinkPacket> s_deferredLinks;
+    std::unique_ptr<PendingEntityLinks> mPendingEntityLinks;
 
 private:
     bool m_closed;

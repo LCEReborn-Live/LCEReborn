@@ -40,11 +40,13 @@ public:
             }
         };
 
-        StructureBlockInfo(const BlockPos& pos, const BlockState* state, CompoundTag* nbt)
+        StructureBlockInfo(const BlockPos& pos, const BlockState* state, CompoundTag* nbt,
+                           const BlockState* extraState = nullptr)
         {
             mPos = pos;
             mState = state;
             mNbt = nbt;
+            mExtraState = extraState;
         }
 
         ~StructureBlockInfo();
@@ -52,6 +54,7 @@ public:
         BlockPos mPos;
         const BlockState* mState;
         CompoundTag* mNbt;
+        const BlockState* mExtraState;
     };
 
     class StructureEntityInfo
@@ -80,6 +83,23 @@ public:
     virtual ~StructureTemplate();
 
     BlockPos getSize() const;
+    BoundingBox* getTransformedBounds(const BlockPos& origin, Mirror* mirror, Rotation* rotation) const;
+
+    struct Connector
+    {
+        BlockPos pos;
+        const Direction* facing;
+        std::wstring type;
+        std::wstring pool;
+        std::wstring target;
+    };
+    const std::vector<Connector>& getConnectors() const { return mConnectors; }
+    const std::vector<StructureBlockInfo*>& getBlocks() const { return mBlocks; }
+    const std::vector<StructureEntityInfo*>& getEntities() const { return mEntities; }
+
+    // Takes ownership of the native piece data. No file format is involved.
+    void setNative(const BlockPos& size, std::vector<StructureBlockInfo*> blocks,
+                   std::vector<StructureEntityInfo*> entities, std::vector<Connector> connectors);
 
     void setAuthor(const std::wstring& author);
     std::wstring getAuthor();
@@ -96,9 +116,6 @@ public:
                                         const StructurePlaceSettings* connectedSettings,
                                         const BlockPos& connectedPos) const;
 
-    void placeEntities(Level* level, const BlockPos& pos, Mirror* mirror, Rotation* rotation,
-                       BoundingBox* boundingBox) const;
-
     void placeInWorld(Level* level, const BlockPos& pos, StructureProcessor* processor,
                       StructurePlaceSettings* settings, int flags) const;
     void placeInWorld(Level* level, const BlockPos& pos, StructurePlaceSettings* settings) const;
@@ -113,12 +130,16 @@ public:
 
     static void addWalkers(DataFixerUpper* fixerUpper);
 
-    void load(CompoundTag* tag);
+    bool loadLocalVillage(CompoundTag* tag, std::wstring& problem);
+    void load(CompoundTag* tag, bool flattened = false, bool localVillage = false);
 
 private:
+    void placeEntities(Level* level, const BlockPos& pos, StructurePlaceSettings* settings) const;
+
     std::vector<const BlockState*> mPalette;
     std::vector<StructureBlockInfo*> mBlocks;
     std::vector<StructureEntityInfo*> mEntities;
+    std::vector<Connector> mConnectors;
     BlockPos mSize;
     std::wstring mAuthor;
 };

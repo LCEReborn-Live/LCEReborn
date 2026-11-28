@@ -39,7 +39,9 @@ bool HarvestFarmBlockGoal::fjGetNextFarmTarget()
 
 bool HarvestFarmBlockGoal::canUse()
 {
-    if (!mVillager->mLevel->getGameRules()->getBoolean(GameRules::RULE_MOBGRIEFING))
+    if (!mVillager->mLevel->getGameRules()->getBoolean(GameRules::RULE_MOBGRIEFING)
+        || mVillager->isSleeping() || mVillager->isTakingShelter()
+        || mVillager->mLevel->getDayTime() % 24000 >= 9000)
     {
         return false;
     }
@@ -54,7 +56,8 @@ bool HarvestFarmBlockGoal::canUse()
 
 bool HarvestFarmBlockGoal::canContinueToUse()
 {
-    return mTargetType >= 0 && MoveToBlockGoal::canContinueToUse();
+    return mTargetType >= 0 && !mVillager->isSleeping() && !mVillager->isTakingShelter()
+        && mVillager->mLevel->getDayTime() % 24000 < 9000 && MoveToBlockGoal::canContinueToUse();
 }
 
 int HarvestFarmBlockGoal::findInventorySlotForFarmSeeds()
@@ -109,41 +112,12 @@ void HarvestFarmBlockGoal::tick()
 
     if (mTargetType == 0 && crop != NULL && crop->isMaxAge(state))
     {
-        level->destroyBlock(above, true);
+        if (level->destroyBlock(above, true))
+            plantCrop(level, above);
     }
     else if (mTargetType == 1 && state->getMaterial() == Material::AIR)
     {
-        int slot = findInventorySlotForFarmSeeds();
-        if (slot >= 0)
-        {
-            SimpleContainer* inventory = mVillager->getInventory();
-            not_null_ptr<ItemInstance> item = inventory->getItem(slot);
-            if (!item->isEmpty())
-            {
-                if (item->getItem() == Items::wheatSeeds)
-                {
-                    level->setBlock(above, Blocks::wheat->defaultBlockState(), Block::UPDATE_ALL, false);
-                }
-                else if (item->getItem() == Items::potato)
-                {
-                    level->setBlock(above, Blocks::potatoes->defaultBlockState(), Block::UPDATE_ALL, false);
-                }
-                else if (item->getItem() == Items::carrot)
-                {
-                    level->setBlock(above, Blocks::carrots->defaultBlockState(), Block::UPDATE_ALL, false);
-                }
-                else if (item->getItem() == Items::beetrootSeeds)
-                {
-                    level->setBlock(above, Blocks::beetroots->defaultBlockState(), Block::UPDATE_ALL, false);
-                }
-            }
-            item->shrink(1);
-            if (item->isEmpty())
-            {
-                inventory->setItem(slot, ItemInstance::EMPTY);
-            }
-        }
-        else
+        if (!plantCrop(level, above))
         {
             mTargetType = -1;
             mNextStartTick = 0;
@@ -158,6 +132,22 @@ void HarvestFarmBlockGoal::tick()
 
     mTargetType = -1;
     mNextStartTick = 10;
+}
+
+bool HarvestFarmBlockGoal::plantCrop(Level* level, const BlockPos& pos)
+{
+    const int slot = findInventorySlotForFarmSeeds();
+    if (slot < 0)
+        return false;
+    auto* inventory = mVillager->getInventory();
+    auto* seed = inventory->getItem(slot)->getItem();
+    Block* crop = seed == Items::wheatSeeds ? Blocks::wheat
+        : seed == Items::potato ? Blocks::potatoes
+        : seed == Items::carrot ? Blocks::carrots : Blocks::beetroots;
+    if (!level->setBlock(pos, crop->defaultBlockState(), Block::UPDATE_ALL, false))
+        return false;
+    inventory->removeItem(slot, 1);
+    return true;
 }
 
 bool HarvestFarmBlockGoal::isValidTarget(Level* level, const BlockPos& pos)

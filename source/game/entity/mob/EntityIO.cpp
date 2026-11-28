@@ -45,6 +45,8 @@
 #include "game/core/EvocationIllager.hpp"
 #include "game/core/Vex.hpp"
 #include "game/core/VindicationIllager.hpp"
+#include "game/core/Pillager.hpp"
+#include "game/core/Ravager.hpp"
 #include "game/core/IllusionIllager.hpp"
 #include "game/core/ThrownTrident.hpp"
 #include "game/core/Dolphin.hpp"
@@ -88,6 +90,9 @@
 #include "game/entity/mob/Horse.hpp"
 #include "game/util/Rabbit.hpp"
 #include "game/core/PolarBear.hpp"
+#include "game/core/Panda.hpp"
+#include "game/core/Cat.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/core/Llama.hpp"
 #include "game/core/LlamaSpit.hpp"
 #include "game/core/Parrot.hpp"
@@ -99,6 +104,7 @@
 #include "game/core/Drowned.hpp"
 #include "game/core/Phantom.hpp"
 #include "game/world/generation/Villager.hpp"
+#include "game/world/generation/WanderingTrader.hpp"
 #include "game/core/EnderCrystal.hpp"
 
 namespace
@@ -141,7 +147,9 @@ EntityIO::SpawnableMobInfo::SpawnableMobInfo(const SpawnableMobInfo& other)
       secondaryColour(other.secondaryColour),
       icon(other.icon),
       type(other.type),
-      flags(other.flags)
+      flags(other.flags),
+      baseRgb(other.baseRgb),
+      overlayRgb(other.overlayRgb)
 {
 }
 
@@ -231,7 +239,10 @@ boost::shared_ptr<Entity> EntityIO::newEntity(CompoundTag* tag, Level* level)
         tag->remove(L"Type");
     }
     ResourceLocation location(tag->getString(L"id"));
-    boost::shared_ptr<Entity> entity = newEntity(sRegistry.get(location), level);
+    auto type = sRegistry.get(location);
+    if (type == EntityType::OCELOT && (!tag->getString(L"OwnerUUID").empty() || !tag->getString(L"Owner").empty()))
+        type = EntityType::CAT;
+    boost::shared_ptr<Entity> entity = newEntity(type, level);
     if (entity)
     {
         entity->load(tag);
@@ -275,10 +286,13 @@ int EntityIO::eTypeToIoid(unsigned long long entityType)
 }
 
 EntityIO::SpawnableMobInfo EntityIO::addSpawnInfo(int id, std::wstring name, eMinecraftColour colour,
-                                                  eMinecraftColour secondaryColour, eMinecraftIconOverride icon)
+                                                  eMinecraftColour secondaryColour, eMinecraftIconOverride icon,
+                                                  int baseRgb, int overlayRgb)
 {
     ResourceLocation location(name);
     SpawnableMobInfo* info = new SpawnableMobInfo(id, location, colour, secondaryColour, icon);
+    info->baseRgb = baseRgb;
+    info->overlayRgb = overlayRgb;
     sSpawnInfo[location] = info;
     return *sSpawnInfo[location];
 }
@@ -398,6 +412,12 @@ void EntityIO::bootStrap()
     Register(Turtle::create, 110, L"turtle", EntityType::TURTLE, L"Turtle");
     Register(Drowned::create, 111, L"drowned", EntityType::DROWNED, L"Drowned");
     Register(Phantom::create, 112, L"phantom", EntityType::PHANTOM, L"Phantom");
+    Register(Panda::create, 113, L"panda", EntityType::PANDA, L"Panda");
+    Register(Cat::create, 114, L"cat", EntityType::CAT, L"Cat");
+    Register(TraderLlama::create, 115, L"trader_llama", EntityType::TRADER_LLAMA, L"TraderLlama");
+    Register(Pillager::create, 116, L"pillager", EntityType::PILLAGER, L"Pillager");
+    Register(Ravager::create, 117, L"ravager", EntityType::RAVAGER, L"Ravager");
+    Register(WanderingTrader::create, 118, L"wandering_trader", EntityType::WANDERING_TRADER, L"WanderingTrader");
     Register(Villager::create, 120, L"villager", EntityType::VILLAGER, L"Villager");
     Register(EnderCrystal::create, 200, L"ender_crystal", EntityType::ENDER_CRYSTAL, L"EnderCrystal");
 
@@ -433,6 +453,10 @@ void EntityIO::bootStrap()
                  eMinecraftColour_Mob_Husk_Colour2, eMinecraftIconOverride_NONE);
     addSpawnInfo(static_cast<int>(IDS_LLAMA), L"llama", eMinecraftColour_Mob_Llama_Colour1,
                  eMinecraftColour_Mob_Llama_Colour2, eMinecraftIconOverride_NONE);
+    addSpawnInfo(IDS_LCE_TRADER_LLAMA, L"trader_llama", eMinecraftColour_Mob_Llama_Colour1,
+                 eMinecraftColour_Mob_Villager_Colour2, eMinecraftIconOverride_NONE);
+    addSpawnInfo(IDS_LCE_WANDERING_TRADER, L"wandering_trader", eMinecraftColour_Mob_Villager_Colour1,
+                 eMinecraftColour_Mob_Llama_Colour2, eMinecraftIconOverride_NONE);
     addSpawnInfo(static_cast<int>(0x9E8D900FU), L"magma_cube", eMinecraftColour_Mob_LavaSlime_Colour1,
                  eMinecraftColour_Mob_LavaSlime_Colour2, eMinecraftIconOverride_NONE);
     addSpawnInfo(static_cast<int>(0x2775807CU), L"mooshroom", eMinecraftColour_Mob_MushroomCow_Colour1,
@@ -443,6 +467,10 @@ void EntityIO::bootStrap()
                  eMinecraftColour_Mob_Ocelot_Colour2, eMinecraftIconOverride_NONE);
     addSpawnInfo(static_cast<int>(IDS_PARROT), L"parrot", eMinecraftColour_Mob_Parrot_Colour1,
                  eMinecraftColour_Mob_Parrot_Colour2, eMinecraftIconOverride_NONE);
+    addSpawnInfo(IDS_LCE_PANDA, L"panda", eMinecraftColour_HTMLColor_White,
+                 eMinecraftColour_HTMLColor_Black, eMinecraftIconOverride_NONE);
+    addSpawnInfo(IDS_LCE_CAT, L"cat", eMinecraftColour_Mob_Ocelot_Colour1,
+                 eMinecraftColour_HTMLColor_Black, eMinecraftIconOverride_NONE);
     addSpawnInfo(static_cast<int>(IDS_PIG), L"pig", eMinecraftColour_Mob_Pig_Colour1, eMinecraftColour_Mob_Pig_Colour2,
                  eMinecraftIconOverride_NONE);
     addSpawnInfo(static_cast<int>(IDS_POLARBEAR), L"polar_bear", eMinecraftColour_Mob_PolarBear_Colour1,
@@ -478,6 +506,10 @@ void EntityIO::bootStrap()
     addSpawnInfo(static_cast<int>(0xF3D4F291U), L"vindication_illager",
                  eMinecraftColour_Mob_Vindication_Illager_Colour1, eMinecraftColour_Mob_Vindication_Illager_Colour2,
                  eMinecraftIconOverride_NONE);
+    addSpawnInfo(IDS_LCE_PILLAGER, L"pillager", eMinecraftColour_Mob_Vindication_Illager_Colour1,
+                 eMinecraftColour_Mob_Vindication_Illager_Colour2, eMinecraftIconOverride_NONE);
+    addSpawnInfo(IDS_LCE_RAVAGER, L"ravager", eMinecraftColour_Mob_Vindication_Illager_Colour1,
+                 eMinecraftColour_Mob_Vindication_Illager_Colour2, eMinecraftIconOverride_NONE, 0x757470, 0x5B5049);
     addSpawnInfo(static_cast<int>(IDS_WITCH), L"witch", eMinecraftColour_Mob_Witch_Colour1,
                  eMinecraftColour_Mob_Witch_Colour2, eMinecraftIconOverride_NONE);
     addSpawnInfo(static_cast<int>(IDS_WITHER_SKELETON), L"wither_skeleton",

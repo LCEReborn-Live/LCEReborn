@@ -1,4 +1,5 @@
 #include "game/core/OceanRuin.hpp"
+#include "game/world/generation/StructureFeatureIO.hpp"
 #include "game/core/EntityType.hpp"
 
 #include <boost/shared_ptr.hpp>
@@ -205,45 +206,35 @@ BlockPos OceanRuin::adaptPosition(const BlockPos& pos, Mirror* mirror, Rotation*
     return pos;
 }
 
-void OceanRuin::fillBelow(const BlockPos& pos, Mirror* mirror, Rotation* rotation, Level* level)
+void OceanRuin::fillBelow(const BlockPos& pos, Level* level, BoundingBox* clip)
 {
-    BlockPos end =
-        StructureTemplate::transform(BlockPos(mWidth - 1, 0, mDepth - 1), mirror, rotation).offset(pos.x, pos.y, pos.z);
-    int top = pos.y - 1;
-    BlockPos min(end.x < pos.x ? end.x : pos.x, end.y < pos.y ? end.y : pos.y, end.z < pos.z ? end.z : pos.z);
-    BlockPos max(pos.x < end.x ? end.x : pos.x, pos.y < end.y ? end.y : pos.y, pos.z < end.z ? end.z : pos.z);
-    for (int x = min.x; x <= max.x; ++x)
+    const int top = pos.y - 1;
+    for (int x = std::max(mBoundingBox->x0, clip->x0); x <= std::min(mBoundingBox->x1, clip->x1); ++x)
     {
-        for (int z = min.z; z <= max.z; ++z)
+        for (int z = std::max(mBoundingBox->z0, clip->z0); z <= std::min(mBoundingBox->z1, clip->z1); ++z)
         {
-            for (int y = min.y; y <= max.y; ++y)
+            int height = top;
+            while (height > 1 && (level->isEmptyBlock(BlockPos(x, height, z))
+                                  || level->getBlockState(BlockPos(x, height, z))->getMaterial()->isLiquid()))
+                --height;
+            Random columnRandom(level->getSeed() ^ BlockPos(x, pos.y, z).compressBlockPos());
+            for (int y = height + 1; y <= top; ++y)
             {
-                int height = y - 1;
-                while ((level->isEmptyBlock(BlockPos(x, height, z))
-                        || level->getBlockState(BlockPos(x, height, z))->getMaterial()->isLiquid())
-                       && height > 1)
-                    --height;
-                for (int h = height; h < top + 1; ++h)
-                {
-                    if (level->mRandom->rollPercentageChance(82))
-                        level->setBlock(BlockPos(x, h, z), Blocks::gravel->defaultBlockState(), Block::UPDATE_CLIENTS,
-                                        false);
-                }
+                if (columnRandom.rollPercentageChance(82))
+                    level->setBlock(BlockPos(x, y, z), Blocks::gravel->defaultBlockState(), Block::UPDATE_CLIENTS, false);
             }
         }
     }
 }
 
-bool OceanRuin::postProcess(Level* level, Random& random, BoundingBox* box)
+bool OceanRuin::postProcess(Level* level, Random&, BoundingBox* box)
 {
+    const bool needsAlignment = mHeightPosition < 0;
     if (!updateAverageGroundHeight(level, box, -2, false))
         return true;
     BoundingBox* boundingBox = getBoundingBox();
     if (boundingBox == NULL)
         return true;
-    if (!box->isInside(BlockPos(boundingBox->x0, boundingBox->y0, boundingBox->z0)))
-        return true;
-
     BlockPos pos(getWorldX(0, 0), getWorldY(0), getWorldZ(0, 0));
     int offsetX = 0;
     int offsetZ = 0;
@@ -265,16 +256,20 @@ bool OceanRuin::postProcess(Level* level, Random& random, BoundingBox* box)
     pos = pos.offset(offsetX, 0, offsetZ);
 
     StructureManager* structureManager = level->getLevelStorage()->getStructureManager();
-    pos = adaptPosition(pos, Mirror::NONE, getRotation(), level);
-    boundingBox->move(0, pos.y - boundingBox->y0, 0);
+    if (needsAlignment)
+    {
+        pos = adaptPosition(pos, Mirror::NONE, getRotation(), level);
+        boundingBox->move(0, pos.y - boundingBox->y0, 0);
+    }
 
     StructurePlaceSettings settings;
     settings.setMirror(Mirror::NONE);
     settings.setRotation(getRotation());
     settings.setIgnoreBlock(Blocks::air);
-    settings.setBoundingBox(boundingBox);
-    fillBelow(pos, Mirror::NONE, getRotation(), level);
-    const StructureTemplate* structure = placeRuin(random, structureManager, level, pos, settings);
+    settings.setBoundingBox(box);
+    fillBelow(pos, level, box);
+    Random placementRandom(level->getSeed() ^ pos.compressBlockPos());
+    const StructureTemplate* structure = placeRuin(placementRandom, structureManager, level, pos, settings);
     StructureTemplate::MarkerMap markers = structure->getMarkers(pos, &settings);
     StructureTemplate::MarkerMap::iterator it;
     for (it = markers.begin(); it != markers.end(); ++it)
@@ -295,7 +290,8 @@ bool OceanRuin::postProcess(Level* level, Random& random, BoundingBox* box)
             boost::shared_ptr<ChestBlockEntity> chest = boost::static_pointer_cast<ChestBlockEntity>(entity);
             ResourceLocation* lootTable = mIsLarge ? &BuiltInLootTables::UNDERWATER_RUIN_BIG
                                                    : &BuiltInLootTables::UNDERWATER_RUIN_SMALL;
-            chest->setLootTable(lootTable, random.nextLong());
+            Random lootRandom(level->getSeed() ^ markerPos.compressBlockPos());
+            chest->setLootTable(lootTable, lootRandom.nextLong());
         }
     }
     return true;
@@ -306,6 +302,8 @@ void OceanRuin::addAdditionalSaveData(DataOutputStream* output)
     output->writeInt(Block::getId(mBlockState->getBlock()));
     output->writeBoolean(mIsLarge);
     output->writeBoolean(mIsWarm);
+    ScatteredFeaturePiece::addAdditionalSaveData(output);
+    output->writeByte(getRotation()->getType());
 }
 
 void OceanRuin::readAdditionalSaveData(DataInputStream* input, StructureManager* structureManager)
@@ -313,6 +311,11 @@ void OceanRuin::readAdditionalSaveData(DataInputStream* input, StructureManager*
     mBlockState = Block::byId(input->readInt())->defaultBlockState();
     mIsLarge = input->readBoolean();
     mIsWarm = input->readBoolean();
+    if (StructureFeatureIO::getVersion() >= 5)
+    {
+        ScatteredFeaturePiece::readAdditionalSaveData(input, structureManager);
+        setRotation(Rotation::byType(static_cast<Rotation::eTYPE>(input->readByte())));
+    }
 }
 
 EStructurePiece OceanRuin::GetType()

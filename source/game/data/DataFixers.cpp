@@ -109,6 +109,7 @@
 #include "game/world/block/BlockEntityShulkerBoxColorFix.hpp"
 #include "game/world/block/BrewingStandBlockEntity.hpp"
 #include "game/world/block/ChestBlockEntity.hpp"
+#include "game/world/block/BarrelBlockEntity.hpp"
 #include "game/world/block/DispenserBlockEntity.hpp"
 #include "game/world/block/DropperBlockEntity.hpp"
 #include "game/world/block/FallingBlockEntity.hpp"
@@ -200,6 +201,7 @@ DataFixerUpper* DataFixers::createFixerUpper()
     Villager::addDataWalkers(fixerUpper);
     VillagerGolem::addDataWalkers(fixerUpper);
     VindicationIllager::addDataWalkers(fixerUpper);
+    Mob::addDataWalkers(fixerUpper, EntityType::PILLAGER);
     Witch::addDataWalkers(fixerUpper);
     WitherBoss::addDataWalkers(fixerUpper);
     WitherSkeleton::addDataWalkers(fixerUpper);
@@ -212,6 +214,7 @@ DataFixerUpper* DataFixers::createFixerUpper()
     FlowerPotBlockEntity::addDataWalkers(fixerUpper);
     FurnaceBlockEntity::addDataWalkers(fixerUpper);
     ChestBlockEntity::addDataWalkers(fixerUpper);
+    BarrelBlockEntity::addDataWalkers(fixerUpper);
     DispenserBlockEntity::addDataWalkers(fixerUpper);
     DropperBlockEntity::addDataWalkers(fixerUpper);
     BrewingStandBlockEntity::addDataWalkers(fixerUpper);

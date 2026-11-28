@@ -21,7 +21,6 @@
 #include "game/world/block/BlockPos.hpp"
 #include "game/util/Vec3.hpp"
 #include "game/world/generation/Player.hpp"
-#include "game/world/generation/StructureFeatureIO.hpp"
 
 MinecartContainer::MinecartContainer(Level* level, double x, double y, double z)
     : Minecart(level, x, y, z),
@@ -261,7 +260,7 @@ void MinecartContainer::remove()
 void MinecartContainer::addAdditonalSaveData(CompoundTag* tag)
 {
     Minecart::addAdditonalSaveData(tag);
-    if (mLootTable != NULL && StructureFeatureIO::getVersion() >= 2)
+    if (mLootTable != NULL)
     {
         tag->putString(L"LootTable", mLootTable->toString());
         if (mLootTableSeed != 0)
@@ -280,7 +279,7 @@ void MinecartContainer::readAdditionalSaveData(CompoundTag* tag)
     Minecart::readAdditionalSaveData(tag);
     delete[] mItems.items.data;
     mItems = NonNullList<not_null_ptr<ItemInstance> >::withSize(getContainerSize(), ItemInstance::EMPTY);
-    if (tag->contains(L"LootTable", Tag::TAG_STRING) && StructureFeatureIO::getVersion() >= 2)
+    if (tag->contains(L"LootTable", Tag::TAG_STRING))
     {
         mLootTable = new ResourceLocation(tag->getString(L"LootTable"));
         mLootTableSeed = tag->getLong(L"LootTableSeed");

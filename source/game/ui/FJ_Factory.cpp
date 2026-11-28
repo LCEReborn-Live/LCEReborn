@@ -801,6 +801,14 @@ void FJ_Factory::initialise()
     g_fuiNodeFactories.insert(
         std::make_pair(g_FurnaceMenu_name, reinterpret_cast<FJ_FactoryFunction>(&FJ_FurnaceMenu::Create)));
     g_fuiNodeFactories.insert(
+        std::make_pair(std::string("CartographyMenu"), reinterpret_cast<FJ_FactoryFunction>(&FJ_FurnaceMenu::Create)));
+    g_fuiNodeFactories.insert(
+        std::make_pair(std::string("GrindstoneMenu"), reinterpret_cast<FJ_FactoryFunction>(&FJ_FurnaceMenu::Create)));
+    g_fuiNodeFactories.insert(
+        std::make_pair(std::string("StonecutterMenu"), reinterpret_cast<FJ_FactoryFunction>(&FJ_FurnaceMenu::Create)));
+    g_fuiNodeFactories.insert(
+        std::make_pair(std::string("LoomMenu"), reinterpret_cast<FJ_FactoryFunction>(&FJ_FurnaceMenu::Create)));
+    g_fuiNodeFactories.insert(
         std::make_pair(g_HopperMenu_name, reinterpret_cast<FJ_FactoryFunction>(&FJ_HopperMenu::Create)));
     g_fuiNodeFactories.insert(std::make_pair(g_HorseInventoryMenu_name,
                                              reinterpret_cast<FJ_FactoryFunction>(&FJ_HorseInventoryMenu::Create)));

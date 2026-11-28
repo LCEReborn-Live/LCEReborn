@@ -33,16 +33,28 @@ DirectionProperty* FurnaceBlock::FACING = NULL;
 
 bool FurnaceBlock::sKeepInventory = false;
 
-FurnaceBlock::FurnaceBlock(bool lit) : BaseEntityBlock(Material::STONE)
+namespace
+{
+Block* furnaceBlock(FurnaceKind kind, bool lit)
+{
+    switch (kind)
+    {
+    case FurnaceKind::Smoker: return lit ? Blocks::lit_smoker : Blocks::smoker;
+    case FurnaceKind::BlastFurnace: return lit ? Blocks::lit_blast_furnace : Blocks::blast_furnace;
+    default: return lit ? Blocks::lit_furnace : Blocks::furnace;
+    }
+}
+}
+
+FurnaceBlock::FurnaceBlock(bool lit, FurnaceKind kind) : BaseEntityBlock(Material::STONE), mLit(lit), mKind(kind)
 {
     DerivedInit();
     registerDefaultState(mStateDefinition->any());
-    mLit = lit;
 }
 
 boost::shared_ptr<BlockEntity> FurnaceBlock::newBlockEntity(Level* level, int)
 {
-    boost::shared_ptr<BlockEntity> blockEntity = boost::shared_ptr<FurnaceBlockEntity>(new FurnaceBlockEntity());
+    boost::shared_ptr<BlockEntity> blockEntity(new FurnaceBlockEntity(mKind));
     blockEntity->setLevel(level);
     return blockEntity;
 }
@@ -54,7 +66,7 @@ void FurnaceBlock::blockStaticCtor()
 
 Item* FurnaceBlock::getResource(const BlockState*, Random*, int)
 {
-    return Item::byBlock(Blocks::furnace);
+    return Item::byBlock(furnaceBlock(mKind, false));
 }
 
 void FurnaceBlock::recalcLockDir(Level* level, const BlockPos& pos, const BlockState* state)
@@ -87,6 +99,15 @@ void FurnaceBlock::animateTick(const BlockState* state, Level* level, const Bloc
 {
     if (!mLit)
         return;
+    if (mKind == FurnaceKind::Smoker)
+    {
+        if (random->nextDouble() < 0.1)
+            level->playLocalSound(pos.x + 0.5, pos.y, pos.z + 0.5, SoundEvents::SMOKER_SMOKE,
+                                  SoundSource::eSoundSource_Blocks, 1.0f, 1.0f, false, 16.0f);
+        level->addParticle(PARTICLE_SMOKE, pos.x + 0.5, pos.y + 1.1, pos.z + 0.5, 0.0, 0.0, 0.0,
+                           arrayWithLength<int>());
+        return;
+    }
     const Direction* facing = state->getValue(FACING);
     const double x = pos.x + 0.5;
     const double y = pos.y + random->nextDouble() * 6.0 / 16.0;
@@ -95,30 +116,17 @@ void FurnaceBlock::animateTick(const BlockState* state, Level* level, const Bloc
     const double side = random->nextDouble() * 0.6 - 0.3;
     if (random->nextDouble() < 0.1)
     {
-        level->playLocalSound(pos.x + 0.5, pos.y, pos.z + 0.5, SoundEvents::FURNACE_FIRE_CRACKLE,
+        const SoundEvent* sound = mKind == FurnaceKind::BlastFurnace ? SoundEvents::BLAST_FURNACE_FIRE_CRACKLE
+                                                                   : SoundEvents::FURNACE_FIRE_CRACKLE;
+        level->playLocalSound(pos.x + 0.5, pos.y, pos.z + 0.5, sound,
                               SoundSource::eSoundSource_Blocks, 1.0f, 1.0f, false, 16.0f);
     }
-    switch (facing->get3DDataValue())
-    {
-    case Direction::eDirection_West:
-        level->addParticle(PARTICLE_SMOKE, x - offset, y, z + side, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        level->addParticle(PARTICLE_FLAME, x - offset, y, z + side, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        break;
-    case Direction::eDirection_East:
-        level->addParticle(PARTICLE_SMOKE, x + offset, y, z + side, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        level->addParticle(PARTICLE_FLAME, x + offset, y, z + side, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        break;
-    case Direction::eDirection_North:
-        level->addParticle(PARTICLE_SMOKE, x + side, y, z - offset, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        level->addParticle(PARTICLE_FLAME, x + side, y, z - offset, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        break;
-    case Direction::eDirection_South:
-        level->addParticle(PARTICLE_SMOKE, x + side, y, z + offset, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        level->addParticle(PARTICLE_FLAME, x + side, y, z + offset, 0.0, 0.0, 0.0, arrayWithLength<int>());
-        break;
-    default:
-        break;
-    }
+    const bool eastWest = facing->getAxis() == Direction::Axis::X;
+    const double frontX = x + offset * facing->getStepX() + (eastWest ? 0.0 : side);
+    const double frontZ = z + offset * facing->getStepZ() + (eastWest ? side : 0.0);
+    level->addParticle(PARTICLE_SMOKE, frontX, y, frontZ, 0.0, 0.0, 0.0, arrayWithLength<int>());
+    if (mKind == FurnaceKind::Furnace)
+        level->addParticle(PARTICLE_FLAME, frontX, y, frontZ, 0.0, 0.0, 0.0, arrayWithLength<int>());
 }
 
 bool FurnaceBlock::TestUse()
@@ -134,7 +142,7 @@ bool FurnaceBlock::use(Level* level, const BlockPos& pos, const BlockState* stat
     if (!level->mIsClientSide)
     {
         boost::shared_ptr<BlockEntity> blockEntity = level->getBlockEntity(pos);
-        bool isFurnace = eTYPE_DERIVED_FROM(BlockEntityType::FURNACE, blockEntity->GetType());
+        bool isFurnace = blockEntity && eTYPE_DERIVED_FROM(BlockEntityType::FURNACE, blockEntity->GetType());
         if (isFurnace)
             player->openContainer(boost::static_pointer_cast<FurnaceBlockEntity>(blockEntity));
     }
@@ -144,26 +152,18 @@ bool FurnaceBlock::use(Level* level, const BlockPos& pos, const BlockState* stat
 void FurnaceBlock::setLit(bool lit, Level* level, const BlockPos& pos)
 {
     const BlockState* state = level->getBlockState(pos);
+    const auto* block = dynamic_cast<FurnaceBlock*>(state->getBlock());
+    if (!block)
+        return;
+    Block* replacement = furnaceBlock(block->mKind, lit);
+    const BlockState* replacementState = replacement->defaultBlockState()->setValue(FACING, state->getValue(FACING));
     boost::shared_ptr<BlockEntity> blockEntity = level->getBlockEntity(pos);
     sKeepInventory = true;
-    if (lit)
-    {
-        level->setBlock(pos, Blocks::lit_furnace->defaultBlockState()->setValue(FACING, state->getValue(FACING)),
-                        Block::UPDATE_ALL, false);
-        level->setBlock(pos, Blocks::lit_furnace->defaultBlockState()->setValue(FACING, state->getValue(FACING)),
-                        Block::UPDATE_ALL, false);
-    }
-    else
-    {
-        level->setBlock(pos, Blocks::furnace->defaultBlockState()->setValue(FACING, state->getValue(FACING)),
-                        Block::UPDATE_ALL, false);
-        level->setBlock(pos, Blocks::furnace->defaultBlockState()->setValue(FACING, state->getValue(FACING)),
-                        Block::UPDATE_ALL, false);
-    }
+    level->setBlock(pos, replacementState, Block::UPDATE_ALL, false);
+    level->setBlock(pos, replacementState, Block::UPDATE_ALL, false);
     sKeepInventory = false;
     if (blockEntity != NULL)
     {
-        sKeepInventory = false;
         blockEntity->clearRemoved();
         level->setBlockEntity(pos, blockEntity);
     }
@@ -178,7 +178,7 @@ void FurnaceBlock::setPlacedBy(Level* level, const BlockPos& pos, const BlockSta
     if (itemInstance->hasCustomHoverName())
     {
         boost::shared_ptr<BlockEntity> blockEntity = level->getBlockEntity(pos);
-        bool isFurnace = eTYPE_DERIVED_FROM(BlockEntityType::FURNACE, blockEntity->GetType());
+        bool isFurnace = blockEntity && eTYPE_DERIVED_FROM(BlockEntityType::FURNACE, blockEntity->GetType());
         if (isFurnace)
         {
             boost::shared_ptr<FurnaceBlockEntity> furnace = boost::dynamic_pointer_cast<FurnaceBlockEntity>(
@@ -219,7 +219,7 @@ int FurnaceBlock::getAnalogOutputSignal(const BlockState*, Level* level, const B
 
 not_null_ptr<ItemInstance> FurnaceBlock::getCloneItemInstance(Level*, const BlockPos&, const BlockState*)
 {
-    return not_null_ptr<ItemInstance>(new ItemInstance(Item::byBlock(Blocks::furnace)));
+    return not_null_ptr<ItemInstance>(new ItemInstance(furnaceBlock(mKind, false)));
 }
 
 EBlockRenderShape FurnaceBlock::getRenderShape(const BlockState*)
@@ -272,14 +272,33 @@ BlockStateDefinition* FurnaceBlock::createBlockStateDefinition()
 
 TextureAtlasSprite* FurnaceBlock::getTexture(const Direction* direction, const BlockState* state)
 {
-    if (direction == Direction::UP || direction == Direction::DOWN)
+    if (direction == Direction::DOWN)
+        return mBottomIcon;
+    if (direction == Direction::UP)
         return mTopIcon;
     return direction != state->getValue(FACING) ? mIcon : mFrontIcon;
 }
 
 void FurnaceBlock::registerIcons(IconRegister* iconRegister)
 {
+    if (mKind == FurnaceKind::Smoker)
+    {
+        mIcon = iconRegister->registerIcon(L"smoker_side");
+        mFrontIcon = iconRegister->registerIcon(mLit ? L"smoker_front_on" : L"smoker_front");
+        mTopIcon = iconRegister->registerIcon(L"smoker_top");
+        mBottomIcon = iconRegister->registerIcon(L"smoker_bottom");
+        return;
+    }
+    if (mKind == FurnaceKind::BlastFurnace)
+    {
+        mIcon = iconRegister->registerIcon(L"blast_furnace_side");
+        mFrontIcon = iconRegister->registerIcon(mLit ? L"blast_furnace_front_on" : L"blast_furnace_front");
+        mTopIcon = iconRegister->registerIcon(L"blast_furnace_top");
+        mBottomIcon = mTopIcon;
+        return;
+    }
     mIcon = iconRegister->registerIcon(L"furnace_side");
     mFrontIcon = iconRegister->registerIcon(mLit ? L"furnace_front_lit" : L"furnace_front");
     mTopIcon = iconRegister->registerIcon(L"furnace_top");
+    mBottomIcon = mTopIcon;
 }

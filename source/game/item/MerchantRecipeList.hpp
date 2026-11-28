@@ -34,6 +34,16 @@ public:
     int size();
     bool empty();
     iterator erase(iterator position);
+
+    static int experienceForLevel(int level);
+    int getTradeLevel() const { return mTradeLevel; }
+    int getTradeExperience() const { return mTradeExperience; }
+    void setTradeProgress(int level, int experience);
+    bool isLocked(const MerchantRecipe* recipe) const;
+
+private:
+    int mTradeLevel = 0;
+    int mTradeExperience = 0;
 };
 
 #endif

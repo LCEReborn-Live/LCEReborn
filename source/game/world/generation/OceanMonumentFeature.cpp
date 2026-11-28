@@ -136,14 +136,13 @@ void OceanMonumentFeature::OceanMonumentStart::Init()
     mCreated = false;
 }
 
-void OceanMonumentFeature::OceanMonumentStart::create(Level* level, Random& random, int chunkX, int chunkZ)
+void OceanMonumentFeature::OceanMonumentStart::create(Level* level, Random&, int chunkX, int chunkZ)
 {
-    random.setSeed(level->getSeed());
-    long long xSeed = random.nextLong();
-    long long zSeed = random.nextLong();
-    long long seedX = (long long)chunkX * xSeed;
-    long long seedZ = (long long)chunkZ * zSeed;
-    random.setSeed(seedX ^ seedZ ^ level->getSeed());
+    Random random(level->getSeed());
+    const auto xSeed = static_cast<unsigned long long>(random.nextLong());
+    const auto zSeed = static_cast<unsigned long long>(random.nextLong());
+    const auto seed = xSeed * chunkX ^ zSeed * chunkZ ^ level->getSeed();
+    random.setSeed(static_cast<long long>(seed));
 
     int originX = chunkX * 16 - 21;
     int originZ = chunkZ * 16 - 21;
@@ -180,6 +179,8 @@ void OceanMonumentFeature::OceanMonumentStart::postProcess(Level* level, Random&
 {
     if (!mCreated)
     {
+        for (auto* piece : mPieces)
+            delete piece;
         mPieces.clear();
         create(level, random, getChunkX(), getChunkZ());
     }

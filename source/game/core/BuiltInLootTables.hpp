@@ -36,6 +36,10 @@ public:
     static ResourceLocation UNDERWATER_RUIN_SMALL;
     static ResourceLocation VILLAGE_BLACKSMITH;
     static ResourceLocation VILLAGE_TWO_ROOM_HOUSE;
+    static ResourceLocation VILLAGE_HOME_SUPPLIES;
+    static ResourceLocation PILLAGER_OUTPOST;
+    static ResourceLocation VILLAGE_FARM_SUPPLIES;
+    static ResourceLocation VILLAGE_WORKSHOP_SUPPLIES;
     static ResourceLocation WOODLAND_MANSION;
     static ResourceLocation ARMOR_SET_CHAIN;
     static ResourceLocation ARMOR_SET_DIAMOND;
@@ -149,6 +153,8 @@ private:
     static void staticLootTable_UNDERWATER_RUIN_SMALL();
     static void staticLootTable_VILLAGE_BLACKSMITH();
     static void staticLootTable_VILLAGE_TWO_ROOM_HOUSE();
+    static void staticLootTable_VILLAGE_SUPPLIES();
+    static void staticLootTable_PILLAGER_OUTPOST();
     static void staticLootTable_WOODLAND_MANSION();
     static void staticLootTable_ARMOR_SET_CHAIN();
     static void staticLootTable_ARMOR_SET_DIAMOND();

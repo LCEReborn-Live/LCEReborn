@@ -53,12 +53,18 @@ FlatLevelSource::FlatLevelSource(Level* level, long long seed, bool generateStru
 
         if (generatorInfo.hasVillage())
         {
-            mStructureFeatures[LargeFeature::VILLAGE] = generatorInfo.getVillage(mLevelSize);
+            auto* village = generatorInfo.getVillage(mLevelSize);
+            village->setTerrainSource(this);
+            mStructureFeatures[LargeFeature::VILLAGE] = village;
         }
         if (generatorInfo.hasBiomeSpecific())
         {
-            mStructureFeatures[LargeFeature::TEMPLE] = generatorInfo.getBiomeSpecific();
-            mStructureFeatures[LargeFeature::RUIN] = new OceanRuinFeature(config);
+            auto* temple = generatorInfo.getBiomeSpecific();
+            temple->setTerrainSource(this);
+            mStructureFeatures[LargeFeature::TEMPLE] = temple;
+            auto* ruin = new OceanRuinFeature(config);
+            ruin->setTerrainSource(this);
+            mStructureFeatures[LargeFeature::RUIN] = ruin;
         }
         if (generatorInfo.hasMineshaft())
         {

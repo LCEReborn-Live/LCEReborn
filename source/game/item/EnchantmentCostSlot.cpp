@@ -13,7 +13,7 @@ bool EnchantmentCostSlot::mayPlace(not_null_ptr<ItemInstance> itemInstance)
 {
     if (itemInstance->getItem() == Items::dye)
     {
-        return DyeColor::byItemData(itemInstance->getAuxValue()) == DyeColor::BLUE;
+        return itemInstance->getAuxValue() == DyeColor::BLUE->getItemData();
     }
     return false;
 }

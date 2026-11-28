@@ -13,6 +13,7 @@ namespace
 {
 const Logger sLog("Audio");
 const char SOUND_BANK_PATH[] = "WiiU/Sound/Minecraft.msscmp";
+const char TU80_SOUND_BANK_PATH[] = "WiiU/Sound/TU80.msscmp";
 const float PI = 3.14159265f;
 const float EPSILON = 0.0001f;
 const float ALIGNED_DOT = 0.9999f;
@@ -118,6 +119,18 @@ void PcSoundEngine::init(char*, SoundBankLoadedCallback)
     }
     for (size_t i = 0; i < m_bank.Skipped().size(); ++i)
         LOG_WARN(sLog, "Sound bank: %s", m_bank.Skipped()[i].c_str());
+
+    const bool hasTu80Bank = ReadWholeFile(TU80_SOUND_BANK_PATH, &bytes);
+    m_tu80BankLoaded = hasTu80Bank && m_tu80Bank.Load(bytes, &error);
+    if (m_tu80BankLoaded)
+    {
+        for (const auto& skipped : m_tu80Bank.Skipped())
+            LOG_WARN(sLog, "TU80 sound bank: %s", skipped.c_str());
+        LOG_INFO(sLog, "TU80 sound bank loaded: %zu events, %zu sounds",
+                 m_tu80Bank.Events().size(), m_tu80Bank.Sounds().size());
+    }
+    else if (hasTu80Bank)
+        LOG_WARN(sLog, "The TU80 sound bank could not be loaded (%s)", error.c_str());
 
     if (!m_mixer.Open())
         return;
@@ -244,7 +257,20 @@ bool PcSoundEngine::MakeRoom(const PcSoundBank::Sound& sound, const PcSoundBank:
 
 void PcSoundEngine::StartEvent(const Pending& pending)
 {
-    const PcSoundBank::Event* event = m_bank.FindEvent(pending.eventName.c_str());
+    const char* name = pending.eventName.c_str();
+    const PcSoundBank::Event* event = m_tu80BankLoaded ? m_tu80Bank.FindEvent(name) : NULL;
+    const PcSoundBank& bank = event ? m_tu80Bank : m_bank;
+    if (!event)
+        event = m_bank.FindEvent(name);
+    if (!event)
+    {
+        if (pending.eventName == "Minecraft/block/barrel/open")
+            event = m_bank.FindEvent("Minecraft/block/chest/open");
+        else if (pending.eventName == "Minecraft/block/barrel/close")
+            event = m_bank.FindEvent("Minecraft/block/chest/close");
+        else if (pending.eventName == "Minecraft/block/blastfurnace/fire_crackle")
+            event = m_bank.FindEvent("Minecraft/block/furnace/fire_crackle");
+    }
     if (event == NULL)
     {
         if (m_missingEvents.insert(pending.eventName).second)
@@ -258,7 +284,7 @@ void PcSoundEngine::StartEvent(const Pending& pending)
         const PcSoundBank::Choice* choice = Choose(play);
         if (choice == NULL)
             continue;
-        const PcSoundBank::Sound* sound = m_bank.FindSound(choice->sound.c_str());
+        const PcSoundBank::Sound* sound = bank.FindSound(choice->sound.c_str());
         if (sound == NULL || !MakeRoom(*sound, play))
             continue;
 

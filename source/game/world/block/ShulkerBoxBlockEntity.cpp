@@ -424,7 +424,7 @@ void ShulkerBoxBlockEntity::setItems(NonNullList<not_null_ptr<ItemInstance> > it
 
 const DyeColor* ShulkerBoxBlockEntity::getColor()
 {
-    if (mColor == NULL)
+    if (mColor == NULL && hasLevel())
         mColor = ShulkerBoxBlock::getColorFromBlock(getBlock());
     return mColor;
 }

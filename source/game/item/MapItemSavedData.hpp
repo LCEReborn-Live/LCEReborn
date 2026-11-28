@@ -75,6 +75,8 @@ public:
     static void addTargetDecoration(const not_null_ptr<ItemInstance>& item, const BlockPos& pos, const std::wstring& id,
                                     const MapDecoration::Type* type);
     bool fjIsCompletelyExplored() const;
+    bool isLocked() const { return mLocked; }
+    unsigned char getScale() const { return mScale; }
     void fjRemoveDecorationByEntityId(int id);
 
 private:
@@ -86,6 +88,7 @@ private:
     signed char mDimension;
     bool mTrackingPosition;
     bool mUnlimitedTracking;
+    bool mLocked;
     unsigned char mScale;
 
 public:

@@ -302,7 +302,7 @@ bool FireworksRecipe::matches(boost::shared_ptr<CraftingContainer> craftingConta
 
             if (item->getItem() == Items::dye)
             {
-                colors.push_back(DyeItem::DYE_COLORS[item->getAuxValue() & 15]);
+                colors.push_back(DyeItem::DYE_COLORS[DyeColor::byItemData(item->getAuxValue())->getItemData()]);
             }
             else if (item->getItem() == Items::glowstoneDust)
             {
@@ -360,7 +360,7 @@ bool FireworksRecipe::matches(boost::shared_ptr<CraftingContainer> craftingConta
 
             if (item->getItem() == Items::dye)
             {
-                colors.push_back(DyeItem::DYE_COLORS[item->getAuxValue() & 15]);
+                colors.push_back(DyeItem::DYE_COLORS[DyeColor::byItemData(item->getAuxValue())->getItemData()]);
             }
             else if (item->getItem() == Items::fireworkCharge)
             {

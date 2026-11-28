@@ -4,6 +4,7 @@
 #include "game/world/generation/Player.hpp"
 
 #include <boost/shared_ptr.hpp>
+#include <memory>
 
 #include "game/client/audio/SoundEvents.hpp"
 #include "game/client/audio/SoundSource.hpp"
@@ -13,6 +14,7 @@
 #include "game/core/DyeColor.hpp"
 #include "game/core/Position.hpp"
 #include "game/core/PrimedTnt.hpp"
+#include "game/core/Sheep.hpp"
 #include "game/core/Snowball.hpp"
 #include "game/core/ThrownEgg.hpp"
 #include "game/core/ThrownExpBottle.hpp"
@@ -35,6 +37,7 @@
 #include "game/item/SpawnEggItem.hpp"
 #include "game/item/ThrownPotion.hpp"
 #include "game/util/Random.hpp"
+#include "game/util/AABB.hpp"
 #include "game/world/Level.hpp"
 #include "game/world/block/Block.hpp"
 #include "game/world/block/AbstractProperty.hpp"
@@ -388,6 +391,37 @@ void DispenserBootstrap::StaticCtor()
             return item;
         }
     };
+    class ShearsDispenseBehavior : public OptionalDispenseItemBehavior
+    {
+    public:
+        not_null_ptr<ItemInstance> execute(BlockSource* source, not_null_ptr<ItemInstance> item,
+                                          eOUTCOME& outcome) override
+        {
+            Level* level = source->getWorld();
+            const auto* facing = source->getBlockState()->getValue(DispenserBlock::FACING);
+            const auto pos = source->getPos().relative(facing);
+            auto* box = AABB::newTemp(pos.x, pos.y, pos.z, pos.x + 1, pos.y + 1, pos.z + 1);
+            std::unique_ptr<std::vector<boost::shared_ptr<Entity>>> sheep(level->getEntitiesOfClass(typeid(Sheep), box));
+            for (const auto& entity : *sheep)
+            {
+                if (!boost::static_pointer_cast<Sheep>(entity)->shear())
+                    continue;
+                if (item->hurt(1, level->mRandom))
+                    item->setCount(0);
+                outcome = eOUTCOME_Success;
+                return item;
+            }
+            outcome = eOUTCOME_Failure;
+            return item;
+        }
+
+        void playSound(BlockSource* source, eOUTCOME outcome) override
+        {
+            source->getWorld()->levelEvent(outcome == eOUTCOME_Success ? LevelEvent::SOUND_DISPENSER_DISPENSE
+                                                                       : LevelEvent::SOUND_DISPENSER_FAIL,
+                                           source->getPos(), 0);
+        }
+    };
     class DyeDispenseBehavior : public OptionalDispenseItemBehavior
     {
     public:
@@ -543,12 +577,14 @@ void DispenserBootstrap::StaticCtor()
     DispenserBlock::DISPENSER_REGISTRY.add(Items::tropicalBucket, new FilledBucketDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Items::bucket, new EmptyBucketDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Items::flintAndSteel, new FlintAndSteelDispenseBehavior());
+    DispenserBlock::DISPENSER_REGISTRY.add(Items::shears, new ShearsDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Items::dye, new DyeDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Item::byBlock(Blocks::tnt), new TntDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Items::skull, new SkullDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Item::byBlock(Blocks::pumpkin), new PumpkinDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Item::byBlock(Blocks::carved_pumpkin), new PumpkinDispenseBehavior());
     DispenserBlock::DISPENSER_REGISTRY.add(Item::byBlock(Blocks::lit_pumpkin), new PumpkinDispenseBehavior());
+    DispenserBlock::DISPENSER_REGISTRY.add(Item::byBlock(Blocks::undyed_shulker_box), new ShulkerBoxDispenseBehavior());
     for (std::vector<const DyeColor*>::iterator it = DyeColor::COLORS.begin(); it != DyeColor::COLORS.end(); ++it)
     {
         DispenserBlock::DISPENSER_REGISTRY.add(Item::byBlock(ShulkerBoxBlock::getBlockByColor(*it)),

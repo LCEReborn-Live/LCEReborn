@@ -16,9 +16,12 @@ public:
     virtual void setWidth(float width);
     virtual void setHeight(float height);
     void setTexture(unsigned int textureWidth, unsigned int textureHeight, int textureId, bool textureAlpha);
+    void setSolidColor(float red, float green, float blue, float alpha)
+    { mSolidRed = red; mSolidGreen = green; mSolidBlue = blue; mSolidAlpha = alpha; }
 
 private:
     int mUnusedE4;
+    float mSolidRed = 1, mSolidGreen = 0, mSolidBlue = 0, mSolidAlpha = 0;
     int mTextureId;
     unsigned char mCustomTexture;
     unsigned char mTextureAlpha;

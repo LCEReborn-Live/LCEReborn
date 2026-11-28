@@ -14,6 +14,7 @@ class BlockPos;
 class BoundingBox;
 class DataInputStream;
 class DataOutputStream;
+class GenericOverworldLevelSource;
 class Level;
 class Random;
 class SuperflatConfig;
@@ -24,10 +25,12 @@ public:
     class VillageStart : public StructureStart
     {
     public:
-        VillageStart(Level* level, Random& random, int chunkX, int chunkZ, int size, int distance);
+        VillageStart(Level* level, Random& random, int chunkX, int chunkZ, int size, int distance,
+                     GenericOverworldLevelSource* terrain = nullptr);
         VillageStart();
 
         static StructureStart* Create();
+        void load(Level* level, DataInputStream* input) override;
         virtual bool isValid();
         virtual void addAdditionalSaveData(DataOutputStream* output);
         virtual void readAdditionalSaveData(DataInputStream* input);
@@ -50,12 +53,15 @@ public:
     virtual bool isFeatureChunk(int chunkX, int chunkZ, bool flatWorld);
     virtual BlockPos* getNearestGeneratedFeature(Level* level, const BlockPos& pos, bool skipExistingChunks);
     virtual StructureStart* createStructureStart(int chunkX, int chunkZ);
+    void setTerrainSource(GenericOverworldLevelSource* terrain) { mTerrain = terrain; }
 
 private:
+    bool isLocatableChunk(int chunkX, int chunkZ) override;
     int mVillageSize;
     int mSpacing;
     int mSeparation;
     int mSize;
+    GenericOverworldLevelSource* mTerrain = nullptr;
 };
 
 #endif

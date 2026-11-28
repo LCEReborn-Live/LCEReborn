@@ -4,6 +4,7 @@
 #include "game/core/EntityType.hpp"
 
 #include <typeinfo>
+#include <memory>
 #include <vector>
 
 #include <boost/shared_ptr.hpp>
@@ -34,6 +35,12 @@ bool MakeLoveGoal::villageNeedsMoreVillagers()
     if (village == NULL)
         return false;
 
+    if (village->usesPointsOfInterest())
+    {
+        BlockPos bed;
+        return mLevel->getVillages()->findFreeBed(BlockPos(mVillager), bed, village.get());
+    }
+
     if (!village->isBreedTimerOk())
         return false;
 
@@ -43,15 +50,40 @@ bool MakeLoveGoal::villageNeedsMoreVillagers()
 
 bool MakeLoveGoal::canUse()
 {
-    if (mVillager->getAge() != 0)
+    if (mVillager->getAge() != 0 || mVillager->isSleeping() || mVillager->isTakingShelter())
         return false;
 
     if (mVillager->getRandom()->nextInt(500) != 0)
         return false;
 
     mVillage = mLevel->getVillages()->getClosestVillage(BlockPos(mVillager->shared_from_this()), 0);
-    if (!mVillage.lock())
+    const auto village = mVillage.lock();
+    if (!village)
         return false;
+
+    if (village->usesPointsOfInterest())
+    {
+        if (!mVillager->hasBreedingFood() || !villageNeedsMoreVillagers())
+            return false;
+        const std::unique_ptr<std::vector<boost::shared_ptr<Entity>>> villagers(
+            mLevel->getEntitiesOfClass(typeid(Villager), mVillager->mBoundingBox->grow(8.0, 3.0, 8.0)));
+        double best = 65.0;
+        for (const auto& entity : *villagers)
+        {
+            auto candidate = boost::static_pointer_cast<Villager>(entity);
+            if (candidate.get() == mVillager || !candidate->isAlive() || candidate->isSleeping()
+                || candidate->isTakingShelter() || candidate->getAge() != 0 || !candidate->hasBreedingFood()
+                || mLevel->getVillages()->getClosestVillage(BlockPos(candidate), 0) != village)
+                continue;
+            const auto distance = mVillager->distanceToSqr(candidate);
+            if (distance < best)
+            {
+                best = distance;
+                mPartner = candidate;
+            }
+        }
+        return !mPartner.expired();
+    }
 
     if (!villageNeedsMoreVillagers() || !mVillager->isWillingToBreed(true))
         return false;
@@ -84,39 +116,62 @@ void MakeLoveGoal::stop()
 
 bool MakeLoveGoal::canContinueToUse()
 {
-    return mPartner.lock() && mRunningTicks > -1 && villageNeedsMoreVillagers() && mVillager->getAge() == 0
-           && mVillager->isWillingToBreed(false);
+    const auto partner = mPartner.lock();
+    const auto village = mVillage.lock();
+    if (!partner || !village || mRunningTicks < 0 || mVillager->getAge() != 0
+        || mVillager->isSleeping() || mVillager->isTakingShelter())
+        return false;
+    if (village->usesPointsOfInterest())
+        return partner->isAlive() && partner->getAge() == 0 && !partner->isSleeping() && !partner->isTakingShelter()
+            && partner->hasBreedingFood() && mVillager->hasBreedingFood()
+            && village->isInside(BlockPos(partner)) && village->isInside(BlockPos(mVillager));
+    return villageNeedsMoreVillagers() && mVillager->isWillingToBreed(false);
 }
 
 void MakeLoveGoal::breed()
 {
-    mPartner.lock()->setAge(6000);
-    mVillager->setAge(6000);
-
-    if (mLevel->canCreateMore(EntityType::VILLAGER, Level::eSpawnType_Breed))
+    const auto partner = mPartner.lock();
+    const auto village = mVillage.lock();
+    if (!partner || !village || !mLevel->canCreateMore(EntityType::VILLAGER, Level::eSpawnType_Breed))
+        return;
+    const auto villages = mLevel->getVillages();
+    const bool modern = village->usesPointsOfInterest();
+    BlockPos bed;
+    if (modern && (!partner->hasBreedingFood() || !mVillager->hasBreedingFood()
+        || !villages->findFreeBed(BlockPos(mVillager), bed, village.get())))
+        return;
+    auto child = boost::static_pointer_cast<Villager>(mVillager->getBreedOffspring(partner));
+    child->setAge(-24000);
+    child->moveTo(mVillager->mX, mVillager->mY, mVillager->mZ, 0.0f, 0.0f);
+    if (!mLevel->addEntity(child))
+        return;
+    if (modern)
     {
-        boost::shared_ptr<Villager> villager = boost::dynamic_pointer_cast<Villager>(
-            mVillager->getBreedOffspring(mPartner.lock()));
-
-        mPartner.lock()->setWillingToBreed(false);
-        mVillager->setWillingToBreed(false);
-        villager->setAge(-24000);
-        villager->moveTo(mVillager->mX, mVillager->mY, mVillager->mZ, 0.0f, 0.0f);
-        mLevel->addEntity(villager);
-        mLevel->broadcastEntityEvent(villager, EntityEvent::LOVE_HEARTS, 0);
+        villages->claimHome(child->getUUID(), bed);
+        partner->consumeBreedingFood();
+        mVillager->consumeBreedingFood();
     }
+    partner->setAge(6000);
+    mVillager->setAge(6000);
+    partner->setWillingToBreed(false);
+    mVillager->setWillingToBreed(false);
+    mLevel->broadcastEntityEvent(child, EntityEvent::LOVE_HEARTS, 0);
 }
 
 void MakeLoveGoal::tick()
 {
     --mRunningTicks;
 
-    mVillager->getLookControl()->setLookAt(mPartner.lock(), 10.0F, 30.0F);
-    if (mVillager->distanceToSqr(mPartner.lock()) > 2.25)
+    const auto partner = mPartner.lock();
+    if (!partner)
+        return;
+    const auto village = mVillage.lock();
+    mVillager->getLookControl()->setLookAt(partner, 10.0F, 30.0F);
+    if (mVillager->distanceToSqr(partner) > 2.25)
     {
-        mVillager->getNavigation()->moveTo(mPartner.lock(), 0.25);
+        mVillager->getNavigation()->moveTo(partner, 0.25);
     }
-    else if (mRunningTicks == 0 && mPartner.lock()->isInLove())
+    else if (mRunningTicks == 0 && (partner->isInLove() || (village && village->usesPointsOfInterest())))
     {
         breed();
     }

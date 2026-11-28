@@ -1,5 +1,6 @@
 #include "game/world/block/Block.hpp"
 #include "game/core/StringIds.hpp"
+#include "game/core/ExtraStrings.hpp"
 #include "game/core/Integer.hpp"
 #include "game/world/block/BlockId.hpp"
 #include "game/item/ItemId.hpp"
@@ -15,6 +16,20 @@
 #include "game/world/block/BlockImpl.hpp"
 #include "game/world/block/Blocks.hpp"
 #include "game/world/block/AirBlock.hpp"
+#include "game/world/block/CartographyTableBlock.hpp"
+#include "game/world/block/GrindstoneBlock.hpp"
+#include "game/world/block/BarrelBlock.hpp"
+#include "game/world/block/ComposterBlock.hpp"
+#include "game/world/block/StonecutterBlock.hpp"
+#include "game/world/block/WorkstationTableBlock.hpp"
+#include "game/world/block/SweetBerryBushBlock.hpp"
+#include "game/world/block/LanternBlock.hpp"
+#include "game/world/block/BambooBlock.hpp"
+#include "game/world/block/ScaffoldingBlock.hpp"
+#include "game/world/block/CampfireBlock.hpp"
+#include "game/world/block/BellBlock.hpp"
+#include "game/world/block/LecternBlock.hpp"
+#include "game/world/block/LoomBlock.hpp"
 #include "game/world/block/DirectionalBlock.hpp"
 #include "game/world/block/HorizontalDirectionalBlock.hpp"
 #include "game/world/block/ThinFenceBlock.hpp"
@@ -176,6 +191,7 @@
 #include "game/world/block/StoneButtonBlock.hpp"
 #include "game/world/block/StandingBannerBlock.hpp"
 #include "game/world/block/StandingSignBlock.hpp"
+#include "game/world/block/DecorativeStone.hpp"
 #include "game/world/block/StemBlock.hpp"
 #include "game/world/block/TallGrassBlock.hpp"
 #include "game/world/block/WallBannerBlock.hpp"
@@ -235,6 +251,25 @@
 
 template <class T>
 std::wstring _toString(T value);
+
+namespace
+{
+class BarkBlock : public RotatedPillarBlockImpl
+{
+public:
+    explicit BarkBlock(int species) : RotatedPillarBlockImpl(Material::WOOD), mSpecies(species) {}
+
+    bool isStrippable() override { return true; }
+    const BlockState* getStrippedBlock(const BlockState* state) override
+    {
+        return Block::byId(BlockId::STRIPPED_WOOD_FIRST + mSpecies)->defaultBlockState()
+            ->setValue(gRotatedPillarBlockAxisProperty, getAxis(state));
+    }
+
+private:
+    int mSpecies;
+};
+}
 
 static const ResourceLocation* AIR_LOCATION = new ResourceLocation(L"air");
 DefaultedMappedRegistry<ResourceLocation, Block*>* const Block::blockRegistry =
@@ -366,7 +401,7 @@ Block* Block::byId(int id)
         id -= 0x300;
     }
 
-    if (id > 0x13E)
+    if (id < 0 || id >= BlockId::COUNT)
     {
         return NULL;
     }
@@ -4290,7 +4325,7 @@ void Block::staticCtor()
                       ->setBaseItemTypeAndMaterial(22, 54));
 
     registerBlock(313, L"bark_spruce",
-                  (new RotatedPillarBlockImpl(Material::WOOD))
+                  (new BarkBlock(1))
                       ->setIconTopName(L"log_spruce")
                       ->setIconName(L"log_spruce")
                       ->setDestroyTime(2.0f)
@@ -4299,7 +4334,7 @@ void Block::staticCtor()
                       ->setNameAndDescriptionId(IDS_TILE_LOG, IDS_DESC_LOG));
 
     registerBlock(314, L"bark_birch",
-                  (new RotatedPillarBlockImpl(Material::WOOD))
+                  (new BarkBlock(2))
                       ->setIconTopName(L"log_birch")
                       ->setIconName(L"log_birch")
                       ->setDestroyTime(2.0f)
@@ -4308,7 +4343,7 @@ void Block::staticCtor()
                       ->setNameAndDescriptionId(IDS_TILE_LOG, IDS_DESC_LOG));
 
     registerBlock(315, L"bark_jungle",
-                  (new RotatedPillarBlockImpl(Material::WOOD))
+                  (new BarkBlock(3))
                       ->setIconTopName(L"log_jungle")
                       ->setIconName(L"log_jungle")
                       ->setDestroyTime(2.0f)
@@ -4317,7 +4352,7 @@ void Block::staticCtor()
                       ->setNameAndDescriptionId(IDS_TILE_LOG, IDS_DESC_LOG));
 
     registerBlock(316, L"bark_acacia",
-                  (new RotatedPillarBlockImpl(Material::WOOD))
+                  (new BarkBlock(4))
                       ->setIconTopName(L"log_acacia")
                       ->setIconName(L"log_acacia")
                       ->setDestroyTime(2.0f)
@@ -4326,7 +4361,7 @@ void Block::staticCtor()
                       ->setNameAndDescriptionId(IDS_TILE_LOG, IDS_DESC_LOG));
 
     registerBlock(317, L"bark_dark_oak",
-                  (new RotatedPillarBlockImpl(Material::WOOD))
+                  (new BarkBlock(5))
                       ->setIconTopName(L"log_big_oak")
                       ->setIconName(L"log_big_oak")
                       ->setDestroyTime(2.0f)
@@ -4335,13 +4370,196 @@ void Block::staticCtor()
                       ->setNameAndDescriptionId(IDS_TILE_LOG, IDS_DESC_LOG));
 
     registerBlock(318, L"bark_oak",
-                  (new RotatedPillarBlockImpl(Material::WOOD))
+                  (new BarkBlock(0))
                       ->setIconTopName(L"log_oak")
                       ->setIconName(L"log_oak")
                       ->setDestroyTime(2.0f)
                       ->setSoundType(SoundType::WOOD)
                       ->sendBlockData(15)
                       ->setNameAndDescriptionId(IDS_TILE_LOG, IDS_DESC_LOG));
+
+    registerBlock(BlockId::SMOKER, L"smoker",
+                  (new FurnaceBlock(false, FurnaceKind::Smoker))
+                      ->setDestroyTime(3.5f)
+                      ->setSoundType(SoundType::STONE)
+                      ->setIconName(L"smoker")
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_SMOKER, IDS_LCE_DESC_SMOKER)
+                      ->setBaseItemTypeAndMaterial(30, 3));
+
+    registerBlock(BlockId::LIT_SMOKER, L"lit_smoker",
+                  (new FurnaceBlock(true, FurnaceKind::Smoker))
+                      ->setDestroyTime(3.5f)
+                      ->setSoundType(SoundType::STONE)
+                      ->setIconName(L"smoker")
+                      ->setLightEmission(0.875f)
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_SMOKER, IDS_LCE_DESC_SMOKER));
+
+    registerBlock(BlockId::BLAST_FURNACE, L"blast_furnace",
+                  (new FurnaceBlock(false, FurnaceKind::BlastFurnace))
+                      ->setDestroyTime(3.5f)
+                      ->setSoundType(SoundType::STONE)
+                      ->setIconName(L"blast_furnace")
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_BLAST_FURNACE, IDS_LCE_DESC_BLAST_FURNACE)
+                      ->setBaseItemTypeAndMaterial(30, 4));
+
+    registerBlock(BlockId::LIT_BLAST_FURNACE, L"lit_blast_furnace",
+                  (new FurnaceBlock(true, FurnaceKind::BlastFurnace))
+                      ->setDestroyTime(3.5f)
+                      ->setSoundType(SoundType::STONE)
+                      ->setIconName(L"blast_furnace")
+                      ->setLightEmission(0.875f)
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_BLAST_FURNACE, IDS_LCE_DESC_BLAST_FURNACE));
+
+    registerBlock(BlockId::SMOOTH_STONE, L"smooth_stone",
+                  (new BlockImpl(Material::STONE))
+                      ->setDestroyTime(2.0f)
+                      ->setExplodeable(6.0f)
+                      ->setSoundType(SoundType::STONE)
+                      ->setIconName(L"smooth_stone")
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_SMOOTH_STONE, IDS_DESC_STONE)
+                      ->setBaseItemTypeAndMaterial(14, 2));
+
+    registerBlock(BlockId::CARTOGRAPHY_TABLE, L"cartography_table",
+                  (new CartographyTableBlock())
+                      ->setDestroyTime(2.5f)
+                      ->setSoundType(SoundType::WOOD)
+                      ->setIconName(L"cartography_table")
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_CARTOGRAPHY_TABLE, IDS_LCE_DESC_CARTOGRAPHY_TABLE)
+                      ->setBaseItemTypeAndMaterial(30, 5));
+
+    registerBlock(BlockId::GRINDSTONE, L"grindstone",
+                  (new GrindstoneBlock())
+                      ->setDestroyTime(2.0f)
+                      ->setSoundType(SoundType::STONE)
+                      ->setIconName(L"grindstone")
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_GRINDSTONE, IDS_LCE_DESC_GRINDSTONE)
+                      ->setBaseItemTypeAndMaterial(30, 6));
+
+    registerBlock(BlockId::BARREL, L"barrel",
+                  (new BarrelBlock())
+                      ->setDestroyTime(2.5f)
+                      ->setSoundType(SoundType::WOOD)
+                      ->setIconName(L"barrel_side")
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_BARREL, IDS_LCE_DESC_BARREL)
+                      ->setBaseItemTypeAndMaterial(30, 7));
+
+    registerBlock(BlockId::COMPOSTER, L"composter",
+                  (new ComposterBlock())
+                      ->setDestroyTime(0.6f)
+                      ->setSoundType(SoundType::WOOD)
+                      ->setIconName(L"composter_side")
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_COMPOSTER, IDS_LCE_DESC_COMPOSTER)
+                      ->setBaseItemTypeAndMaterial(30, 8));
+
+    registerBlock(BlockId::STONECUTTER, L"stonecutter",
+                  (new StonecutterBlock())
+                      ->setDestroyTime(3.5f)
+                      ->setSoundType(SoundType::STONE)
+                      ->sendBlockData(3)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_STONECUTTER, IDS_LCE_DESC_STONECUTTER)
+                      ->setBaseItemTypeAndMaterial(30, 9));
+
+    registerBlock(BlockId::SMITHING_TABLE, L"smithing_table",
+                  (new WorkstationTableBlock(L"smithing_table", L"smithing_table_bottom"))
+                      ->setDestroyTime(2.5f)
+                      ->setSoundType(SoundType::WOOD)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_SMITHING_TABLE, IDS_LCE_DESC_SMITHING_TABLE)
+                      ->setBaseItemTypeAndMaterial(30, 10));
+
+    registerBlock(BlockId::FLETCHING_TABLE, L"fletching_table",
+                  (new WorkstationTableBlock(L"fletching_table", L"planks_birch"))
+                      ->setDestroyTime(2.5f)
+                      ->setSoundType(SoundType::WOOD)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_FLETCHING_TABLE, IDS_LCE_DESC_FLETCHING_TABLE)
+                      ->setBaseItemTypeAndMaterial(30, 11));
+
+    registerBlock(BlockId::SWEET_BERRY_BUSH, L"sweet_berry_bush",
+                  (new SweetBerryBushBlock())
+                      ->setDestroyTime(0.0f)
+                      ->setSoundType(SoundType::GRASS)
+                      ->sendBlockData(3)
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_SWEET_BERRY_BUSH, IDS_LCE_DESC_SWEET_BERRIES));
+
+    registerBlock(BlockId::UNDYED_SHULKER_BOX, L"shulker_box",
+                  (new ShulkerBoxBlock(nullptr))
+                      ->setIconName(L"shulker_top")
+                      ->setDestroyTime(2.0f)
+                      ->setSoundType(SoundType::STONE)
+                      ->setNameAndDescriptionId(IDS_CONTAINER_SHULKER_BOX, IDS_TILE_SHULKER_BOX_DESC)
+                      ->setBaseItemTypeAndMaterial(36, 70));
+
+    const wchar_t* speciesNames[] = {L"oak", L"spruce", L"birch", L"jungle", L"acacia", L"dark_oak"};
+    for (int species = 0; species < BlockId::WOOD_SPECIES_COUNT; ++species)
+    {
+        const std::wstring name = std::wstring(L"stripped_") + speciesNames[species];
+        const std::wstring texture = std::wstring(L"stripped_log_") + speciesNames[species];
+        registerBlock(BlockId::STRIPPED_WOOD_FIRST + species, name + L"_wood",
+                      (new RotatedPillarBlockImpl(Material::WOOD))
+                          ->setIconTopName(texture)
+                          ->setIconName(texture)
+                          ->setDestroyTime(2.0f)
+                          ->setSoundType(SoundType::WOOD)
+                          ->sendBlockData(15)
+                          ->setNameAndDescriptionId(IDS_LCE_TILE_STRIPPED_WOOD_FIRST + species, IDS_DESC_LOG));
+    }
+
+    registerBlock(BlockId::LANTERN, L"lantern",
+                  (new LanternBlock())
+                      ->setDestroyTime(3.5f)
+                      ->setExplodeable(3.5f)
+                      ->setLightEmission(1.0f)
+                      ->sendBlockData(1)
+                      ->setIconName(L"lantern")
+                      ->setNameAndDescriptionId(IDS_LCE_TILE_LANTERN, IDS_LCE_DESC_LANTERN));
+
+    for (int wood = 1; wood < BlockId::WOOD_SPECIES_COUNT; ++wood)
+    {
+        const auto name = PlanksBlock::Variant::byData(wood)->getSerializedName();
+        const int title = IDS_LCE_WOOD_SIGN_FIRST + wood - 1;
+        registerBlock(BlockId::STANDING_WOOD_SIGN_FIRST + wood - 1, name + L"_standing_sign",
+                      (new StandingSignBlock())->setDestroyTime(1.0f)->setSoundType(SoundType::WOOD)
+                          ->setNotCollectStatistics()->sendBlockData(15)->setNameAndDescriptionId(title, IDS_DESC_SIGN));
+        registerBlock(BlockId::WALL_WOOD_SIGN_FIRST + wood - 1, name + L"_wall_sign",
+                      (new WallSignBlock())->setDestroyTime(1.0f)->setSoundType(SoundType::WOOD)
+                          ->setNotCollectStatistics()->sendBlockData(15)->setNameAndDescriptionId(title, IDS_DESC_SIGN));
+    }
+
+    registerBlock(BlockId::BAMBOO, L"bamboo",
+                  (new BambooBlock())
+                      ->setDestroyTime(1.0f)
+                      ->setSoundType(SoundType::WOOD)
+                      ->setLightBlock(0)
+                      ->sendBlockData(7)
+                      ->setNameAndDescriptionId(IDS_LCE_BAMBOO, IDS_LCE_DESC_BAMBOO));
+
+    registerBlock(BlockId::SCAFFOLDING, L"scaffolding",
+                  (new ScaffoldingBlock())
+                      ->setDestroyTime(0.0f)
+                      ->setSoundType(SoundType::SCAFFOLDING)
+                      ->setLightBlock(0)
+                      ->sendBlockData(15)
+                      ->setNameAndDescriptionId(IDS_LCE_SCAFFOLDING, IDS_LCE_DESC_SCAFFOLDING));
+
+    DecorativeStone::registerBlocks();
+    registerBlock(BlockId::CAMPFIRE, L"campfire",
+                  (new CampfireBlock())->setDestroyTime(2.0f)->setSoundType(SoundType::WOOD)
+                      ->sendBlockData(7)->setNameAndDescriptionId(IDS_LCE_CAMPFIRE, IDS_LCE_DESC_CAMPFIRE));
+    registerBlock(BlockId::BELL, L"bell",
+                  (new BellBlock())->setDestroyTime(5.0f)->setSoundType(SoundType::METAL)
+                      ->sendBlockData(15)->setNameAndDescriptionId(IDS_LCE_BELL, IDS_LCE_DESC_BELL));
+    registerBlock(BlockId::LECTERN, L"lectern",
+                  (new LecternBlock())->setDestroyTime(2.5f)->setSoundType(SoundType::WOOD)
+                      ->sendBlockData(15)->setNameAndDescriptionId(IDS_LCE_LECTERN, IDS_LCE_DESC_LECTERN));
+    registerBlock(BlockId::LOOM, L"loom",
+                  (new LoomBlock())->setDestroyTime(2.5f)->setSoundType(SoundType::WOOD)
+                      ->sendBlockData(3)->setNameAndDescriptionId(IDS_LCE_LOOM, IDS_LCE_DESC_LOOM));
 
     const boost::unordered_map<ResourceLocation, Block*>& registry = blockRegistry->keySet();
 

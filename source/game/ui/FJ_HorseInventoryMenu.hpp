@@ -15,6 +15,7 @@ public:
     void SetInventoryType(int type);
     void SetHasInventory(bool hasInventory);
     void SetCanHaveSaddle(bool canHaveSaddle);
+    void SetEquipmentHints(bool saddle, bool armor, bool carpet);
     virtual void SetSafeZone(int top, int bottom, int left, int right);
 };
 

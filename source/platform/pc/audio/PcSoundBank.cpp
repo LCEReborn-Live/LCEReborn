@@ -241,10 +241,12 @@ bool PcSoundBank::ReadSounds(std::string* error)
         unsigned long offset = 0;
         char extension[16] = {0};
         if (dataName == NULL || sscanf(dataName, "*%lu*%lu.%15s", &size, &offset, extension) != 3
-            || strcmp(extension, "binka") != 0 || !Contains(offset, size) || size < 4
-            || memcmp(&m_bytes[offset], "1FCB", 4) != 0)
+            || !Contains(offset, size) || size < 12
+            || !((strcmp(extension, "binka") == 0 && memcmp(&m_bytes[offset], "1FCB", 4) == 0)
+                || (strcmp(extension, "wav") == 0 && memcmp(&m_bytes[offset], "RIFF", 4) == 0
+                    && memcmp(&m_bytes[offset+8], "WAVE", 4) == 0)))
         {
-            m_skipped.push_back("sound " + recordName + ": not an embedded Bink Audio file");
+            m_skipped.push_back("sound " + recordName + ": not an embedded Bink Audio or PCM WAVE file");
             continue;
         }
         if (Word(record + SOUND_MARKER_COUNT * 4) != 0)

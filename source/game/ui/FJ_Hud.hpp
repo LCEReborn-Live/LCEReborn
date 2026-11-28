@@ -86,7 +86,7 @@ public:
     void HideSelectedLabel();
     void UpdateStatusEffectTile(int count, int index, int effect, bool ambient, float alpha);
     void SetNumBossBars(int count);
-    void SetBossBar(int index, float progress, const std::wstring& name);
+    void SetBossBar(int index, float progress, const std::wstring& name, int color, int overlay);
     void ShowGameModePlayers(bool visible);
     void SetGameModeNumPlayers(int count, bool alignLeft);
     void SetGameModePlayerState(int player, int state, bool alive);
@@ -210,9 +210,9 @@ private:
     int m_numBossBars;
     FJ_DragonHealth* m_bossBars[5];
     int m_numStatusEffects;
-    FJ_MobEffect_Tile* m_statusEffectTiles[27];
+    FJ_MobEffect_Tile* m_statusEffectTiles[28];
     int m_statusEffectsYOffset;
-    bool m_statusEffectAmbient[27];
+    bool m_statusEffectAmbient[28];
     int m_hudSize;
     int m_loadedHudSize;
     int m_hudY;

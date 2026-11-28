@@ -7,7 +7,9 @@
 #include "game/core/IconRegister.hpp"
 #include "game/core/L10N.hpp"
 #include "game/util/Random.hpp"
+#include "game/world/Dimension.hpp"
 #include "game/world/Level.hpp"
+#include "game/world/biome/Biome.hpp"
 #include "game/world/block/BlockPos.hpp"
 #include "game/world/block/BlockState.hpp"
 #include "game/world/block/BlockStateDefinition.hpp"
@@ -94,12 +96,33 @@ void SpongeBlock::tryAbsorbWater(Level* level, const BlockPos& pos, const BlockS
     {
         level->setBlock(pos, state->setValue(WET, true), Block::UPDATE_ALL, false);
         level->levelEvent(LevelEvent::PARTICLES_DESTROY_BLOCK, pos, Block::getId(Blocks::water));
+        if (!level->mIsClientSide && level->getBiome(pos)->getTemperatureCategory() == Biome::eTemperatureCategory_Warm)
+            level->addToTickNextTick(pos, this, 200);
     }
 }
 
 void SpongeBlock::onPlace(Level* level, const BlockPos& pos, const BlockState* state)
 {
+    if (!level->mIsClientSide && state->getValue(WET))
+    {
+        if (level->mDimension->isUltraWarm())
+            tick(level, pos, state, level->mRandom);
+        else if (level->getBiome(pos)->getTemperatureCategory() == Biome::eTemperatureCategory_Warm)
+            level->addToTickNextTick(pos, this, 200);
+        return;
+    }
     tryAbsorbWater(level, pos, state);
+}
+
+void SpongeBlock::tick(Level* level, const BlockPos& pos, const BlockState* state, Random*)
+{
+    if (!level->mIsClientSide && state->getValue(WET)
+        && (level->mDimension->isUltraWarm()
+            || level->getBiome(pos)->getTemperatureCategory() == Biome::eTemperatureCategory_Warm))
+    {
+        if (level->setBlock(pos, state->setValue(WET, false), Block::UPDATE_CLIENTS, false))
+            level->levelEvent(LevelEvent::SOUND_EXTINGUISH_FIRE, pos, 0);
+    }
 }
 
 void SpongeBlock::neighborChanged(const BlockState* state, Level* level, const BlockPos& pos, Block* block,

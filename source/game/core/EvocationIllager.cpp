@@ -44,7 +44,7 @@ EvocationIllager::EvocationIllager(Level* level) : SpellcasterIllager(level), mW
 }
 void EvocationIllager::registerGoals()
 {
-    Mob::registerGoals();
+    Raider::registerGoals();
     mGoalSelector.addGoal(0, new FloatGoal(this), true);
     mGoalSelector.addGoal(2, new AvoidEntityGoal(this, typeid(Player), 8.0f, 0.6, 1.0), true);
     mGoalSelector.addGoal(4, new EvokerSummonSpellGoal(this), true);

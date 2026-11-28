@@ -17,6 +17,8 @@
 #include "game/server/LeaderboardSavedData.hpp"
 #include "game/world/generation/StructureFeatureSavedData.hpp"
 #include "game/world/generation/Villages.hpp"
+#include "game/entity/mob/PatrolSpawner.hpp"
+#include "game/world/generation/Raids.hpp"
 
 void __debugbreak();
 
@@ -76,6 +78,14 @@ boost::shared_ptr<SavedData> SavedDataStorage::get(const std::type_info& type, c
             {
                 boost::shared_ptr<Villages> villages(new Villages(id));
                 savedData = boost::dynamic_pointer_cast<SavedData>(villages);
+            }
+            else if (type == typeid(Raids))
+            {
+                savedData.reset(new Raids(id));
+            }
+            else if (type == typeid(PatrolSpawner))
+            {
+                savedData.reset(new PatrolSpawner(id));
             }
             else if (type == typeid(StructureFeatureSavedData))
             {

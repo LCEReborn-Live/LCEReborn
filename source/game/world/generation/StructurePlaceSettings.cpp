@@ -96,14 +96,18 @@ StructurePlaceSettings* StructurePlaceSettings::copy()
     settings->mRotation = mRotation;
     settings->mIgnoreEntities = mIgnoreEntities;
     settings->mIgnoreBlock = mIgnoreBlock;
-    settings->mChunkPos = mChunkPos;
-    settings->mBoundingBox = mBoundingBox;
+    if (mChunkPos)
+        settings->mChunkPos = new ChunkPos(mChunkPos->x, mChunkPos->z);
+    if (mBoundingBox)
+        settings->mBoundingBox = new BoundingBox(mBoundingBox);
     settings->mIgnoreStructureBlocks = mIgnoreStructureBlocks;
     settings->mIntegrity = mIntegrity;
     settings->mRandom = mRandom;
     settings->mSeed = mSeed;
     settings->mPlaceWaterBelowSeaLevel = mPlaceWaterBelowSeaLevel;
     settings->mSwapAuxValues = mSwapAuxValues;
+    settings->verticalOffset = verticalOffset;
+    settings->findSafeMobPosition = findSafeMobPosition;
     return settings;
 }
 
@@ -130,8 +134,11 @@ StructurePlaceSettings* StructurePlaceSettings::setIgnoreBlock(Block* block)
 
 StructurePlaceSettings* StructurePlaceSettings::setBoundingBox(BoundingBox* box)
 {
-    delete mBoundingBox;
-    mBoundingBox = new BoundingBox(box);
+    if (mBoundingBox != box)
+    {
+        delete mBoundingBox;
+        mBoundingBox = box ? new BoundingBox(box) : nullptr;
+    }
     return this;
 }
 
@@ -172,9 +179,10 @@ Random* StructurePlaceSettings::getRandom(const BlockPos* position, bool& genera
     {
         return new Random(System::processTimeInMilliSecs());
     }
-    int x = position->x;
-    int z = position->z;
-    return new Random(static_cast<int>(x * x * 4987142 + x * 5947611 + z * z * 4392871 + z * 389711 ^ 987234911));
+    const auto x = static_cast<unsigned int>(position->x);
+    const auto z = static_cast<unsigned int>(position->z);
+    const auto seed = (x * x * 4987142u + x * 5947611u + z * z * 4392871u + z * 389711u) ^ 987234911u;
+    return new Random(static_cast<int>(seed));
 }
 
 float StructurePlaceSettings::getIntegrity()

@@ -1,21 +1,89 @@
 #include "game/ui/UIScene_FurnaceMenu.hpp"
-#include "game/core/StringIds.hpp"
 
+#include <cstring>
+
+#include "game/core/StringIds.hpp"
+#include "game/core/ExtraStrings.hpp"
+#include "game/core/InteractionObject.hpp"
+#include "game/client/render/Renderer.hpp"
+#include "game/client/render/Tesselator.hpp"
+
+#include "game/core/BufferBuilder.hpp"
 #include "game/core/CConsoleMinecraftApp.hpp"
 #include "game/core/CMinecraftApp.hpp"
+#include "game/core/GlStateManager.hpp"
 #include "game/core/L10N.hpp"
 #include "game/core/Minecraft.hpp"
 #include "game/item/Container.hpp"
 #include "game/item/Inventory.hpp"
+#include "game/item/Item.hpp"
+#include "game/item/ItemInstance.hpp"
+#include "game/item/Items.hpp"
+#include "game/network/ClientboundContainerOpenPacket.hpp"
 #include "game/minigame/Tutorial.hpp"
 #include "game/ui/FurnaceMenu.hpp"
+#include "game/ui/CartographyMenu.hpp"
+#include "game/ui/GrindstoneMenu.hpp"
+#include "game/ui/StonecutterMenu.hpp"
+#include "game/ui/LoomMenu.hpp"
 #include "game/ui/UIString.hpp"
 #include "game/ui/fuiFile.hpp"
+#include "game/ui/fuiRect.hpp"
 #include "game/ui/fuiRenderNode.hpp"
 #include "game/world/generation/MultiPlayerGameMode.hpp"
+#include "game/world/generation/MultiplayerLocalPlayer.hpp"
 #include "game/ui/UILayer.hpp"
+#include "game/world/block/Blocks.hpp"
 
 extern CConsoleMinecraftApp gApp;
+
+namespace
+{
+constexpr int HintSize = 12;
+constexpr const char* LoomHintNames[] = {"slot_0", "slot_1", "slot_2"};
+constexpr const char* LoomHints[][HintSize] = {
+    {"............", "..########..", "....####....", "....#..#....", "....#..#....", "....#..#....",
+     "....#..#....", "....#..#....", "....#..#....", "....####....", ".....#......", "............"},
+    {"............", "............", ".......#....", ".....#......", "....###.....", "...#...#....",
+     "..#.....#...", "..#......#..", "..########..", "...######...", "............", "............"},
+    {"............", "............", "....######..", "...##...##..", "...#....#...", "...#.#..#...",
+     "...#.##.#...", "...#.#..#...", "...#...##...", "..######....", "............", "............"},
+};
+static_assert(std::size(LoomHints) == LoomMenu::InputCount && std::size(LoomHintNames) == LoomMenu::InputCount);
+
+void drawLoomHint(const fuiRect& rect, int slot)
+{
+    const float scaleX = (rect.xMax - rect.xMin) / HintSize;
+    const float scaleY = (rect.yMax - rect.yMin) / HintSize;
+    auto* builder = Tesselator::getInstance()->getBuilder();
+    GlStateManager::disableTexture();
+    builder->begin();
+    builder->color(104, 104, 104);
+    for (int row = 0; row < HintSize; ++row)
+    {
+        const auto* pixels = LoomHints[slot][row];
+        const float top = rect.yMin + row * scaleY;
+        const float bottom = top + scaleY;
+        for (int column = 0; column < HintSize;)
+        {
+            if (pixels[column] != '#')
+            {
+                ++column;
+                continue;
+            }
+            const float left = rect.xMin + column * scaleX;
+            do { ++column; } while (column < HintSize && pixels[column] == '#');
+            const float right = rect.xMin + column * scaleX;
+            builder->vertex(right, top, 0);
+            builder->vertex(left, top, 0);
+            builder->vertex(left, bottom, 0);
+            builder->vertex(right, bottom, 0);
+        }
+    }
+    builder->end();
+    GlStateManager::enableTexture();
+}
+}
 
 struct FurnaceMenuData
 {
@@ -38,19 +106,43 @@ UIScene_FurnaceMenu::UIScene_FurnaceMenu(int type, void* data, UILayer* layer)
       m_furnaceArrow()
 {
     FurnaceMenuData* input = static_cast<FurnaceMenuData*>(data);
+    m_container = input->container;
+    auto* interaction = dynamic_cast<InteractionObject*>(m_container.get());
+    const int kind = interaction ? interaction->getTypeId(false) : -1;
+    mCartography = kind == ClientboundContainerOpenPacket::CARTOGRAPHY;
+    mGrindstone = kind == ClientboundContainerOpenPacket::GRINDSTONE;
+    mStonecutter = kind == ClientboundContainerOpenPacket::STONECUTTER;
+    mLoom = kind == ClientboundContainerOpenPacket::LOOM;
     initialiseMovie();
 
-    m_container = input->container;
-    m_furnaceLabel.init(UIString(m_container->getName()));
-    if (!m_container->getName().empty())
-        m_furnaceLabel.init(UIString(m_container->getName()));
-    else
-        m_furnaceLabel.init(UIString(L10N::GetString(IDS_TILE_FURNACE)));
+    const std::wstring name = m_container->getName();
+    int defaultName = IDS_TILE_FURNACE;
+    switch (FurnaceMenu::getKind(m_container))
+    {
+    case FurnaceKind::Smoker: defaultName = IDS_LCE_TILE_SMOKER; break;
+    case FurnaceKind::BlastFurnace: defaultName = IDS_LCE_TILE_BLAST_FURNACE; break;
+    default: break;
+    }
+    if (mCartography)
+        defaultName = IDS_LCE_TILE_CARTOGRAPHY_TABLE;
+    if (mGrindstone)
+        defaultName = IDS_LCE_TILE_GRINDSTONE;
+    if (mStonecutter)
+        defaultName = IDS_LCE_TILE_STONECUTTER;
+    if (mLoom)
+        defaultName = IDS_LCE_LOOM;
+    m_furnaceLabel.init(UIString(name.empty() ? L10N::GetString(defaultName) : name));
 
-    m_ingredientLabel.init(UIString(L10N::GetString(IDS_INGREDIENT)));
-    m_fuelLabel.init(UIString(L10N::GetString(IDS_FUEL)));
-    m_furnaceFire.init(UIString(L""), 0, 0, 0, 0);
-    m_furnaceArrow.init(UIString(L""), 0, 0, 0, 0);
+    m_ingredientLabel.init(UIString(L10N::GetString(mLoom ? IDS_LCE_LOOM_INPUTS
+                                   : mCartography ? IDS_LCE_CARTOGRAPHY_MAP : IDS_INGREDIENT)));
+    const int secondLabel = m_useStonecutterMovie ? IDS_LCE_STONECUTTER_RECIPES : IDS_LCE_STONECUTTER_NEXT;
+    m_fuelLabel.init(UIString(L10N::GetString(mLoom ? IDS_LCE_LOOM_PATTERNS : mCartography ? IDS_LCE_CARTOGRAPHY_MATERIAL
+                                   : mStonecutter ? secondLabel : mGrindstone ? IDS_INGREDIENT : IDS_FUEL)));
+    if (!m_useWorkstationMovie && !m_useStonecutterMovie && !mLoom)
+    {
+        m_furnaceFire.init(UIString(L""), 0, 0, 0, 0);
+        m_furnaceArrow.init(UIString(L""), 0, 0, 0, 0);
+    }
 
     if (Minecraft::GetInstance()->mGameModes[input->player] != 0)
     {
@@ -58,16 +150,30 @@ UIScene_FurnaceMenu::UIScene_FurnaceMenu(int type, void* data, UILayer* layer)
         if (tutorial != 0)
         {
             m_previousTutorialState = tutorial->currentState;
-            tutorial->changeTutorialState(eTutorial_State_FurnaceMenu, this);
+            if (!mCartography && !mGrindstone && !mStonecutter && !mLoom)
+                tutorial->changeTutorialState(eTutorial_State_FurnaceMenu, this);
         }
     }
 
-    FurnaceMenu* menu = new FurnaceMenu(input->inventory, input->container);
-    Initialize(false, input->player, menu, true, 3, IUIScene_AbstractContainerMenu::ESceneSection_FurnaceHotbar,
+    AbstractContainerMenu* menu;
+    if (mCartography)
+        menu = new CartographyMenu(input->inventory,
+                                  Minecraft::GetInstance()->mLocalPlayers[input->player]->mLevel, BlockPos());
+    else if (mGrindstone)
+        menu = new GrindstoneMenu(input->inventory,
+                                 Minecraft::GetInstance()->mLocalPlayers[input->player]->mLevel, BlockPos());
+    else if (mStonecutter)
+        menu = new StonecutterMenu(input->inventory,
+                                   Minecraft::GetInstance()->mLocalPlayers[input->player]->mLevel, BlockPos());
+    else if (mLoom)
+        menu = new LoomMenu(input->inventory, Minecraft::GetInstance()->mLocalPlayers[input->player]->mLevel, BlockPos());
+    else
+        menu = new FurnaceMenu(input->inventory, input->container);
+    Initialize(false, input->player, menu, true, mLoom ? LoomMenu::ResultSlot + 1 : 3, IUIScene_AbstractContainerMenu::ESceneSection_FurnaceHotbar,
                IUIScene_AbstractContainerMenu::ESceneSection_FurnaceMax, false);
-    m_fuelSlot.addSlots(1, 1);
-    m_ingredientSlot.addSlots(0, 1);
-    m_resultSlot.addSlots(2, 1);
+    m_fuelSlot.addSlots(getSectionStartOffset(ESceneSection_FurnaceFuel), getSectionColumns(ESceneSection_FurnaceFuel));
+    m_ingredientSlot.addSlots(0, getSectionColumns(ESceneSection_FurnaceIngredient));
+    m_resultSlot.addSlots(getSectionStartOffset(ESceneSection_FurnaceResult), 1);
     gApp.SetRichPresenceContext(m_playerId, 6);
     delete input;
 }
@@ -85,8 +191,12 @@ int UIScene_FurnaceMenu::getSectionColumns(IUIScene_AbstractContainerMenu::EScen
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceInventory:
         columns = 9;
         break;
-    case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceIngredient:
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceFuel:
+        columns = mLoom ? LoomMenu::PatternSlotCount : m_useStonecutterMovie ? StonecutterMenu::RecipeSlotCount : 1;
+        break;
+    case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceIngredient:
+        columns = mLoom ? LoomMenu::InputCount : 1;
+        break;
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceResult:
         columns = 1;
         break;
@@ -132,7 +242,9 @@ unsigned int UIScene_FurnaceMenu::GetSectionAndSlotInDirection(IUIScene_Abstract
         }
         else if (state == IUIScene_AbstractContainerMenu::ETapState_Down)
         {
-            if (m_smallInventory)
+            if (mLoom)
+                target = IUIScene_AbstractContainerMenu::ESceneSection_FurnaceFuel;
+            else if (m_smallInventory)
                 target = IUIScene_AbstractContainerMenu::ESceneSection_FurnaceHotbar;
             else
                 target = IUIScene_AbstractContainerMenu::ESceneSection_FurnaceInventory;
@@ -297,19 +409,19 @@ int UIScene_FurnaceMenu::getSectionStartOffset(IUIScene_AbstractContainerMenu::E
     switch (section)
     {
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceHotbar:
-        offset = 30;
+        offset = mLoom ? LoomMenu::ResultSlot + 28 : 30;
         break;
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceInventory:
-        offset = 3;
+        offset = mLoom ? LoomMenu::ResultSlot + 1 : 3;
         break;
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceIngredient:
         offset = 0;
         break;
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceFuel:
-        offset = 1;
+        offset = mLoom ? LoomMenu::PatternStart : m_useStonecutterMovie ? StonecutterMenu::RecipeSlotStart : 1;
         break;
     case IUIScene_AbstractContainerMenu::ESceneSection_FurnaceResult:
-        offset = 2;
+        offset = mLoom ? LoomMenu::ResultSlot : 2;
         break;
     default:
         break;
@@ -349,6 +461,52 @@ void UIScene_FurnaceMenu::setSectionSelectedSlot(IUIScene_AbstractContainerMenu:
 unsigned int UIScene_FurnaceMenu::mapElementsAndNames()
 {
     UIScene_AbstractContainerMenu::mapElementsAndNames();
+    if (m_useStonecutterMovie || mLoom)
+    {
+        auto* panel = m_mainPanel.getFuiRenderNode();
+        m_ingredientSlot.setupControl(this, panel, mLoom ? "Inputs" : "Material");
+        m_fuelSlot.setupControl(this, panel, mLoom ? "Patterns" : "Recipes");
+        m_resultSlot.setupControl(this, panel, "Output");
+        m_furnaceLabel.setupControl(this, panel, "Title");
+        m_ingredientLabel.setupControl(this, panel, mLoom ? "InputsLabel" : "MaterialLabel");
+        m_fuelLabel.setupControl(this, panel, mLoom ? "PatternsLabel" : "RecipesLabel");
+        m_controls.insert(m_controls.end(),
+                          {&m_ingredientSlot, &m_fuelSlot, &m_resultSlot, &m_furnaceLabel, &m_ingredientLabel, &m_fuelLabel});
+        return 1;
+    }
+    if (m_useWorkstationMovie)
+    {
+        auto* panel = m_mainPanel.getFuiRenderNode();
+        m_ingredientSlot.setupControl(this, panel, "Ingredient");
+        m_fuelSlot.setupControl(this, panel, "Ingredient2");
+        m_resultSlot.setupControl(this, panel, "Result");
+        m_furnaceLabel.setupControl(this, panel, "TitleText");
+        for (UIControl* control : {static_cast<UIControl*>(&m_ingredientSlot), static_cast<UIControl*>(&m_fuelSlot),
+                                   static_cast<UIControl*>(&m_resultSlot), static_cast<UIControl*>(&m_furnaceLabel)})
+            m_controls.push_back(control);
+        if (mGrindstone)
+        {
+            m_grindstoneCross.setupControl(this, panel, "GrindstoneCross");
+            m_grindstoneCross.setVisible(false);
+            return 1;
+        }
+        m_mapName.setupControl(this, panel, "MapNameText");
+        m_mapStatus.setupControl(this, panel, "MapStatusText");
+        m_controls.push_back(&m_mapName);
+        m_controls.push_back(&m_mapStatus);
+        const char* previews[] = {"Map_Map", "Map_Zoom", "Map_Copy", "Map_Locked", "Map_Empty"};
+        for (size_t i = 0; i < m_mapPreviews.size(); ++i)
+        {
+            m_mapPreviews[i].setupControl(this, panel, previews[i]);
+            m_mapPreviews[i].setVisible(i == 0);
+        }
+        UIControl nameEditor;
+        if (nameEditor.setupControl(this, panel, "MapTextInput"))
+            nameEditor.setVisible(false);
+        m_mapName.init(UIString(L""));
+        m_mapStatus.init(UIString(L""));
+        return 1;
+    }
     fuiRenderNode* currentNode = m_movie->getRootNode();
     {
         fuiRenderNode* parentNode = currentNode;
@@ -379,6 +537,8 @@ unsigned int UIScene_FurnaceMenu::mapElementsAndNames()
         }
         {
             m_furnaceFire.setupControl(this, currentNode, std::string("FurnaceFire"));
+            if (mCartography || mGrindstone || mStonecutter)
+                m_furnaceFire.setVisible(false);
             m_controls.push_back(&m_furnaceFire);
         }
         {
@@ -392,20 +552,97 @@ unsigned int UIScene_FurnaceMenu::mapElementsAndNames()
 
 std::wstring UIScene_FurnaceMenu::getMoviePath()
 {
-    return gApp.GetLocalPlayerCount() > 1 ? std::wstring(L"FurnaceMenuSplit") : std::wstring(L"FurnaceMenu");
+    const bool split = gApp.GetLocalPlayerCount() > 1;
+    if (mLoom)
+        return split ? L"LoomMenuSplit" : L"LoomMenu";
+    if (mStonecutter)
+    {
+        const std::wstring movie = split ? L"StonecutterMenuSplit" : L"StonecutterMenu";
+        m_useStonecutterMovie = gApp.hasArchiveFile(movie + (gRenderer->IsWidescreen() ? L"720.fui" : L"480.fui"), false);
+        if (m_useStonecutterMovie)
+            return movie;
+    }
+    std::wstring workstation = mGrindstone ? L"GrindstoneMenu" : L"CartographyMenu";
+    if (split)
+        workstation += L"Split";
+    m_useWorkstationMovie = (mCartography || mGrindstone) && gApp.hasArchiveFile(
+        workstation + (gRenderer->IsWidescreen() ? L"720.fui" : L"480.fui"), false);
+    if (m_useWorkstationMovie)
+        return workstation;
+    return split ? L"FurnaceMenuSplit" : L"FurnaceMenu";
 }
 
 void UIScene_FurnaceMenu::handleReload()
 {
-    Initialize(true, m_playerId, m_menu, true, 3, IUIScene_AbstractContainerMenu::ESceneSection_FurnaceHotbar,
+    Initialize(true, m_playerId, m_menu, true, mLoom ? LoomMenu::ResultSlot + 1 : 3, IUIScene_AbstractContainerMenu::ESceneSection_FurnaceHotbar,
                IUIScene_AbstractContainerMenu::ESceneSection_FurnaceMax, false);
-    m_fuelSlot.addSlots(1, 1);
-    m_ingredientSlot.addSlots(0, 1);
-    m_resultSlot.addSlots(2, 1);
+    m_fuelSlot.addSlots(getSectionStartOffset(ESceneSection_FurnaceFuel), getSectionColumns(ESceneSection_FurnaceFuel));
+    m_ingredientSlot.addSlots(0, getSectionColumns(ESceneSection_FurnaceIngredient));
+    m_resultSlot.addSlots(getSectionStartOffset(ESceneSection_FurnaceResult), 1);
+    updateWorkstationMovie();
+}
+
+void UIScene_FurnaceMenu::updateWorkstationMovie()
+{
+    if (!m_useWorkstationMovie)
+        return;
+    if (mGrindstone)
+    {
+        const bool hasInput = m_menu->getSlot(0)->hasItem() || m_menu->getSlot(1)->hasItem();
+        m_grindstoneCross.setVisible(hasInput && !m_menu->getSlot(2)->hasItem());
+    }
+    else
+        updateMapPreview();
+}
+
+void UIScene_FurnaceMenu::updateMapPreview()
+{
+    const auto map = m_menu->getSlot(0)->getItem();
+    const auto material = m_menu->getSlot(1)->getItem();
+    const auto result = m_menu->getSlot(2)->getItem();
+    size_t preview = 0;
+    if (result->getItem() == Items::map)
+        preview = 4;
+    else if (result->getItem() == Items::filledMap)
+    {
+        if (material->getItem() == Items::paper)
+            preview = 1;
+        else if (material->getItem() == Items::map)
+            preview = 2;
+        else if (material->getItem() == Item::byBlock(Blocks::glass_pane))
+            preview = 3;
+    }
+    for (size_t i = 0; i < m_mapPreviews.size(); ++i)
+        m_mapPreviews[i].setVisible(i == preview);
+    const int labels[] = {0, IDS_LCE_CARTOGRAPHY_ZOOM, IDS_LCE_CARTOGRAPHY_COPY,
+                          IDS_LCE_CARTOGRAPHY_LOCK, IDS_LCE_CARTOGRAPHY_EMPTY};
+    m_mapStatus.setLabel(UIString(preview ? L10N::GetString(labels[preview]) : L""), true, false);
+    if (map->getItem() == Items::filledMap)
+        m_mapName.setLabel(UIString(map->getHoverName()), true, false);
+    else
+        m_mapName.setLabel(UIString(L""), true, false);
 }
 
 void UIScene_FurnaceMenu::tick()
 {
+    if (mLoom)
+    {
+        const int selected = static_cast<LoomMenu*>(m_menu)->getSelectedPattern();
+        for (int i = 0; i < LoomMenu::PatternsPerPage; ++i)
+            m_fuelSlot.setSlotHighlighted(i, i == selected);
+    }
+    if (m_useStonecutterMovie)
+    {
+        const int selected = static_cast<StonecutterMenu*>(m_menu)->getSelectedRecipe();
+        for (int i = 0; i < StonecutterMenu::RecipeSlotCount; ++i)
+            m_fuelSlot.setSlotHighlighted(i, i == selected);
+    }
+    if (mCartography || mGrindstone || mStonecutter || mLoom)
+    {
+        updateWorkstationMovie();
+        UIScene_AbstractContainerMenu::tick();
+        return;
+    }
     if (m_furnaceFire.getMax() != m_container->getContainerData(1))
     {
         m_furnaceFire.setMax(m_container->getContainerData(1));
@@ -419,6 +656,28 @@ void UIScene_FurnaceMenu::tick()
     m_furnaceFire.setProgress(m_container->getContainerData(0));
     m_furnaceArrow.setProgress(m_container->getContainerData(2));
     UIScene_AbstractContainerMenu::tick();
+}
+
+void UIScene_FurnaceMenu::customDraw(const char* name, fuiRect* rect)
+{
+    if (mLoom)
+    {
+        const auto* minecraft = Minecraft::GetInstance();
+        if (minecraft->mLocalPlayers[m_playerId] && minecraft->mGameModes[m_playerId])
+        {
+            for (int slot = 0; slot < LoomMenu::InputCount; ++slot)
+            {
+                if (std::strcmp(name, LoomHintNames[slot]) == 0 && !m_menu->getSlot(slot)->hasItem()
+                    && m_menu->GetQuickCraftItem(m_playerId, slot)->isEmpty())
+                {
+                    m_slotDrawPending = true;
+                    drawLoomHint(*rect, slot);
+                    return;
+                }
+            }
+        }
+    }
+    UIScene_AbstractContainerMenu::customDraw(name, rect);
 }
 
 UIControl* UIScene_FurnaceMenu::getSection(IUIScene_AbstractContainerMenu::ESceneSection section)
@@ -449,6 +708,23 @@ UIControl* UIScene_FurnaceMenu::getSection(IUIScene_AbstractContainerMenu::EScen
 
 void UIScene_FurnaceMenu::handleSectionClick(IUIScene_AbstractContainerMenu::ESceneSection)
 {
+}
+
+void UIScene_FurnaceMenu::handleSlotListClicked(IUIScene_AbstractContainerMenu::ESceneSection section, int buttonNum,
+                                               int quickKeyHeld)
+{
+    if ((!mStonecutter && !mLoom) || section != IUIScene_AbstractContainerMenu::ESceneSection_FurnaceFuel)
+    {
+        UIScene_AbstractContainerMenu::handleSlotListClicked(section, buttonNum, quickKeyHeld);
+        return;
+    }
+    auto* minecraft = Minecraft::GetInstance();
+    auto player = minecraft->mLocalPlayers[m_playerId];
+    const int recipe = mLoom ? getCurrentIndex(section) - LoomMenu::PatternStart
+        : m_useStonecutterMovie ? getCurrentIndex(section) - StonecutterMenu::RecipeSlotStart
+                                            : StonecutterMenu::NextRecipe;
+    if (m_menu->clickMenuButton(player, recipe))
+        minecraft->mGameModes[m_playerId]->handleInventoryButtonClick(m_menu->m_containerId, recipe);
 }
 
 int UIScene_FurnaceMenu::getSceneType()

@@ -22,6 +22,18 @@
 #include "game/world/Level.hpp"
 #include "game/world/block/BlockPos.hpp"
 #include "game/world/generation/Player.hpp"
+#include "game/world/generation/Villager.hpp"
+
+namespace
+{
+bool isProtectedVillager(Mob* attacker, const boost::shared_ptr<LivingEntity>& target)
+{
+    if (!eTYPE_DERIVED_FROM(EntityType::ABSTRACT_ILLAGER, attacker->GetType()))
+        return false;
+    auto* villager = dynamic_cast<Villager*>(target.get());
+    return villager && villager->isBaby();
+}
+}
 
 TargetGoal::TargetGoal(PathfinderMob* mob, bool mustSee) : Goal()
 {
@@ -54,7 +66,7 @@ bool TargetGoal::canContinueToUse()
     if (!target)
         return false;
 
-    if (!target->isAlive())
+    if (!target->isAlive() || isProtectedVillager(mMob, target))
         return false;
 
     if (eTYPE_DERIVED_FROM(EntityType::WITHER_SKELETON, mMob->GetType()))
@@ -128,7 +140,7 @@ bool TargetGoal::canAttack(Mob* mob, boost::shared_ptr<LivingEntity> target, boo
     if (target == mob->shared_from_this())
         return false;
 
-    if (!target->isAlive())
+    if (!target->isAlive() || isProtectedVillager(mob, target))
         return false;
 
     if (!mob->canAttackType(target->GetType()))

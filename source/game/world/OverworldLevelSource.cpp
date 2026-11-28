@@ -33,6 +33,7 @@
 #include "game/world/generation/MonsterRoomFeature.hpp"
 #include "game/world/generation/OceanMonumentFeature.hpp"
 #include "game/world/generation/OceanRuinFeature.hpp"
+#include "game/world/generation/PillagerOutpostFeature.hpp"
 #include "game/world/generation/RandomScatteredLargeFeature.hpp"
 #include "game/world/generation/ShipwreckFeature.hpp"
 #include "game/world/generation/StrongholdFeature.hpp"
@@ -55,8 +56,10 @@ OverworldLevelSource::OverworldLevelSource(Level* level, long long seed, bool ge
     mCaves = new LargeCaveFeature();
     mStronghold = new StrongholdFeature();
     mVillage = new VillageFeature(level->getLevelData()->getXZSize());
+    mVillage->setTerrainSource(this);
     mMineshaft = new MineShaftFeature();
     mTemple = new RandomScatteredLargeFeature();
+    mTemple->setTerrainSource(this);
     mRavines = new CanyonFeature();
     mUnderwaterCaves = new UnderwaterLargeCaveFeature();
     mUnderwaterRavines = new UnderwaterCanyonFeature();
@@ -65,6 +68,7 @@ OverworldLevelSource::OverworldLevelSource(Level* level, long long seed, bool ge
     mBuriedTreasure = new BuriedTreasureFeature(level->getLevelData()->getXZSize());
     mShipwreck = new ShipwreckFeature(this, mMonument);
     mOceanRuin = new OceanRuinFeature();
+    mOceanRuin->setTerrainSource(this);
     mRandom = Random(seed);
     mPopulationRandom = Random(seed);
     mMinLimitNoise = new PerlinNoise(&mRandom, 16);
@@ -108,6 +112,7 @@ OverworldLevelSource::OverworldLevelSource(Level* level, long long seed, bool ge
         mSettings = new CustomizableSourceSettings(builder);
     }
     delete builder;
+    mOutpost = new PillagerOutpostFeature(this, mSettings->useVillages);
 }
 
 OverworldLevelSource::~OverworldLevelSource()
@@ -124,6 +129,7 @@ OverworldLevelSource::~OverworldLevelSource()
     delete mBuriedTreasure;
     delete mShipwreck;
     delete mOceanRuin;
+    delete mOutpost;
     delete mMinLimitNoise;
     delete mMaxLimitNoise;
     delete mMainNoise;
@@ -450,6 +456,7 @@ LevelChunk* OverworldLevelSource::createChunk(int chunkX, int chunkZ)
     }
     if (mGenerateStructures)
     {
+        mOutpost->apply(mLevel, chunkX, chunkZ, &primer);
         if (mSettings->useMineShafts)
         {
             PIXBeginNamedEvent(0.0f, "Applying mineshafts");
@@ -588,9 +595,11 @@ void OverworldLevelSource::postProcess(int chunkX, int chunkZ)
                               ^ mLevel->getSeed());
     ChunkPos chunkPos(chunkX, chunkZ);
     bool villageGenerated = false;
+    bool outpostGenerated = false;
     PIXBeginNamedEvent(0.0f, "Structure postprocessing");
     if (mGenerateStructures)
     {
+        outpostGenerated = mOutpost->postProcess(mLevel, mPopulationRandom, &chunkPos);
         if (mSettings->useMineShafts)
             mMineshaft->postProcess(mLevel, mPopulationRandom, &chunkPos);
         if (mSettings->useVillages)
@@ -612,7 +621,8 @@ void OverworldLevelSource::postProcess(int chunkX, int chunkZ)
     }
     PIXEndNamedEvent();
     PIXBeginNamedEvent(0.0f, "Lakes");
-    if (biome != Biome::DESERT && biome != Biome::DESERT_HILLS && mSettings->useWaterLakes && !villageGenerated
+    if (biome != Biome::DESERT && biome != Biome::DESERT_HILLS && mSettings->useWaterLakes
+        && !villageGenerated && !outpostGenerated
         && mPopulationRandom.nextInt(mSettings->waterLakeChance) == 0)
     {
         const int x = mPopulationRandom.nextInt(16) + 8;
@@ -683,6 +693,8 @@ std::vector<Biome::MobSpawnerData*>* OverworldLevelSource::getMobsAt(MobCategory
     Biome* biome = mLevel->getBiome(pos);
     if (mGenerateStructures)
     {
+        if (category == MobCategory::MONSTER && mOutpost->isPatrolArea(mLevel, pos))
+            return mOutpost->getEnemies();
         if ((category == MobCategory::MONSTER || category == MobCategory::SLIME) && mTemple->isSwamphut(pos))
         {
             return mTemple->getSwamphutEnemies();
@@ -700,6 +712,8 @@ bool OverworldLevelSource::isPosInFeature(Level*, const std::wstring& feature, c
 {
     if (!mGenerateStructures)
         return false;
+    if (feature == LargeFeature::PILLAGER_OUTPOST)
+        return mOutpost->isPatrolArea(mLevel, pos);
     if (LargeFeature::STRONGHOLD == feature && mStronghold != NULL)
         return mStronghold->isInsideFeature(pos);
     if (LargeFeature::SHIPWRECK == feature && mShipwreck != NULL)
@@ -724,6 +738,8 @@ BlockPos* OverworldLevelSource::findNearestMapFeature(Level* level, const std::w
 {
     if (!mGenerateStructures)
         return NULL;
+    if (feature == LargeFeature::PILLAGER_OUTPOST)
+        return mOutpost->getNearestGeneratedFeature(level, pos, takeBlock);
     if (LargeFeature::STRONGHOLD == feature && mStronghold != NULL)
         return mStronghold->getNearestGeneratedFeature(level, pos, takeBlock);
     if (LargeFeature::SHIPWRECK == feature && mShipwreck != NULL)
@@ -745,10 +761,12 @@ BlockPos* OverworldLevelSource::findNearestMapFeature(Level* level, const std::w
     return NULL;
 }
 
-void OverworldLevelSource::recreateLogicStructuresForChunk(LevelChunk*, int chunkX, int chunkZ)
+void OverworldLevelSource::recreateLogicStructuresForChunk(LevelChunk* chunk, int chunkX, int chunkZ)
 {
     if (!mGenerateStructures)
         return;
+    if (chunk)
+        mOutpost->updateLoadedBanners(mLevel, *chunk);
     if (mSettings->useMineShafts)
         mMineshaft->apply(mLevel, chunkX, chunkZ, NULL);
     if (mSettings->useVillages)

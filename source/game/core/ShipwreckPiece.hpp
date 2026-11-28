@@ -18,6 +18,7 @@ class ShipwreckPiece : public StructurePiece
 public:
     ShipwreckPiece(Level* level, GenericOverworldLevelSource* levelSource, int x, int z, Random& random,
                    const Direction* orientation);
+    static StructurePiece* Create();
 
     static int GetNonUpsideDownShipwreckType(Random& random);
     static bool IsUpsideDownShipwreckType(int type);
@@ -28,6 +29,7 @@ public:
     virtual EStructurePiece GetType();
 
 private:
+    ShipwreckPiece() = default;
     Rotation* mRotation;
     int mType;
     int mNonUpsideDownType;

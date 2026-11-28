@@ -51,7 +51,9 @@ public:
         EMobEffectIcon_Luck,
         EMobEffectIcon_Unluck,
         EMobEffectIcon_SlowFalling = 26,
-        EMobEffectIcon_ConduitPower
+        EMobEffectIcon_ConduitPower,
+        EMobEffectIcon_BadOmen,
+        EMobEffectIcon_HeroOfTheVillage
     };
 
     static MappedRegistry<ResourceLocation, MobEffect*>* mobEffectRegistry;

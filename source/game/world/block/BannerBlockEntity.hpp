@@ -42,6 +42,7 @@ public:
     std::vector<const BannerPattern*>* getPatterns();
     std::vector<const DyeColor*>* getColors();
     std::wstring getTextureHashName();
+    bool isIllagerBanner() const { return mIsIllagerBanner; }
     static void fjAddPatternToItem(const not_null_ptr<ItemInstance>& item, const BannerPattern* pattern,
                                    const DyeColor* color);
     static void removeLastPattern(not_null_ptr<ItemInstance> item);
@@ -61,6 +62,7 @@ private:
     const DyeColor* mBaseColor;
     ListTag* mPatterns;
     bool mPatternDataSet;
+    bool mIsIllagerBanner = false;
     std::vector<const BannerPattern*>* mPatternList;
     std::vector<const DyeColor*>* mColorList;
     std::wstring mTextureHashName;

@@ -32,6 +32,7 @@ public:
     static const std::wstring TEXTURE_BOTTOM;
     static const std::wstring TEXTURE_WATER;
     static AbstractProperty<int>* LEVEL;
+    static constexpr int LavaLevel = 7;
 
     CauldronBlock();
     virtual boost::shared_ptr<BlockEntity> newBlockEntity(Level*, int);
@@ -40,6 +41,7 @@ public:
     virtual const AABB* getShape(const BlockState*, LevelSource*, const BlockPos&);
     virtual bool isSolidRender(const BlockState*) const;
     virtual bool isCubeShaped(const BlockState*);
+    int getLightEmission(const BlockState*) override;
     virtual void entityInside(Level*, const BlockPos&, const BlockState*, const boost::shared_ptr<Entity>&);
     virtual bool TestUse();
     void useInventory(boost::shared_ptr<Player>, not_null_ptr<ItemInstance>, not_null_ptr<ItemInstance>, int);

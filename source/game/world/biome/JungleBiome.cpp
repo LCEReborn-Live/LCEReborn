@@ -6,6 +6,7 @@
 #include "game/world/Level.hpp"
 #include "game/world/biome/BiomeDecorator.hpp"
 #include "game/world/block/Block.hpp"
+#include "game/world/block/BambooBlock.hpp"
 #include "game/world/block/BlockPos.hpp"
 #include "game/world/block/Blocks.hpp"
 #include "game/world/block/OldLeafBlock.hpp"
@@ -35,7 +36,7 @@ JungleBiome::JungleBiome(EBiomeIDs biomeId, bool isEdge, BiomeProperties* proper
     }
     else
     {
-        mDecorator->treesPerChunk = 50;
+        mDecorator->treesPerChunk = biomeId == eBiomeIDs_BambooJungle ? 16 : 50;
     }
     mDecorator->grassPerChunk = 25;
     mDecorator->flowersPerChunk = 4;
@@ -43,6 +44,7 @@ JungleBiome::JungleBiome(EBiomeIDs biomeId, bool isEdge, BiomeProperties* proper
     if (!isEdge)
     {
         mMonsters.push_back(new MobSpawnerData(2, EntityType::OCELOT, 1, 1));
+        mCreatures.push_back(new MobSpawnerData(biomeId == eBiomeIDs_BambooJungle ? 70 : 2, EntityType::PANDA, 1, 2));
     }
     mCreatures.push_back(new MobSpawnerData(40, EntityType::PARROT, 1, 2));
     mCreatures.push_back(new MobSpawnerData(10, EntityType::CHICKEN, 4, 4));
@@ -109,6 +111,18 @@ void JungleBiome::decorate(Level* level, Random& random, const BlockPos& pos)
         vines.place(level, random, pos.offset(vineX, 64, vineZ));
     }
     PIXEndNamedEvent();
+
+    const bool denseBamboo = id == eBiomeIDs_BambooJungle;
+    const int attempts = denseBamboo ? 40 : random.nextInt(mIsEdge ? 16 : 5) == 0 ? 7 : 0;
+    auto* bamboo = static_cast<BambooBlock*>(Blocks::bamboo);
+    for (int i = 0; i < attempts; ++i)
+    {
+        const int x = random.nextInt(16) + 8;
+        const int z = random.nextInt(16) + 8;
+        const BlockPos base = level->getHeightmapPos(pos.offset(x, 0, z));
+        if (level->getBiome(base)->getBaseClass() == eBiomeBaseClass_Jungle)
+            bamboo->placeStalk(level, base, 5 + random.nextInt(12));
+    }
 }
 
 Biome::EBiomeBaseClass JungleBiome::getBaseClass()

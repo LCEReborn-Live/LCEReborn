@@ -40,7 +40,7 @@ without replacing locally earned progress.
 `LCERebornServer` runs a world with no window. Releases provide separate Windows ZIP and Linux tar.gz server downloads; it also remains in the full portable client package. See [dedicated server setup](dedicated-server.md) for headless installation and startup.
 
 - **Windows:** run it from the package folder.
-- **Linux:** run it from the tar.gz, not the AppImage, with `--content-dir ~/.local/share/LCEReborn/assets`.
+- **Linux:** extract the tar.gz and run it from the package folder, using its bundled `assets/` directory. The AppImage starts the launcher only.
 
 The first start writes `server.properties` to the saves folder. Edit it and restart to apply changes. Useful settings:
 

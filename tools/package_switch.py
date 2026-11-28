@@ -16,8 +16,6 @@ CLIENT_ROOT = "LCEReborn"
 OUTPUT_ROOT = f"switch/{CLIENT_ROOT}"
 REQUIRED_CLIENT_FILES = {
     "LCEReborn.nro",
-    "packs/1.14 Texture Pack/TexturePack.pck",
-    "packs/1.14 Texture Pack/Data/x16Data.pck",
     "resources/experimental/shield_base_1_14.png",
     "resources/experimental/shield_icon.png",
 }

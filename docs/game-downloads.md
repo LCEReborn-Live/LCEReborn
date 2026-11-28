@@ -1,4 +1,17 @@
-# First-run game data installation
+# Bundled game data
+
+Release packages include the complete prepared `assets/` directory: menus,
+textures, sounds, DLC and local structure templates. Start the launcher and
+play; no separate game-data download or import is needed. Windows installers
+include this directory, and Linux tar.gz and AppImage packages use the assets
+beside the launcher, keeping saves and profiles in the user's data directory.
+
+Packaging verifies every file against `assets/.bundle-manifest.json` and fails
+if content is missing or changed. After intentionally updating the assets, run
+`python tools/bundled_assets.py --write-manifest` and commit the content and
+manifest together. The separate 1.14 Texture Pack is no longer bundled.
+
+## Recovery and source-only builds
 
 The launcher offers **Download & install** alongside the existing local-folder
 import. The automatic path downloads the base game and Update 688, checks each
@@ -32,9 +45,9 @@ both extraction and the subsequent import.
 
 ## Village & Pillage resources
 
-The PC packages run with the standard Wii U data installed by the launcher.
-For the PlayStation 4 textures, models, and menus, prepare a separate copy of
-that data and import the `Common` folder from your PS4 1.95 update dump.
+The PC packages already contain the prepared Village & Pillage resources.
+To update them from another PS4 1.95 dump during development, import its
+`Common` folder into a separate prepared data directory:
 
 ```sh
 python tools/import_common_update.py --common /path/to/ps4-update/Common \

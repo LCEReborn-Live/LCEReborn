@@ -6,13 +6,16 @@ Release builds produce two dedicated-server downloads in addition to the client:
 - `LCEReborn-Live-Server-Linux-VERSION.tar.gz`
 
 They contain the existing `LCERebornServer` executable, a startup script, bundled
-packs, a headless asset preparation tool, and dependency licenses. They omit the
+prepared game assets, a headless asset preparation tool, and dependency licenses. They omit the
 launcher, Qt, Node.js, account sessions, game dumps, saved worlds and logs. The
 server also remains in the full portable client package for compatibility.
 
 ## Game data
 
-Run `start-server.cmd` (Windows) or `./start-server.sh` (Linux). If game data is
+Run `start-server.cmd` (Windows) or `./start-server.sh` (Linux). Prepared game
+data is included in `assets/`, so normal startup needs no download or import.
+The following preparation tools are only for recovery or source-only builds.
+If game data is
 missing, it automatically downloads the base game and Update 688, verifies their
 SHA-256 checksums, extracts them and imports the merged content into `assets/`.
 Subsequent starts reuse that folder. Allow at least **10 GB of free disk space**
@@ -34,9 +37,9 @@ It does not install Python globally or change PATH. Linux requires `python3`;
 on Ubuntu/Debian, install it with `sudo apt install python3` if missing.
 
 You can instead copy an existing prepared `assets` folder from the launcher
-installation into the server folder. On Linux, launcher data normally lives in
-`~/.local/share/LCEReborn/assets`; on Windows, it lives beside the installed
-launcher. To import already extracted local game dumps without downloading:
+installation into the server folder. Bundled assets live beside the launcher
+on both Windows and Linux (inside the AppImage for that distribution).
+To import already extracted local game dumps without downloading:
 
 ```sh
 ./prepare-server.sh --base "/path/to/base" --update "/path/to/update688"

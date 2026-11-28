@@ -25,14 +25,14 @@ def portable_files(archive, system):
     if system == 'windows':
         with zipfile.ZipFile(archive) as package:
             for name in package.namelist():
-                if name == 'LCERebornServer.exe' or name == 'third_party/NOTICES.txt' or name.startswith('packs/'):
+                if name == 'LCERebornServer.exe' or name == 'third_party/NOTICES.txt' or name.startswith(('packs/', 'assets/')):
                     if not name.endswith('/'):
                         selected[name] = package.read(name)
     else:
         with tarfile.open(archive) as package:
             for member in package:
                 name = member.name.removeprefix('LCEReborn/')
-                if name == 'LCERebornServer' or name == 'third_party/NOTICES.txt' or name.startswith('packs/'):
+                if name == 'LCERebornServer' or name == 'third_party/NOTICES.txt' or name.startswith(('packs/', 'assets/')):
                     if member.isfile():
                         selected[name] = package.extractfile(member).read()
     if any(name.startswith('/') or '..' in name.split('/') or '\\' in name for name in selected):
@@ -62,6 +62,7 @@ def package_portable(archive, system, source, version, output):
             raise common.PackageError('The Linux server has no glibc version information')
         glibc = max((value.decode() for value in versions), key=lambda value: tuple(map(int, value.split('.'))))
     entries = [(binary_name, binary)]
+    entries.extend((name, data) for name, data in sorted(files.items()) if name.startswith('assets/'))
     entries.extend((name, data) for name, data in sorted(files.items()) if name.startswith('packs/') and name.endswith('.pck'))
     for file, relative in package_server.setup_files(system):
         entries.append((relative, Path(file).read_bytes()))

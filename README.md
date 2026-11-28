@@ -38,10 +38,10 @@
 Hosting a world? Separate **Windows and Linux dedicated-server packages** are also produced for releases. See [server setup](docs/dedicated-server.md).
 
 1. Download the installer, portable archive, or Linux AppImage from the [releases page](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
-2. Start the launcher and choose **Download & install**, or import **your own dumps** of the base game and Update 688.
+2. Start the launcher. All game assets are included; no separate download or import is needed.
 3. Sign in to Live from the launcher, choose a profile, and select **Play**.
 
-The PC launcher prepares game data during first-run setup and stores your saves locally. [Game data installation](docs/game-downloads.md)
+The PC package includes prepared game data and stores your saves locally. [Bundled game data](docs/game-downloads.md)
 
 ### Install on Nintendo Switch or Wii U (Beta)
 
@@ -108,10 +108,10 @@ LCEReborn code is licensed under the [GNU GPL v3 or later](LICENSE). Third-party
 Для хостинга мира также собираются отдельные **dedicated-серверы для Windows и Linux**. Подробнее: [настройка сервера](docs/dedicated-server.md).
 
 1. Скачайте установщик, portable-архив или Linux AppImage со [страницы релизов](https://github.com/LCEReborn-Live/LCEReborn/releases/latest).
-2. Запустите лаунчер и выберите **Download & install** или импортируйте **собственные дампы** базовой игры и Update 688.
+2. Запустите лаунчер. Все игровые ассеты уже включены; отдельное скачивание или импорт не нужны.
 3. Войдите в Live через кнопку в лаунчере, выберите профиль и нажмите **Play**.
 
-При первом запуске лаунчер подготовит игровые данные. Сохранения хранятся локально. [Установка игровых данных](docs/game-downloads.md)
+Игровые данные уже включены в сборку. Сохранения хранятся локально. [Игровые ассеты](docs/game-downloads.md)
 
 ### Установка на Nintendo Switch и Wii U (Beta)
 

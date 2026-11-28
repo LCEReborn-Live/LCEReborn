@@ -4,7 +4,7 @@
     python tools/package_server.py --build build/pc
 
 Windows produces a ZIP; Linux produces a tar.gz. Neither includes the launcher,
-Qt, Node.js, game dumps, account files, configuration or saved worlds.
+Qt, Node.js, account files, configuration or saved worlds. Prepared assets are included.
 """
 import argparse
 import io
@@ -22,6 +22,7 @@ def server_files(build, system):
     if not os.path.isfile(binary):
         raise common.PackageError('%s is missing. Build the LCERebornServer target first.' % binary)
     files = [(binary, program)]
+    files.extend(common.bundled_game_files())
     # PC headless hosting does not need interface artwork or Qt resources.
     files.extend(setup_files(system))
     packs = os.path.join(common.ROOT, 'packs')
@@ -96,8 +97,8 @@ def readme(source, system, glibc=None):
             '===========================================\n\n'
             '%s\n'
             'Game data\n---------\n'
-            'Game data is not included. Copy the prepared assets folder from your\n'
-            'launcher installation beside this README. If assets/ is missing,\n'
+            'Game data is included in assets/ and is ready to use. No separate\n'
+            'download or import is needed. If assets/ is removed,\n'
             'start-server automatically runs prepare-server, downloads both game\n'
             'archives, verifies SHA-256, unpacks them and imports the content.\n'
             'You can also run prepare-server separately before starting the server.\n\n'

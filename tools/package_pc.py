@@ -12,8 +12,8 @@ On Linux it also writes the same files as build/LCEReborn-linux-<commit>.AppImag
 which needs appimagetool and the AppImage runtime (tools/build/Dockerfile.linux
 installs both).
 
-Only those files are taken from the build folder, so the game files, saves,
-logs and settings that playing from it leaves there stay out.
+Prepared assets are verified and included from the source tree. Saves, logs,
+settings and stale packs left in the build folder stay out.
 
 The package names the commit it was built from as its source, so the tree
 must have no uncommitted changes and the commit should be pushed before the
@@ -193,10 +193,18 @@ def linux_qt_files(build):
     return files
 
 
+def bundled_game_files():
+    from bundled_assets import verify
+    try:
+        return verify(os.path.join(ROOT, "assets"))
+    except (OSError, ValueError) as error:
+        raise PackageError("Bundled game assets are missing or damaged: %s" % error) from error
+
+
 def program_files(build):
     """The files to package, as (path, name in the package), and the Qt files among them as
     (name in the package, name in Qt's SBOM or None)."""
-    files = []
+    files = bundled_game_files()
     for name in PROGRAMS:
         path = os.path.join(build, name)
         if not os.path.isfile(path):
@@ -212,7 +220,7 @@ def program_files(build):
         for name in sorted(names):
             path = os.path.join(folder, name)
             files.append((path, "resources/" + os.path.relpath(path, resources).replace(os.sep, "/")))
-    packs = os.path.join(build, "packs")
+    packs = os.path.join(ROOT, "packs")
     if os.path.isdir(packs):
         for folder, _, names in os.walk(packs):
             for name in sorted(names):
@@ -525,12 +533,10 @@ def requirements_text(glibc):
 
 def server_text():
     if LINUX:
-        start = ("Set up the game with the launcher first, then start it with --content-dir "
-                 "~/.local/share/LCEReborn/assets to use the content the launcher imported. The AppImage "
-                 "can't start it; use the tar.gz.")
+        start = ("Start it from the extracted package folder to use the bundled assets. "
+                 "The AppImage can't start it; use the tar.gz.")
     else:
-        start = ("Set up the game with the launcher first, then start it from this folder, where it finds "
-                 "the content the launcher imported.")
+        start = "Start it from this folder, where it finds the bundled assets."
     text = ("%s plays a world for others with no window. %s It keeps its worlds, server.properties and "
             "ops.json in saves in the folder it is started from; --save-dir picks another, and one apart "
             "from your own saves is safest. Players join on TCP port 25570, and the server takes commands "
@@ -561,9 +567,9 @@ def readme_text(source, glibc):
             "%s\n\n"
             "A PC build of LCEReborn, the reconstructed source of Minecraft: Wii U\n"
             "Edition. Build %s.\n\n"
-            "This download contains no game content. Start %s:\n"
-            "the first time, choose Download & install, or import your own extracted\n"
-            "base game and Update 688 folders. The imported content is kept in %s"
+            "Game content is included in assets/. Start %s and play;\n"
+            "no separate game download or import is required. Keep assets/ beside\n"
+            "the launcher. User data is kept in %s"
             "%s\n"
             "%s"
             "%s"

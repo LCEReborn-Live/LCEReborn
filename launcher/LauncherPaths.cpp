@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
 
 namespace LauncherPaths
@@ -23,6 +24,9 @@ QString DataDir()
 
 QString AssetsDir()
 {
+    const QString bundled = InstallDir() + "/assets";
+    if (QFileInfo(bundled + "/Common/Media/MediaWiiU.arc").isFile())
+        return bundled;
     return DataDir() + "/assets";
 }
 

@@ -33,6 +33,10 @@ Source: "..\build\installer-files\*"; DestDir: "{app}"; Flags: ignoreversion rec
 Name: "{autoprograms}\LCEReborn Live"; Filename: "{app}\LCERebornLauncher.exe"
 Name: "{autodesktop}\LCEReborn Live"; Filename: "{app}\LCERebornLauncher.exe"; Tasks: desktopicon
 
+[InstallDelete]
+Type: files; Name: "{app}\packs\1.14 Texture Pack\TexturePack.pck"
+Type: files; Name: "{app}\packs\1.14 Texture Pack\Data\x16Data.pck"
+
 [Run]
 Filename: "{app}\LCERebornLauncher.exe"; Description: "Launch LCEReborn Live"; Flags: postinstall nowait skipifsilent
 

@@ -2,6 +2,7 @@
 
 #include <QDesktopServices>
 #include <QDir>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QMessageBox>
@@ -10,6 +11,7 @@
 #include <QVBoxLayout>
 
 #include "ProfileDialog.hpp"
+#include "LauncherPaths.hpp"
 #include "Profiles.hpp"
 #include "Skins.hpp"
 #include "Widgets.hpp"
@@ -29,6 +31,7 @@ ProfilesTab::ProfilesTab(ProfileStore& store, QWidget* parent)
     auto* editButton = new QPushButton("Edit", this);
     auto* openButton = new QPushButton("Open game folder", this);
     auto* reimportButton = new QPushButton("Re-import game files", this);
+    reimportButton->setVisible(!QFileInfo(LauncherPaths::InstallDir() + "/assets/.bundle-manifest.json").isFile());
     auto* browserJoins = new QPushButton("Enable browser joins", this);
     browserJoins->setToolTip("Allow lcereborn.xyz to open this launcher for game invitations and world joins.");
     auto* buttons = new QHBoxLayout;

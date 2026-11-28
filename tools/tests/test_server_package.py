@@ -26,6 +26,8 @@ class ServerPackageTest(unittest.TestCase):
         self.root = Path(self.temporary.name).resolve()
         self.build = self.root / 'build'
         self.build.mkdir()
+        self.asset = self.root / 'bundled.arc'
+        self.asset.write_bytes(b'bundled game data')
         for name in ('LCERebornServer.exe', 'LCERebornServer'):
             (self.build / name).write_bytes(b'server fixture')
         for name in ('LCERebornLauncher.exe', 'Qt6Core.dll', 'server.properties', 'launcher.ini'):
@@ -41,6 +43,8 @@ class ServerPackageTest(unittest.TestCase):
 
     def package(self, system):
         with patch.object(package_server.common, 'game_components', return_value=[]), \
+             patch.object(package_server.common, 'bundled_game_files',
+                          return_value=[(str(self.asset), 'assets/Common/Media/MediaWiiU.arc')]), \
              patch.object(package_server.common, 'glibc_requirement', return_value='2.35'):
             outputs, _ = package_server.package(str(self.build), output_dir=str(self.root), source=SOURCE, system=system)
         return Path(outputs[0])
@@ -53,10 +57,12 @@ class ServerPackageTest(unittest.TestCase):
         self.assertIn('tools/gamedata/shaders.py', names)
         self.assertIn('LICENSE.txt', names)
         self.assertIn('third_party/NOTICES.txt', names)
+        self.assertIn('assets/Common/Media/MediaWiiU.arc', names)
+        self.assertNotIn('assets/private.json', names)
         for name in names:
             self.assertNotIn('Qt6', name)
             self.assertNotIn('Launcher', name)
-            self.assertFalse(name.startswith(('assets/', 'saves/', 'logs/', 'live/')))
+            self.assertFalse(name.startswith(('saves/', 'logs/', 'live/')))
             self.assertNotIn(name, ('server.properties', 'launcher.ini'))
 
     def test_windows_package_excludes_client_and_user_data(self):
@@ -70,6 +76,7 @@ class ServerPackageTest(unittest.TestCase):
             self.assertIn('tools/python-runtime.json', names)
             self.assertIn(b'prepare-server.cmd', archive.read('start-server.cmd'))
             self.assertEqual(archive.read('LCERebornServer.exe'), b'server fixture')
+            self.assertEqual(archive.read('assets/Common/Media/MediaWiiU.arc'), b'bundled game data')
             self.assertIn(b'cd /d "%~dp0"', archive.read('start-server.cmd'))
             self.assertIn(b'Visual C++', archive.read('README.txt'))
 
@@ -99,11 +106,13 @@ class ServerPackageTest(unittest.TestCase):
             archive.writestr('Qt6Core.dll', b'omit')
             archive.writestr('live/node.exe', b'omit')
             archive.writestr('packs/default/TexturePack.pck', b'pack')
+            archive.writestr('assets/custom-villages/outpost.nbt', b'template')
         target = release_server_artifacts.package_portable(portable, 'windows', SOURCE, '1.2.3', self.root)
         with zipfile.ZipFile(target) as archive:
             self.assertEqual(archive.read('LCERebornServer.exe'), b'existing compiled server')
             self.assertNotIn('Qt6Core.dll', archive.namelist())
             self.assertNotIn('live/node.exe', archive.namelist())
+            self.assertEqual(archive.read('assets/custom-villages/outpost.nbt'), b'template')
             self.assertNotIn(b'Qt details', archive.read('third_party/NOTICES.txt'))
 
     def test_repack_existing_linux_build_sets_executable_permissions(self):
@@ -112,12 +121,14 @@ class ServerPackageTest(unittest.TestCase):
         notice = ('Engine\nLicense: Zlib\n\nQt, in Launcher\nSource: ' + SOURCE['commit']).encode()
         binary = b'\x7fELF existing server GLIBC_2.35\0'
         with tarfile.open(portable, 'w:gz') as archive:
-            for name, data in [('LCEReborn/LCERebornServer', binary), ('LCEReborn/third_party/NOTICES.txt', notice)]:
+            for name, data in [('LCEReborn/LCERebornServer', binary), ('LCEReborn/third_party/NOTICES.txt', notice),
+                               ('LCEReborn/assets/custom-villages/outpost.nbt', b'template')]:
                 member = tarfile.TarInfo(name); member.size = len(data)
                 archive.addfile(member, io.BytesIO(data))
         target = release_server_artifacts.package_portable(portable, 'linux', SOURCE, '1.2.3', self.root)
         with tarfile.open(target) as archive:
             self.assertEqual(archive.extractfile('LCERebornServer/LCERebornServer').read(), binary)
+            self.assertEqual(archive.extractfile('LCERebornServer/assets/custom-villages/outpost.nbt').read(), b'template')
             self.assertEqual(archive.getmember('LCERebornServer/start-server.sh').mode, 0o755)
 
     def make_dump(self, name, version):

@@ -93,9 +93,7 @@ def build_bundle(rpx, update, files):
     content = root.add(wuhb.Dir("content"))
     files = dict(files)
     for relative in ("resources/pc/experimental/shield_base_1_14.png",
-                     "resources/pc/experimental/shield_icon.png",
-                     "packs/1.14 Texture Pack/TexturePack.pck",
-                     "packs/1.14 Texture Pack/Data/x16Data.pck"):
+                     "resources/pc/experimental/shield_icon.png"):
         files[relative.replace("resources/pc/", "resources/", 1)] = os.path.join(ROOT, relative)
     if update is not None:
         for name in META_IMAGES:

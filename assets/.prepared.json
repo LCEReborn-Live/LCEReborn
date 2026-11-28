@@ -1,0 +1,25 @@
+{
+  "prepared_at": "2026-11-21T18:50:46Z",
+  "title_id": "00050000101D9D00",
+  "base_version": 1,
+  "update_version": 688,
+  "executable_sha256": "1469512f0fd7d03eaf73fef34d953d532b22ac2a186ea3ebef190b0e920156ba",
+  "shaders": {
+    "MiiIconDefaultShader.inc": "284ef772e60d297496bb9cd5f083f52348a58302ef8cc2adbf979a8e6e979e78",
+    "MiiIconExtShader.inc": "cae1932f059a9b48e5dd8772fff8620565e753267355bd8fd02a9bfd6bfe9709",
+    "MonitoringCryptoKeys.inc": "ca593920e766f8a56680d26a0fadadd3542168a07e40e64d3e985f4853921345",
+    "NexAccessKey.inc": "d64da6b3ec315beb8b6c00acd76cce7693a68954bf736ded35ef6279f4cea82e",
+    "PeadFloatDigitTable.inc": "9aa81f98c1d5c6ac1f25510dbcd0bbeaebf488ae95ee5f207b44f01d0f7b639f",
+    "PeadSjisCodeTable.inc": "5e9ca1a14310165fb2ec6f87f0cbbc10fc3d73489c85009bbc9e28c0a4934c5f",
+    "PeadSjisIndexTable.inc": "8935725bf7e6851534070170126079f38515498f65293381b517016100c2fcfa",
+    "RendererShaders.inc": "d82edf5e4a1076802f79ddb5f87b64d0363b7bb68f33f4b040e78ece4a9440b2"
+  },
+  "assets": {
+    "files": 1112,
+    "bytes": 1499382353,
+    "from_base": 409,
+    "from_update": 703,
+    "update_overrides": 100,
+    "seconds": 14.6
+  }
+}
